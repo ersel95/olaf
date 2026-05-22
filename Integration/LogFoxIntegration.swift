@@ -21,6 +21,9 @@ import netfox
 #if canImport(PulseUI)
 import PulseUI
 #endif
+#if canImport(LogFoxNetwork)
+import LogFoxNetwork
+#endif
 
 // MARK: - App'e özel log kategorileri (genişletin)
 //
@@ -57,6 +60,11 @@ public final class LogFoxManager {
         // guard Feature.isEnabled(.logFox) else { return }
 
         LogFox.start(.bankingDefault)
+
+        #if canImport(LogFoxNetwork)
+        // Network capture — BaseService/URLSession config'e DOKUNMADAN, SSL kırmadan (swizzle + trust kabul).
+        LogFoxNetwork.startAutomaticCapture()
+        #endif
 
         Task { @MainActor in
             var bridges: [any ExternalToolBridge] = []

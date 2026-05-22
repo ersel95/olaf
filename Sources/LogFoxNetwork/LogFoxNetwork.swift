@@ -56,6 +56,22 @@ public enum LogFoxNetwork {
         URLProtocol.registerClass(LogFoxURLProtocol.self)
     }
 
+    /// **En kolay kurulum (Netfox tarzı) — host networking koduna DOKUNMADAN.**
+    /// `URLSessionConfiguration.default/.ephemeral` swizzle edilerek tüm session'lara (Alamofire dahil)
+    /// otomatik enjekte edilir + shared session için global kayıt yapılır.
+    ///
+    /// SSL: proxy session sunucu trust'ını kabul eder (iç/pinned sertifikalar kırılmaz). **Non-prod debug** için.
+    ///
+    /// ```swift
+    /// // LogFoxManager.initialize() içinde tek satır — BaseService'e dokunmaya gerek yok:
+    /// LogFoxNetwork.startAutomaticCapture()
+    /// ```
+    public static func startAutomaticCapture(_ networkConfiguration: LogFoxNetworkConfiguration = .default) {
+        self.configuration = networkConfiguration
+        URLSessionConfiguration.logfoxEnableAutomaticInjection()
+        URLProtocol.registerClass(LogFoxURLProtocol.self)
+    }
+
     /// Global kaydı kaldırır.
     public static func uninstallGlobally() {
         URLProtocol.unregisterClass(LogFoxURLProtocol.self)

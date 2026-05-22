@@ -144,50 +144,33 @@ LogFox kendi `URLProtocol`'ü ile istek/yanıtları yakalayıp `.network` katego
 geçirerek** (PAN/IBAN/token maskeli) loglar. Böylece app + network logları tek listede görünür; Netfox/Pulse'a
 geçiş butonu derin inceleme için kalır.
 
-Yakalama parametreleri (gövde/header) **default açık** ve **init'te** verilir:
+### ÖNERİLEN: tek satır otomatik capture (networking koduna dokunmadan)
+
+`startAutomaticCapture()`, `URLSessionConfiguration`'ı swizzle ederek **tüm** session'lara (Alamofire dahil)
+protokolü otomatik enjekte eder ve proxy session sunucu trust'ını kabul eder → **SSL/sertifika kırılmaz**.
+`LogFoxManager.initialize()` içinde tek satır; **BaseService'e dokunmaya gerek yok** (drop-in template'te hazır):
 
 ```swift
 import LogFoxNetwork
-
-// A) Custom URLSession/Alamofire config (ÖNERİLEN — BaseService'te NFXProtocol enjeksiyonunun yanına):
-LogFoxNetwork.install(into: sessionConfiguration)   // default config: gövde + header açık
-
-// İsterseniz parametreleri init'te kısın:
-LogFoxNetwork.install(
-    into: sessionConfiguration,
-    with: LogFoxNetworkConfiguration(capturesBodies: false, capturesHeaders: true, maxBodyLength: 8000)
-)
-
-// B) veya URLSession.shared / global istekler için:
-LogFoxNetwork.installGlobally()                     // veya .installGlobally(myConfig)
+LogFoxNetwork.startAutomaticCapture()                                // gövde+header default açık
+LogFoxNetwork.startAutomaticCapture(LogFoxNetworkConfiguration(capturesBodies: false)) // kısmak için
 ```
 
-### Netfox/Pulse ile BİRLİKTE yakalama (zincirleme)
+> **Neden bu yöntem?** Eskiden önerilen `install(into: sessionConfiguration)` yaklaşımı, isteği kendi proxy
+> session'ında yeniden başlattığı için host'un `ServerTrustManager`'ını (pinned/internal sertifika) taşımıyor
+> ve iç UAT sertifikalarında "certificate invalid" hatasıyla **trafiği kırıyordu**. `startAutomaticCapture`
+> hem bu sorunu çözer (trust kabul) hem de BaseService'e dokunmaz.
 
-Aynı session'da iki `URLProtocol` çakışır: ilk yakalayan, isteği kendi temiz session'ında yeniden
-başlatır ve diğeri trafiği göremez. İkisinin de yakalaması için LogFox'u **zincirleyin** — LogFox
-yakalar, sonra isteği zincirlenen protokole (Netfox) devreder:
+### Gelişmiş (opsiyonel): manuel enjeksiyon
 
 ```swift
-LogFoxNetwork.install(into: configuration, chainingTo: [NFXProtocol.self])
-// Akış: istek → LogFox (yakala+redakte) → NFXProtocol (Netfox yakalar) → ağ
+LogFoxNetwork.install(into: sessionConfiguration)          // belirli bir config'e
+LogFoxNetwork.install(into: config, chainingTo: [NFXProtocol.self])  // Netfox ile zincirleme
 ```
 
-> **YapiKredi'de:** `BaseService`'te `NFXProtocol`'ün `configuration.protocolClasses`'a eklendiği yerde,
-> LogFox etkinse NFX'i ana session'a koymak yerine LogFox'a zincirleyin:
-> ```swift
-> if !Feature.isDisabled(.logFox) {
->     LogFoxNetwork.install(into: configuration,
->         chainingTo: !Feature.isDisabled(.netfox) ? [NFXProtocol.self] : [])
-> } else if !Feature.isDisabled(.netfox) {
->     configuration.protocolClasses = [NFXProtocol.self] + (configuration.protocolClasses ?? [])
-> }
-> ```
-> Network kayıtları viewer'da `network` kategori chip'iyle görünür; Netfox switch'i de dolu kalır.
->
 > **Güvenlik:** Gövde/header default açıktır → tüm trafik loglanır. Hepsi `BankingRedactor`'dan geçer
-> (PAN/IBAN/token, `Authorization`/`Cookie` header'ları maskelenir), ancak keyfi JSON'daki her PII
-> garanti yakalanamaz. Daha sıkı istiyorsanız `capturesBodies: false` ile init edin.
+> (PAN/IBAN/token, `Authorization`/`Cookie` header'ları maskelenir), ancak keyfi JSON'daki her PII garanti
+> yakalanamaz. Trust kabulü ve gövde loglama **yalnız non-prod debug** içindir → network capture PROD'da çalışmamalı.
 
 ## 7. Uygulamada loglama — her zaman `LogFoxManager` üzerinden
 

@@ -119,6 +119,23 @@ extension LogFoxURLProtocol: URLSessionDataDelegate {
         client?.urlProtocol(self, didLoad: data)
     }
 
+    /// Sunucu trust challenge'ı: proxy session host'un `ServerTrustManager`'ını (pinned/internal cert)
+    /// taşımadığından, sunucunun sunduğu trust'ı OLDUĞU GİBİ kabul ederiz — aksi halde iç UAT
+    /// sertifikaları "invalid" sayılıp host'un trafiği kırılır. **Yalnız non-prod debug** içindir;
+    /// bu yüzden network capture PROD'da çalıştırılmamalıdır.
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+           let trust = challenge.protectionSpace.serverTrust {
+            completionHandler(.useCredential, URLCredential(trust: trust))
+        } else {
+            completionHandler(.performDefaultHandling, nil)
+        }
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,

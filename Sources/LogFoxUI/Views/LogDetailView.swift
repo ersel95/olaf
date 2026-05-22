@@ -80,7 +80,20 @@ struct LogDetailView: View {
             if let ms = info.durationMs { kv("Süre", "\(ms) ms") }
             if let b = info.requestBytes { kv("İstek boyutu", Formatting.byteCount(b)) }
             if let b = info.responseBytes { kv("Yanıt boyutu", Formatting.byteCount(b)) }
-            if let error = info.error { kv("Hata", error) }
+        }
+
+        if let error = info.error {
+            Section("Hata") {
+                Text(error)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                Button {
+                    logFoxCopy(error, showing: $didCopy)
+                } label: {
+                    Label("Hatayı kopyala", systemImage: "doc.on.doc")
+                }
+            }
         }
 
         Section("İstek") {
