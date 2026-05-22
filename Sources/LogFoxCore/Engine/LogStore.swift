@@ -10,7 +10,7 @@ final class LogStore: @unchecked Sendable {
     private let capacity: Int
     private let redactor: any Redactor
     private let persistence: FilePersistence?
-    private let fileFormatter: any LogFormatter
+    private let exportFormatter: any LogFormatter
     private let osLogMirror: OSLogMirror?
 
     /// Sabit kapasiteli halka tampon (en yeni `capacity` kayıt).
@@ -22,13 +22,13 @@ final class LogStore: @unchecked Sendable {
         capacity: Int,
         redactor: any Redactor,
         persistence: FilePersistence?,
-        fileFormatter: any LogFormatter,
+        exportFormatter: any LogFormatter,
         osLogMirror: OSLogMirror?
     ) {
         self.capacity = capacity
         self.redactor = redactor
         self.persistence = persistence
-        self.fileFormatter = fileFormatter
+        self.exportFormatter = exportFormatter
         self.osLogMirror = osLogMirror
         self.buffer.reserveCapacity(capacity)
     }
@@ -65,7 +65,7 @@ final class LogStore: @unchecked Sendable {
                 buffer.removeFirst(buffer.count - capacity)
             }
 
-            persistence?.write(fileFormatter.string(from: entry))
+            persistence?.write(entry)
             osLogMirror?.log(entry)
 
             for continuation in continuations.values {
@@ -105,7 +105,12 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
+    /// Diskteki tüm kayıtları (oturumlar arası geçmiş dahil) ayrıştırıp döndürür.
+    func loadPersisted() -> [LogEntry] {
+        queue.sync { persistence?.loadEntries() ?? [] }
+    }
+
     func exportFileURL() -> URL? {
-        queue.sync { persistence?.consolidatedFileURL() }
+        queue.sync { persistence?.consolidatedTextURL(using: exportFormatter) }
     }
 }

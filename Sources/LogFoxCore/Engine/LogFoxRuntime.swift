@@ -35,7 +35,7 @@ final class LogFoxRuntime: @unchecked Sendable {
             capacity: configuration.inMemoryCapacity,
             redactor: configuration.redactor,
             persistence: persistence,
-            fileFormatter: configuration.fileFormatter,
+            exportFormatter: configuration.exportFormatter,
             osLogMirror: mirror
         )
         _minimumLevel = configuration.minimumLevel

@@ -83,9 +83,15 @@ public enum LogFox {
 
     // MARK: - Okuma & yönetim (viewer bu API üzerinden besler)
 
-    /// Mevcut tampondaki kayıtların anlık kopyası (eskiden yeniye).
+    /// Mevcut tampondaki (bu oturum, bellek) kayıtların anlık kopyası (eskiden yeniye).
     public static func snapshot() -> [LogEntry] {
         runtime.store?.snapshot() ?? []
+    }
+
+    /// Diskteki tüm kayıtlar — **önceki oturumlar dahil** (ring buffer kapasitesinden bağımsız).
+    /// TestFlight teşhisi için "uygulama yeniden başlamadan önce ne oldu" sorusunu cevaplar.
+    public static func loadPersistedEntries() -> [LogEntry] {
+        runtime.store?.loadPersisted() ?? []
     }
 
     /// Yeni kayıtları canlı yayınlayan akış.

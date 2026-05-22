@@ -1,6 +1,8 @@
 import Foundation
 
-/// Logları diske yazar, boyut bazlı rotation ve dosya-sayısı retention uygular.
+/// Logları diske **NDJSON** (satır başına bir JSON `LogEntry`) olarak yazar; boyut bazlı
+/// rotation ve dosya-sayısı retention uygular. NDJSON sayesinde kayıtlar tam doğrulukla
+/// geri okunabilir (oturumlar arası geçmiş). Export ise insan-okur düz metne dönüştürülür.
 ///
 /// Bu tip **kendi başına thread-safe değildir**; yalnızca `LogStore`'un serial
 /// kuyruğundan çağrılır. `@unchecked Sendable` bu sözleşmeye dayanır.
@@ -11,9 +13,12 @@ final class FilePersistence: @unchecked Sendable {
     private let maxFileCount: Int
     private let fileManager = FileManager.default
 
-    private let activeFileName = "logfox-current.log"
+    private let activeFileName = "logfox-current.ndjson"
     private let rotatedPrefix = "logfox-"
-    private let fileExtension = "log"
+    private let fileExtension = "ndjson"
+
+    private let encoder: JSONEncoder
+    private let decoder: JSONDecoder
 
     private var handle: FileHandle?
     private var currentSize: Int = 0
@@ -22,6 +27,15 @@ final class FilePersistence: @unchecked Sendable {
         self.directory = directory
         self.maxFileSize = maxFileSize
         self.maxFileCount = maxFileCount
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.withoutEscapingSlashes]
+        self.encoder = encoder
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        self.decoder = decoder
 
         do {
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -38,8 +52,10 @@ final class FilePersistence: @unchecked Sendable {
 
     // MARK: - Yazma
 
-    func write(_ line: String) {
-        guard let handle, let data = (line + "\n").data(using: .utf8) else { return }
+    func write(_ entry: LogEntry) {
+        guard let handle, let json = try? encoder.encode(entry) else { return }
+        var data = json
+        data.append(0x0A) // '\n'
         do {
             try handle.seekToEnd()
             try handle.write(contentsOf: data)
@@ -50,6 +66,23 @@ final class FilePersistence: @unchecked Sendable {
         } catch {
             // Disk hatası logging'i çökertmemeli; sessizce geç.
         }
+    }
+
+    // MARK: - Okuma (oturumlar arası geçmiş)
+
+    /// Diskteki tüm kayıtları (eskiden yeniye) ayrıştırıp döndürür. Bozuk satırlar atlanır.
+    func loadEntries() -> [LogEntry] {
+        try? handle?.synchronize()
+        var result: [LogEntry] = []
+        for file in rotatedFilesSortedAscending() + [activeFileURL] {
+            guard let content = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            for line in content.split(separator: "\n", omittingEmptySubsequences: true) {
+                guard let data = line.data(using: .utf8),
+                      let entry = try? decoder.decode(LogEntry.self, from: data) else { continue }
+                result.append(entry)
+            }
+        }
+        return result
     }
 
     // MARK: - Temizleme & export
@@ -63,22 +96,20 @@ final class FilePersistence: @unchecked Sendable {
         try? openActiveFile()
     }
 
-    /// Tüm dosyaları (eskiden yeniye) tek bir export dosyasında birleştirir.
-    func consolidatedFileURL() -> URL? {
-        try? handle?.synchronize()
-        let files = rotatedFilesSortedAscending() + [activeFileURL]
+    /// Diskteki tüm kayıtları, verilen formatter ile **insan-okur düz metin** bir dosyaya
+    /// dönüştürür ve paylaşılabilir URL döndürür.
+    func consolidatedTextURL(using formatter: any LogFormatter) -> URL? {
+        let entries = loadEntries()
+        let text = entries.map { formatter.string(from: $0) }.joined(separator: "\n")
+
         let exportURL = fileManager.temporaryDirectory
             .appendingPathComponent("logfox-export-\(Int(Date().timeIntervalSince1970)).log")
-
-        fileManager.createFile(atPath: exportURL.path, contents: nil)
-        guard let out = try? FileHandle(forWritingTo: exportURL) else { return nil }
-        defer { try? out.close() }
-
-        for file in files {
-            guard let data = try? Data(contentsOf: file) else { continue }
-            try? out.write(contentsOf: data)
+        do {
+            try text.write(to: exportURL, atomically: true, encoding: .utf8)
+            return exportURL
+        } catch {
+            return nil
         }
-        return exportURL
     }
 
     // MARK: - Dahili

@@ -18,6 +18,7 @@ public struct LogFoxViewerView: View {
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                scopePicker
                 FilterBarView(model: model)
                 Divider()
                 logList
@@ -33,6 +34,19 @@ public struct LogFoxViewerView: View {
             }
         }
         .onAppear { model.start() }
+    }
+
+    private var scopePicker: some View {
+        Picker("Kapsam", selection: Binding(
+            get: { model.scope },
+            set: { model.setScope($0) }
+        )) {
+            Text("Oturum").tag(LogViewerModel.Scope.session)
+            Text("Geçmiş").tag(LogViewerModel.Scope.history)
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Liste

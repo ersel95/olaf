@@ -8,7 +8,7 @@ final class LogStoreTests: XCTestCase {
             capacity: capacity,
             redactor: redactor,
             persistence: nil,
-            fileFormatter: PlainTextFormatter(),
+            exportFormatter: PlainTextFormatter(),
             osLogMirror: nil
         )
     }

@@ -21,8 +21,9 @@ public struct LogFoxConfiguration: Sendable {
     /// Yazma anında uygulanan redaksiyon. Varsayılan banking-grade ve **açık**.
     public var redactor: any Redactor
 
-    /// Diske yazılırken kullanılan biçim. Varsayılan düz metin.
-    public var fileFormatter: any LogFormatter
+    /// Export (.log paylaşımı) sırasında kullanılan **insan-okur** biçim. Disk depolaması
+    /// her zaman NDJSON'dur (geri okunabilirlik için); bu formatter yalnız paylaşım metnini üretir.
+    public var exportFormatter: any LogFormatter
 
     /// OSLog (`os.Logger`) köprüsü — loglar Console.app'te de görünsün mü?
     public var mirrorsToOSLog: Bool
@@ -37,7 +38,7 @@ public struct LogFoxConfiguration: Sendable {
         maxFileSize: Int = 1_048_576,        // 1 MB
         maxFileCount: Int = 5,
         redactor: any Redactor = BankingRedactor(),
-        fileFormatter: any LogFormatter = PlainTextFormatter(),
+        exportFormatter: any LogFormatter = PlainTextFormatter(),
         mirrorsToOSLog: Bool = true,
         subsystem: String = Bundle.main.bundleIdentifier ?? "com.logfox"
     ) {
@@ -47,7 +48,7 @@ public struct LogFoxConfiguration: Sendable {
         self.maxFileSize = max(4096, maxFileSize)
         self.maxFileCount = max(1, maxFileCount)
         self.redactor = redactor
-        self.fileFormatter = fileFormatter
+        self.exportFormatter = exportFormatter
         self.mirrorsToOSLog = mirrorsToOSLog
         self.subsystem = subsystem
     }

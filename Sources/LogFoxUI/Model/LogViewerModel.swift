@@ -9,6 +9,13 @@ public final class LogViewerModel: ObservableObject {
     /// Toplanan tüm kayıtlar (snapshot + canlı).
     @Published public private(set) var entries: [LogEntry] = []
 
+    /// Gösterim kapsamı.
+    public enum Scope: String, CaseIterable, Sendable {
+        case session   // bu oturum (bellek ring buffer)
+        case history   // diskteki tüm geçmiş (önceki oturumlar dahil)
+    }
+    @Published public var scope: Scope = .session
+
     /// Filtreler.
     @Published public var searchText: String = ""
     @Published public var minimumLevel: LogLevel = .trace
@@ -27,7 +34,7 @@ public final class LogViewerModel: ObservableObject {
     // MARK: - Yaşam döngüsü
 
     public func start() {
-        entries = LogFox.snapshot()
+        reload()
         guard streamTask == nil else { return }
         streamTask = Task { [weak self] in
             for await entry in LogFox.stream() {
@@ -35,6 +42,21 @@ public final class LogViewerModel: ObservableObject {
                 self.append(entry)
             }
         }
+    }
+
+    /// Kapsama göre kayıtları (yeniden) yükler. Geçmiş modunda disk okunur.
+    public func reload() {
+        switch scope {
+        case .session: entries = LogFox.snapshot()
+        case .history: entries = LogFox.loadPersistedEntries()
+        }
+        pendingWhilePaused.removeAll()
+    }
+
+    public func setScope(_ newScope: Scope) {
+        guard newScope != scope else { return }
+        scope = newScope
+        reload()
     }
 
     private func append(_ entry: LogEntry) {
