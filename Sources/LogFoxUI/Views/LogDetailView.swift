@@ -2,8 +2,8 @@
 import SwiftUI
 import LogFoxCore
 
-/// Tek kaydın tam detayı — Pulse tarzı gruplu (inset) kart düzeni.
-/// `.network` kayıtları status/URL/header/gövde bölümleriyle; diğerleri seviye + mesaj + metadata.
+/// Tek kaydın detayı — Pulse tarzı: renkli status başlığı + gruplu List + alt ekranlara
+/// navigation (header'lar, gövde, cURL, metrikler). `.network` dışı kayıtlar seviye + mesaj + metadata.
 struct LogDetailView: View {
     let entry: LogEntry
 
@@ -22,9 +22,7 @@ struct LogDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    UIPasteboard.general.string = entry.oneLineDescription
-                } label: {
+                Button { UIPasteboard.general.string = entry.oneLineDescription } label: {
                     Image(systemName: "doc.on.doc")
                 }
                 .accessibilityLabel("Kopyala")
@@ -32,75 +30,86 @@ struct LogDetailView: View {
         }
     }
 
-    // MARK: - Network bölümleri
+    // MARK: - Network
 
     @ViewBuilder
     private func networkSections(_ info: NetworkLogInfo) -> some View {
         Section {
-            HStack(spacing: 10) {
-                StatusPill(statusCode: info.statusCode, isFailure: info.isFailure)
-                MethodBadge(method: info.method ?? "GET")
-                Spacer()
-                if let ms = info.durationMs {
-                    Text("\(ms)ms").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+            StatusBanner(info: info)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+        }
+
+        Section("Özet") {
+            if let method = info.method { kv("Metot", method, mono: true) }
+            kv("URL", info.url ?? "-", mono: true)
+            if let status = info.statusCode { kv("Durum", String(status)) }
+            if let ms = info.durationMs { kv("Süre", "\(ms) ms") }
+            if let b = info.requestBytes { kv("İstek boyutu", Formatting.byteCount(b)) }
+            if let b = info.responseBytes { kv("Yanıt boyutu", Formatting.byteCount(b)) }
+            if let error = info.error { kv("Hata", error) }
+        }
+
+        Section("İstek") {
+            NavigationLink {
+                HeadersListView(title: "İstek Header'ları", headers: info.requestHeaders)
+            } label: {
+                rowLabel("Header'lar", count: info.requestHeaders.count, systemImage: "arrow.up.circle")
+            }
+            .disabled(info.requestHeaders.isEmpty)
+
+            if let body = info.requestBody, !body.isEmpty {
+                NavigationLink {
+                    TextViewerView(title: "İstek Gövdesi", rawText: body)
+                } label: {
+                    rowLabel("Gövdeyi görüntüle", systemImage: "doc.plaintext")
                 }
             }
         }
 
-        Section("URL") {
-            Text(info.url ?? "-")
-                .font(.callout.monospaced())
-                .textSelection(.enabled)
-        }
+        Section("Yanıt") {
+            NavigationLink {
+                HeadersListView(title: "Yanıt Header'ları", headers: info.responseHeaders)
+            } label: {
+                rowLabel("Header'lar", count: info.responseHeaders.count, systemImage: "arrow.down.circle")
+            }
+            .disabled(info.responseHeaders.isEmpty)
 
-        if let error = info.error {
-            Section("Hata") {
-                Text(error).font(.callout).foregroundStyle(.red).textSelection(.enabled)
+            if let body = info.responseBody, !body.isEmpty {
+                NavigationLink {
+                    TextViewerView(title: "Yanıt Gövdesi", rawText: body)
+                } label: {
+                    rowLabel("Gövdeyi görüntüle", systemImage: "doc.plaintext")
+                }
             }
         }
 
-        Section("Bilgi") {
-            if let ms = info.durationMs { kv("Süre", "\(ms) ms") }
-            if let b = info.requestBytes { kv("İstek boyutu", Formatting.byteCount(b)) }
-            if let b = info.responseBytes { kv("Yanıt boyutu", Formatting.byteCount(b)) }
+        Section {
+            NavigationLink {
+                TextViewerView(title: "cURL", rawText: CurlBuilder.curl(from: info))
+            } label: {
+                rowLabel("cURL", systemImage: "terminal")
+            }
+        }
+
+        Section("Metrikler") {
             kv("Thread", entry.thread)
             kv("Zaman", entry.date.formatted(date: .numeric, time: .standard))
         }
-
-        if !info.requestHeaders.isEmpty {
-            Section("İstek Header'ları") { headerRows(info.requestHeaders) }
-        }
-        if let body = info.requestBody, !body.isEmpty {
-            Section("İstek Gövdesi") { CodeBlock(text: body) }
-        }
-        if !info.responseHeaders.isEmpty {
-            Section("Yanıt Header'ları") { headerRows(info.responseHeaders) }
-        }
-        if let body = info.responseBody, !body.isEmpty {
-            Section("Yanıt Gövdesi") { CodeBlock(text: body) }
-        }
     }
 
-    // MARK: - Log bölümleri
+    // MARK: - Log
 
     @ViewBuilder
     private var logSections: some View {
         Section {
-            HStack(spacing: 8) {
-                LevelDot(level: entry.level)
-                Text(entry.level.name).font(.callout.weight(.semibold)).foregroundStyle(entry.level.color)
-                Spacer()
-                Text(entry.category.rawValue)
-                    .font(.caption)
-                    .padding(.horizontal, 8).padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.15), in: Capsule())
-            }
+            LevelBanner(level: entry.level, category: entry.category)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
         }
 
         Section("Mesaj") {
-            Text(entry.message)
-                .font(.callout.monospaced())
-                .textSelection(.enabled)
+            Text(entry.message).font(.callout.monospaced()).textSelection(.enabled)
         }
 
         if !entry.metadata.isEmpty {
@@ -135,33 +144,59 @@ struct LogDetailView: View {
     }
 
     @ViewBuilder
-    private func headerRows(_ headers: [(key: String, value: String)]) -> some View {
-        ForEach(headers, id: \.key) { header in
-            kv(header.key, header.value, mono: true)
+    private func rowLabel(_ title: String, count: Int? = nil, systemImage: String) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+            if let count {
+                Spacer()
+                Text("\(count)").foregroundStyle(.secondary)
+            }
         }
     }
 }
 
-/// Gövde/JSON için monospace kod bloğu; JSON ise pretty-print + kopyalama.
-private struct CodeBlock: View {
-    let text: String
+// MARK: - Banner'lar
+
+/// Network status başlığı (Pulse tarzı tam-genişlik renkli banner).
+private struct StatusBanner: View {
+    let info: NetworkLogInfo
 
     var body: some View {
-        let display = Formatting.isJSON(text) ? Formatting.prettyJSON(text) : text
-        VStack(alignment: .leading, spacing: 8) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                Text(display)
-                    .font(.caption.monospaced())
-                    .textSelection(.enabled)
-                    .padding(.vertical, 4)
-            }
-            Button {
-                UIPasteboard.general.string = display
-            } label: {
-                Label("Kopyala", systemImage: "doc.on.doc").font(.caption2)
-            }
+        HStack(spacing: 10) {
+            StatusPill(statusCode: info.statusCode, isFailure: info.isFailure)
+            MethodBadge(method: info.method ?? "GET")
+            Text(info.path)
+                .font(.subheadline.monospaced())
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 0)
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(info.isFailure ? Color.red.opacity(0.85) : Color.accentColor.opacity(0.9))
+    }
+}
+
+/// Log seviyesi başlığı.
+private struct LevelBanner: View {
+    let level: LogLevel
+    let category: LogCategory
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(level.symbol)
+            Text(level.name).font(.headline).foregroundStyle(.white)
+            Spacer(minLength: 0)
+            Text(category.rawValue)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.9))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(level.color.opacity(0.85))
     }
 }
 #endif

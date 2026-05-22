@@ -10,6 +10,16 @@ struct LogFilterView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Kapsam") {
+                    Picker("Kayıtlar", selection: Binding(
+                        get: { model.scope },
+                        set: { model.setScope($0) }
+                    )) {
+                        Text("Bu oturum").tag(LogViewerModel.Scope.session)
+                        Text("Tüm geçmiş").tag(LogViewerModel.Scope.history)
+                    }
+                }
+
                 Section {
                     ForEach(LogLevel.allCases, id: \.self) { level in
                         Toggle(isOn: Binding(
