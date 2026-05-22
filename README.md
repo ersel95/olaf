@@ -17,14 +17,18 @@ Tasarım/fizibilite detayları için ana projedeki `LOGFOX_REPORT.md`'ye bakın.
 | **2 — Viewer (LogFoxUI)** | Shake → SwiftUI düz metin viewer, **Oturum/Geçmiş** kapsamı, filtre/arama/paylaşım, canlı akış | ✅ |
 | **3 — Araç köprüleri** | `ExternalToolBridge` + `install(tools:)` + `presentExternal` → **Netfox & Pulse** geçişi, shake sahipliği devri (app tarafı: `INTEGRATION.md` / `AGENTS.md`) | ✅ |
 | **N — Network capture (LogFoxNetwork)** | Opsiyonel URLProtocol; istek/yanıt `.network` kategorisinde, redaksiyonlu → app+network tek listede | ✅ |
+| **5 — UX & paylaşım** | Pulse tarzı detay (status banner, pretty-JSON gövde), Netfox tarzı paylaşım (Basit/Tam log + cURL), kopyalama toast, start öncesi log tamponlama, oturum bazlı geçmiş | ✅ |
 | 4 — Köprüler | OSLogStore importer, swift-log backend | ⏳ |
 
 ## Kurulum (SPM)
 
 ```swift
-.package(url: "https://github.com/ersel95/logfox.git", from: "0.1.0")
+.package(url: "https://github.com/ersel95/logfox.git", from: "0.9.0")
 ```
-Target bağımlılığı: `LogFoxCore`.
+Ürünler: `LogFoxCore` (motor) · `LogFoxUI` (viewer) · `LogFoxNetwork` (opsiyonel network capture).
+
+> Uygulamada doğrudan `LogFox.x(...)` çağırmak yerine tek entegrasyon noktası olan `LogFoxManager`
+> üzerinden loglamanız önerilir — bkz. [`INTEGRATION.md`](INTEGRATION.md).
 
 ## Kullanım
 
