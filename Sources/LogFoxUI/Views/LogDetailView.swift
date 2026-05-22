@@ -14,6 +14,7 @@ struct LogDetailView: View {
     let entry: LogEntry
 
     @State private var shareItem: ShareItem?
+    @State private var didCopy = false
 
     private var network: NetworkLogInfo? { NetworkLogInfo(entry: entry) }
 
@@ -34,6 +35,7 @@ struct LogDetailView: View {
         .sheet(item: $shareItem) { item in
             ShareSheet(items: [item.text])
         }
+        .copyToast($didCopy)
     }
 
     /// Netfox tarzı paylaşım menüsü: network için Basit/Tam/cURL, log için tam metin; ayrıca kopyala.
@@ -57,8 +59,9 @@ struct LogDetailView: View {
             }
             Divider()
             Button {
-                UIPasteboard.general.string = network.map { ShareFormatter.fullNetworkLog(entry: entry, info: $0) }
+                let text = network.map { ShareFormatter.fullNetworkLog(entry: entry, info: $0) }
                     ?? ShareFormatter.logDetail(entry: entry)
+                logFoxCopy(text, showing: $didCopy)
             } label: { Label("Panoya kopyala", systemImage: "doc.on.doc") }
         } label: {
             Image(systemName: "square.and.arrow.up")

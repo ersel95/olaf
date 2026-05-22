@@ -9,6 +9,7 @@ struct TextViewerView: View {
 
     @State private var query = ""
     @State private var isSharePresented = false
+    @State private var didCopy = false
     /// Varsayılan: satır kaydır (ekrana sığar). Kapatınca ham (yatay kaydırmalı) gösterim.
     @State private var wrapLines = true
 
@@ -57,8 +58,8 @@ struct TextViewerView: View {
                 .accessibilityLabel(wrapLines ? "Satır kaydırmayı kapat" : "Satır kaydır")
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { UIPasteboard.general.string = display } label: {
-                    Image(systemName: "doc.on.doc")
+                Button { logFoxCopy(display, showing: $didCopy) } label: {
+                    Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
                 }
                 .accessibilityLabel("Kopyala")
             }
@@ -72,6 +73,7 @@ struct TextViewerView: View {
         .sheet(isPresented: $isSharePresented) {
             ShareSheet(items: [display])
         }
+        .copyToast($didCopy)
     }
 }
 #endif
