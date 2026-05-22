@@ -82,56 +82,44 @@ public final class LogFoxManager {
 
     // MARK: - Logging (app bu manager üzerinden loglar; LogFox'a doğrudan bağlanmaz)
     //
-    // file/line/function OTOMATİK yakalanır — yazman gereken tek şey mesaj (+ ops. category/metadata):
+    // file/line/function OTOMATİK doldurulur — sadece mesaj (+ ops. category/metadata) yaz:
     //   LogFoxManager.shared.info("Login başarılı", category: .auth)
     //   LogFoxManager.shared.error(error, category: .payment)
-    // `source` parametresine DOKUNMA; default'u çağrı yerinin dosya/satır/fonksiyon bilgisini alır.
+    // file/line/function parametrelerine DOKUNMA; default'ları (#fileID/#line/#function) çağrı yerini yakalar.
+    // (Swift'te call-site bilgisini yakalamanın tek yolu doğrudan default parametredir; tek struct'a
+    //  sarmak yakalamayı bozar — manager'ın konumunu loglar.)
     // LogFox başlatılmadıysa (ör. PROD) çağrılar güvenle no-op'tur.
 
-    public func trace(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], source: LogSource = LogSource()) {
-        LogFox.trace(message(), category: category, metadata: metadata, file: source.file, line: source.line, function: source.function)
+    public func trace(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {
+        LogFox.trace(message(), category: category, metadata: metadata, file: file, line: line, function: function)
     }
 
-    public func debug(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], source: LogSource = LogSource()) {
-        LogFox.debug(message(), category: category, metadata: metadata, file: source.file, line: source.line, function: source.function)
+    public func debug(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {
+        LogFox.debug(message(), category: category, metadata: metadata, file: file, line: line, function: function)
     }
 
-    public func info(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], source: LogSource = LogSource()) {
-        LogFox.info(message(), category: category, metadata: metadata, file: source.file, line: source.line, function: source.function)
+    public func info(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {
+        LogFox.info(message(), category: category, metadata: metadata, file: file, line: line, function: function)
     }
 
-    public func notice(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], source: LogSource = LogSource()) {
-        LogFox.notice(message(), category: category, metadata: metadata, file: source.file, line: source.line, function: source.function)
+    public func notice(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {
+        LogFox.notice(message(), category: category, metadata: metadata, file: file, line: line, function: function)
     }
 
-    public func warning(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], source: LogSource = LogSource()) {
-        LogFox.warning(message(), category: category, metadata: metadata, file: source.file, line: source.line, function: source.function)
+    public func warning(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {
+        LogFox.warning(message(), category: category, metadata: metadata, file: file, line: line, function: function)
     }
 
-    public func error(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], source: LogSource = LogSource()) {
-        LogFox.error(message(), category: category, metadata: metadata, file: source.file, line: source.line, function: source.function)
+    public func error(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {
+        LogFox.error(message(), category: category, metadata: metadata, file: file, line: line, function: function)
     }
 
-    public func error(_ error: Error, category: LogCategory = .general, metadata: [String: String] = [:], source: LogSource = LogSource()) {
-        LogFox.error(error, category: category, metadata: metadata, file: source.file, line: source.line, function: source.function)
+    public func error(_ error: Error, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {
+        LogFox.error(error, category: category, metadata: metadata, file: file, line: line, function: function)
     }
 
-    public func critical(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], source: LogSource = LogSource()) {
-        LogFox.critical(message(), category: category, metadata: metadata, file: source.file, line: source.line, function: source.function)
-    }
-}
-
-/// Çağrı yerinin kaynak bilgisini OTOMATİK yakalar. Default `LogSource()` bir log fonksiyonunun
-/// default argümanı olduğunda `#fileID/#line/#function` **çağıranın** konumuna çözülür → file/line/function
-/// ayrı ayrı yazmaya gerek kalmaz.
-public struct LogSource {
-    public let file: String
-    public let line: Int
-    public let function: String
-    public init(file: String = #fileID, line: Int = #line, function: String = #function) {
-        self.file = file
-        self.line = line
-        self.function = function
+    public func critical(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {
+        LogFox.critical(message(), category: category, metadata: metadata, file: file, line: line, function: function)
     }
 }
 
