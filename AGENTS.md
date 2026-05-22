@@ -48,6 +48,26 @@ NFX.sharedInstance().setGesture(.custom)   // shake artık LogFox'un
 - Viewer toolbar (•••) menüsünde, **seçilen ve link'li** tek network logger buton olarak görünür ("Netfox" veya "Pulse").
 - Netfox butonu → LogFox kapanır, Netfox açılır. Pulse butonu → Pulse konsolu LogFox üzerinde açılır.
 
+## Loglama (app her zaman manager üzerinden loglar)
+Uygulama kodunda `import LogFoxCore` + `LogFox.x(...)` KULLANMA. Entegrasyon dosyasındaki manager'ı kullan:
+```swift
+LogFoxManager.shared.info("Login başarılı", category: .auth)
+LogFoxManager.shared.error(error, category: .payment)
+```
+Manager `trace/debug/info/notice/warning/error/critical` + `error(Error)` sağlar; çağıran dosya/satır korunur,
+LogFox başlatılmamışsa (PROD) no-op'tur. `print()` çağrılarını kademeli olarak bu metodlara taşı.
+
+### Kategorileri genişletme
+`LogCategory` string-backed'tir; entegrasyon dosyasındaki `extension LogCategory` bloğuna projenin modüllerini ekle:
+```swift
+public extension LogCategory {
+    static let cards: LogCategory = "cards"
+    static let transfers: LogCategory = "transfers"
+}
+```
+Entegrasyon dosyası `@_exported import LogFoxCore` içerdiğinden, çağrı yerleri `import LogFoxCore` yazmadan
+`LogFoxManager.shared.info("...", category: .cards)` kullanabilir.
+
 ## Davranış kuralları (agent için)
 - Paketin `Sources/` içeriğini DEĞİŞTİRME; entegrasyon tamamen host tarafındadır.
 - `#if canImport(netfox)` / `#if canImport(PulseUI)` kontrollerini **host dosyasında** tut — pakete taşıma (pakette her zaman false döner).

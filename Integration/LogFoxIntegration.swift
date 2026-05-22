@@ -10,7 +10,9 @@
 //   • kararı init sırasında LogFoxUI.install(tools:) ile pakete gönderir.
 
 import Foundation
-import LogFoxCore
+// @_exported: LogCategory/LogLevel app genelinde görünür → çağrı yerleri `import LogFoxCore` yazmadan
+// `.cards` gibi kategorileri ve LogFoxManager loglamasını kullanabilir.
+@_exported import LogFoxCore
 import LogFoxUI
 
 #if canImport(netfox)
@@ -19,6 +21,17 @@ import netfox
 #if canImport(PulseUI)
 import PulseUI
 #endif
+
+// MARK: - App'e özel log kategorileri (genişletin)
+//
+// LogCategory string-backed'tir; projeye göre kategori ekleyin. Eklenenler her yerden
+// `LogFoxManager.shared.info("...", category: .myCategory)` ile kullanılabilir.
+public extension LogCategory {
+    // ADAPT: projenizin modüllerine göre düzenleyin.
+    static let cards: LogCategory = "cards"
+    static let accounts: LogCategory = "accounts"
+    static let transfers: LogCategory = "transfers"
+}
 
 // MARK: - Host konfigürasyonu
 

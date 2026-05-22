@@ -205,6 +205,23 @@ LogFoxManager.shared.error(error, category: .payment, metadata: ["code": code])
 Kademeli göç önerilir. Network logları BaseService'teki `LogFoxNetwork.install` ile otomatik yakalanır;
 manager'a yalnız üst-seviye iş olayları girer.
 
+### Kategorileri genişletme
+
+`LogCategory` string-backed'tir; entegrasyon dosyasındaki `extension LogCategory` bloğuna projenizin
+modüllerini ekleyin:
+
+```swift
+public extension LogCategory {
+    static let cards: LogCategory = "cards"
+    static let accounts: LogCategory = "accounts"
+    static let transfers: LogCategory = "transfers"
+}
+```
+
+Entegrasyon dosyası `@_exported import LogFoxCore` içerir → çağrı yerlerinde `import LogFoxCore` yazmadan
+`LogFoxManager.shared.info("...", category: .cards)` kullanabilirsiniz. Viewer'da bu kategoriler filtre
+ve kategori chip'i olarak otomatik görünür.
+
 ---
 
 ## Pulse hakkında not
