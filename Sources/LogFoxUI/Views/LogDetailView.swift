@@ -2,18 +2,11 @@
 import SwiftUI
 import LogFoxCore
 
-/// Paylaşım sheet'i için Identifiable sarmalayıcı.
-private struct ShareItem: Identifiable {
-    let id = UUID()
-    let text: String
-}
-
 /// Tek kaydın detayı — Pulse tarzı: renkli status başlığı + gruplu List + alt ekranlara
 /// navigation (header'lar, gövde, cURL, metrikler). `.network` dışı kayıtlar seviye + mesaj + metadata.
 struct LogDetailView: View {
     let entry: LogEntry
 
-    @State private var shareItem: ShareItem?
     @State private var didCopy = false
 
     private var network: NetworkLogInfo? { NetworkLogInfo(entry: entry) }
@@ -31,9 +24,6 @@ struct LogDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { shareMenu }
-        }
-        .sheet(item: $shareItem) { item in
-            ShareSheet(items: [item.text])
         }
         .copyToast($didCopy)
     }
@@ -70,7 +60,7 @@ struct LogDetailView: View {
     }
 
     private func share(_ text: String) {
-        shareItem = ShareItem(text: text)
+        presentShareSheet([text])
     }
 
     // MARK: - Network

@@ -8,8 +8,6 @@ public struct LogFoxViewerView: View {
     @StateObject private var model = LogViewerModel()
     private let onClose: () -> Void
 
-    @State private var shareURL: URL?
-    @State private var isSharePresented = false
     @State private var isFilterPresented = false
 
     public init(onClose: @escaping () -> Void = {}) {
@@ -29,11 +27,6 @@ public struct LogFoxViewerView: View {
             .searchable(text: $model.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Loglarda ara")
             .toolbar { toolbarContent }
             .safeAreaInset(edge: .bottom) { externalToolBar }
-            .sheet(isPresented: $isSharePresented) {
-                if let shareURL {
-                    ShareSheet(items: [shareURL])
-                }
-            }
             .sheet(isPresented: $isFilterPresented) {
                 LogFilterView(model: model)
             }
@@ -140,8 +133,7 @@ public struct LogFoxViewerView: View {
     private func share() {
         Task {
             if let url = await model.exportFileURL() {
-                shareURL = url
-                isSharePresented = true
+                presentShareSheet([url])
             }
         }
     }

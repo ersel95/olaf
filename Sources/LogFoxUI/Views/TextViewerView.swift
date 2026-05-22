@@ -8,7 +8,6 @@ struct TextViewerView: View {
     let rawText: String
 
     @State private var query = ""
-    @State private var isSharePresented = false
     @State private var didCopy = false
     /// Varsayılan: satır kaydır (ekrana sığar). Kapatınca ham (yatay kaydırmalı) gösterim.
     @State private var wrapLines = true
@@ -64,14 +63,11 @@ struct TextViewerView: View {
                 .accessibilityLabel("Kopyala")
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { isSharePresented = true } label: {
+                Button { presentShareSheet([display]) } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
                 .accessibilityLabel("Paylaş")
             }
-        }
-        .sheet(isPresented: $isSharePresented) {
-            ShareSheet(items: [display])
         }
         .copyToast($didCopy)
     }
