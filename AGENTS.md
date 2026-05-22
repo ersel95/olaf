@@ -14,12 +14,18 @@ Bir AI agent "LogFox'u entegre et" komutu aldığında **bu dosyayı** takip ede
 - Ana app target'ına: `LogFoxCore` **ve** `LogFoxUI`.
 - App extension'lara (varsa): yalnız `LogFoxCore`.
 
-### 2. Entegrasyon dosyasını kopyala
-`Integration/LogFoxIntegration.swift` dosyasını host app kaynaklarına kopyala (örn. `Core/Utils/`).
-Bu dosya: `LogFoxManager` + `LogFoxNetworkLogger` enum'u + (canImport-gate'li) `NetfoxBridge` & `PulseBridge` içerir.
+### 2. Entegrasyon dosyasını kopyala (ZORUNLU)
+`Integration/LogFoxIntegration.swift` dosyasını host app kaynaklarına **mutlaka** kopyala (örn. `Core/Utils/`).
+Bu dosya tek entegrasyon noktasıdır: `LogFoxManager` (başlatma + **loglama fonksiyonları**) + `LogFoxNetworkLogger`
+enum'u + (canImport-gate'li) `NetfoxBridge` & `PulseBridge`.
 `// ADAPT:` ile işaretli satırları projeye uyarla:
 - Feature-flag kontrolü (varsa). Yoksa satırı kaldır.
 - `#if !PROD` derleme koşulu projede yoksa, projenin eşdeğer koşuluyla değiştir veya kaldır.
+
+> Uygulama **`LogFox`'a doğrudan bağlanmaz**; loglar bu manager üzerinden atılır:
+> `LogFoxManager.shared.info("...", category: .auth)`, `LogFoxManager.shared.error(error, category: .payment)`.
+> Manager `trace/debug/info/notice/warning/error/critical` + `error(Error)` sağlar; çağıran dosya/satır korunur.
+> LogFox başlatılmamışsa (PROD) çağrılar no-op'tur → her yerde güvenle çağrılabilir.
 
 ### 3. Başlatmayı bağla
 Bir projede **yalnız bir** network logger aktiftir. Önce projede hangisinin kullanıldığını tespit et

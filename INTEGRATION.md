@@ -189,15 +189,21 @@ LogFoxNetwork.install(into: configuration, chainingTo: [NFXProtocol.self])
 > (PAN/IBAN/token, `Authorization`/`Cookie` header'ları maskelenir), ancak keyfi JSON'daki her PII
 > garanti yakalanamaz. Daha sıkı istiyorsanız `capturesBodies: false` ile init edin.
 
-## 7. `print()` → `LogFox` göçü
+## 7. Uygulamada loglama — her zaman `LogFoxManager` üzerinden
+
+Uygulama kodu `LogFox`'a **doğrudan bağlanmaz**; tek entegrasyon noktası olan manager üzerinden loglar.
+`LogFoxManager` `trace/debug/info/notice/warning/error/critical` + `error(Error)` sağlar; çağıran dosya/satır
+korunur, LogFox başlatılmamışsa (PROD) no-op'tur.
 
 ```swift
 // önce:
 print("⚠️ token decode hatası")
 // sonra:
-LogFox.warning("token decode hatası", category: .security)
+LogFoxManager.shared.warning("token decode hatası", category: .security)
+LogFoxManager.shared.error(error, category: .payment, metadata: ["code": code])
 ```
-Kademeli göç önerilir. Network logları Netfox/Pulse'ta kalır; LogFox'a yalnız üst-seviye iş olayları girer.
+Kademeli göç önerilir. Network logları BaseService'teki `LogFoxNetwork.install` ile otomatik yakalanır;
+manager'a yalnız üst-seviye iş olayları girer.
 
 ---
 
