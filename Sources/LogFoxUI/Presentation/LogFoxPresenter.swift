@@ -51,6 +51,20 @@ final class LogFoxPresenter {
         window = nil
     }
 
+    /// Gömülebilir SwiftUI aracını LogFox penceresi üzerinde modal olarak sunar.
+    /// LogFox açık değilse önce açar, böylece geri dönülecek bir bağlam olur.
+    func presentExternal<Content: View>(rootView: Content) {
+        if window == nil { present() }
+        guard let root = window?.rootViewController else { return }
+
+        var top = root
+        while let presented = top.presentedViewController { top = presented }
+
+        let host = UIHostingController(rootView: rootView)
+        host.modalPresentationStyle = .fullScreen
+        top.present(host, animated: true)
+    }
+
     private static func activeScene() -> UIWindowScene? {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }

@@ -13,7 +13,7 @@ Tasarım/fizibilite detayları için ana projedeki `LOGFOX_REPORT.md`'ye bakın.
 | **0 — İskelet** | SPM, model'ler | ✅ |
 | **1 — Core motor** | Ring buffer, redaksiyon, disk persistans, OSLog köprüsü, facade | ✅ |
 | **2 — Viewer (LogFoxUI)** | Shake → SwiftUI düz metin viewer, filtre/arama/paylaşım, canlı akış | ✅ |
-| **3 — Netfox köprüsü** | `ExternalToolBridge` protokolü + shake sahipliği devri (app tarafı: `INTEGRATION.md`) | ✅ |
+| **3 — Araç köprüleri** | `ExternalToolBridge` + `install(tools:)` + `presentExternal` → **Netfox & Pulse** geçişi, shake sahipliği devri (app tarafı: `INTEGRATION.md` / `AGENTS.md`) | ✅ |
 | 4 — Köprüler | OSLogStore importer, swift-log backend | ⏳ |
 
 ## Kurulum (SPM)
@@ -46,25 +46,36 @@ LogFox.clear()
 LogFox.isEnabled = false
 ```
 
-### In-app viewer (LogFoxUI)
+### In-app viewer (LogFoxUI) + Netfox / Pulse geçişi
+
+LogFox, **Netfox** ve **Pulse** ile uyumludur. Paket bunlara bağlı değildir; host app `#if canImport`
+ile hangilerinin yüklü olduğunu tespit eder ve etkin geçiş köprülerini **init'te** gönderir:
 
 ```swift
 import LogFoxUI
 
-// Uygulama başlangıcında (LogFox.start'tan sonra):
-LogFoxUI.install()                    // cihaz sallandığında viewer açılır
+var tools: [any ExternalToolBridge] = []
+#if canImport(netfox)
+if config.enableNetfox { tools.append(NetfoxBridge()) }   // app tarafında tanımlı köprü
+#endif
+#if canImport(PulseUI)
+if config.enablePulse  { tools.append(PulseBridge())  }
+#endif
 
-// Başka bir araca (örn. Netfox) geçiş butonu — app tarafında köprü kaydı:
-LogFoxUI.register(NetfoxBridge())     // ExternalToolBridge'e uyan app tipi
+LogFoxUI.install(tools: tools)   // shake → viewer; karar pakete init'te gönderilir
 
 // Programatik:
 LogFoxUI.present()
 LogFoxUI.dismiss()
+LogFoxUI.presentExternal { ConsoleView() }   // Pulse gibi gömülebilir araçlar için
 ```
 
-Shake sahibi LogFox'tur. Netfox da kullanılıyorsa onun shake'ini kapatın
-(`NFX.sharedInstance().setGesture(.custom)`); geçiş, viewer'daki köprü butonuyla yapılır.
-**YapiKredi entegrasyonu için adım adım:** [`INTEGRATION.md`](INTEGRATION.md).
+Shake sahibi LogFox'tur; viewer içinden **yalnız link'li ve etkin** araçlara (Netfox/Pulse) geçilir.
+Netfox kullanılıyorsa shake'ini kapatın (`NFX.sharedInstance().setGesture(.custom)`).
+
+- **Adım adım entegrasyon:** [`INTEGRATION.md`](INTEGRATION.md)
+- **AI agent için makine-takipli talimat:** [`AGENTS.md`](AGENTS.md)
+- **Tek-dosya drop-in template:** [`Integration/LogFoxIntegration.swift`](Integration/LogFoxIntegration.swift)
 
 ## Mimari (Core)
 
