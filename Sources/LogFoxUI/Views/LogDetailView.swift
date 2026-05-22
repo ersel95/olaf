@@ -2,23 +2,23 @@
 import SwiftUI
 import LogFoxCore
 
-/// Tek kaydın tam detayı. `.network` kayıtları bölümlü (summary/header/body) gösterilir;
-/// diğerleri seviye + metadata olarak. Tüm metinler kopyalanabilir.
+/// Tek kaydın tam detayı — Pulse tarzı gruplu (inset) kart düzeni.
+/// `.network` kayıtları status/URL/header/gövde bölümleriyle; diğerleri seviye + mesaj + metadata.
 struct LogDetailView: View {
     let entry: LogEntry
 
+    private var network: NetworkLogInfo? { NetworkLogInfo(entry: entry) }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                if let network = NetworkLogInfo(entry: entry) {
-                    networkContent(network)
-                } else {
-                    logContent
-                }
+        List {
+            if let network {
+                networkSections(network)
+            } else {
+                logSections
             }
-            .padding()
         }
-        .navigationTitle(NetworkLogInfo(entry: entry) != nil ? "Network" : "Log Detayı")
+        .listStyle(.insetGrouped)
+        .navigationTitle(network != nil ? "Network" : "Log")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -32,106 +32,112 @@ struct LogDetailView: View {
         }
     }
 
-    // MARK: - Network içeriği
+    // MARK: - Network bölümleri
 
     @ViewBuilder
-    private func networkContent(_ info: NetworkLogInfo) -> some View {
-        HStack(spacing: 10) {
-            StatusPill(statusCode: info.statusCode, isFailure: info.isFailure)
-            MethodBadge(method: info.method ?? "GET")
-            if let ms = info.durationMs {
-                Text("\(ms)ms").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+    private func networkSections(_ info: NetworkLogInfo) -> some View {
+        Section {
+            HStack(spacing: 10) {
+                StatusPill(statusCode: info.statusCode, isFailure: info.isFailure)
+                MethodBadge(method: info.method ?? "GET")
+                Spacer()
+                if let ms = info.durationMs {
+                    Text("\(ms)ms").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
+                }
             }
         }
 
-        section("URL") {
-            Text(info.url ?? "-").font(.callout.monospaced()).textSelection(.enabled)
+        Section("URL") {
+            Text(info.url ?? "-")
+                .font(.callout.monospaced())
+                .textSelection(.enabled)
         }
 
         if let error = info.error {
-            section("Hata") {
+            Section("Hata") {
                 Text(error).font(.callout).foregroundStyle(.red).textSelection(.enabled)
             }
         }
 
-        let sizes = [
-            info.requestBytes.map { "İstek \(Formatting.byteCount($0))" },
-            info.responseBytes.map { "Yanıt \(Formatting.byteCount($0))" }
-        ].compactMap { $0 }
-        if !sizes.isEmpty {
-            field("Boyut", sizes.joined(separator: " · "))
+        Section("Bilgi") {
+            if let ms = info.durationMs { kv("Süre", "\(ms) ms") }
+            if let b = info.requestBytes { kv("İstek boyutu", Formatting.byteCount(b)) }
+            if let b = info.responseBytes { kv("Yanıt boyutu", Formatting.byteCount(b)) }
+            kv("Thread", entry.thread)
+            kv("Zaman", entry.date.formatted(date: .numeric, time: .standard))
         }
 
         if !info.requestHeaders.isEmpty {
-            section("İstek Header'ları") { headerList(info.requestHeaders) }
+            Section("İstek Header'ları") { headerRows(info.requestHeaders) }
         }
         if let body = info.requestBody, !body.isEmpty {
-            section("İstek Gövdesi") { CodeBlock(text: body) }
+            Section("İstek Gövdesi") { CodeBlock(text: body) }
         }
         if !info.responseHeaders.isEmpty {
-            section("Yanıt Header'ları") { headerList(info.responseHeaders) }
+            Section("Yanıt Header'ları") { headerRows(info.responseHeaders) }
         }
         if let body = info.responseBody, !body.isEmpty {
-            section("Yanıt Gövdesi") { CodeBlock(text: body) }
+            Section("Yanıt Gövdesi") { CodeBlock(text: body) }
         }
     }
 
+    // MARK: - Log bölümleri
+
     @ViewBuilder
-    private func headerList(_ headers: [(key: String, value: String)]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(headers, id: \.key) { header in
-                HStack(alignment: .top, spacing: 8) {
-                    Text(header.key).font(.caption.weight(.semibold))
-                    Spacer(minLength: 8)
-                    Text(header.value).font(.caption.monospaced()).foregroundStyle(.secondary)
-                        .multilineTextAlignment(.trailing).textSelection(.enabled)
-                }
+    private var logSections: some View {
+        Section {
+            HStack(spacing: 8) {
+                LevelDot(level: entry.level)
+                Text(entry.level.name).font(.callout.weight(.semibold)).foregroundStyle(entry.level.color)
+                Spacer()
+                Text(entry.category.rawValue)
+                    .font(.caption)
+                    .padding(.horizontal, 8).padding(.vertical, 2)
+                    .background(Color.secondary.opacity(0.15), in: Capsule())
             }
         }
-    }
 
-    // MARK: - Log içeriği
-
-    @ViewBuilder
-    private var logContent: some View {
-        field("Seviye", "\(entry.level.symbol) \(entry.level.name)", color: entry.level.color)
-        field("Kategori", entry.category.rawValue)
-        field("Zaman", entry.date.formatted(date: .numeric, time: .standard))
-        field("Thread", entry.thread)
-        field("Kaynak", "\(entry.fileName):\(entry.line) — \(entry.function)")
-
-        section("Mesaj") {
-            Text(entry.message).font(.callout.monospaced()).textSelection(.enabled)
+        Section("Mesaj") {
+            Text(entry.message)
+                .font(.callout.monospaced())
+                .textSelection(.enabled)
         }
 
         if !entry.metadata.isEmpty {
-            section("Metadata") {
+            Section("Metadata") {
                 ForEach(entry.metadata.sorted { $0.key < $1.key }, id: \.key) { key, value in
-                    HStack(alignment: .top) {
-                        Text(key).font(.caption.weight(.semibold))
-                        Spacer(minLength: 8)
-                        Text(value).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-                    }
+                    kv(key, value, mono: true)
                 }
             }
+        }
+
+        Section("Kaynak") {
+            kv("Dosya", "\(entry.fileName):\(entry.line)", mono: true)
+            kv("Fonksiyon", entry.function, mono: true)
+            kv("Thread", entry.thread)
+            kv("Zaman", entry.date.formatted(date: .numeric, time: .standard))
         }
     }
 
     // MARK: - Yardımcılar
 
     @ViewBuilder
-    private func field(_ title: String, _ value: String, color: Color = .primary) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.caption2).foregroundStyle(.secondary)
-            Text(value).font(.callout).foregroundStyle(color).textSelection(.enabled)
+    private func kv(_ key: String, _ value: String, mono: Bool = false) -> some View {
+        LabeledContent {
+            Text(value)
+                .font(mono ? .callout.monospaced() : .callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
+                .textSelection(.enabled)
+        } label: {
+            Text(key).font(.callout)
         }
     }
 
     @ViewBuilder
-    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title.uppercased()).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
-            content()
+    private func headerRows(_ headers: [(key: String, value: String)]) -> some View {
+        ForEach(headers, id: \.key) { header in
+            kv(header.key, header.value, mono: true)
         }
     }
 }
@@ -142,22 +148,20 @@ private struct CodeBlock: View {
 
     var body: some View {
         let display = Formatting.isJSON(text) ? Formatting.prettyJSON(text) : text
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(display)
                     .font(.caption.monospaced())
                     .textSelection(.enabled)
-                    .padding(10)
+                    .padding(.vertical, 4)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
             Button {
                 UIPasteboard.general.string = display
             } label: {
                 Label("Kopyala", systemImage: "doc.on.doc").font(.caption2)
             }
         }
+        .padding(.vertical, 2)
     }
 }
 #endif
