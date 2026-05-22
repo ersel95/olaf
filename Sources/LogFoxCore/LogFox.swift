@@ -39,18 +39,35 @@ public enum LogFox {
         line: Int = #line,
         function: String = #function
     ) {
-        guard let store = runtime.activeStore(for: level) else { return }
-        store.ingest(
-            date: Date(),
-            level: level,
-            category: category,
-            rawMessage: message(),
-            rawMetadata: metadata,
-            file: file,
-            line: line,
-            function: function,
-            thread: LogFoxRuntime.currentThreadLabel()
-        )
+        switch runtime.target(for: level) {
+        case .drop:
+            return
+        case .store(let store):
+            store.ingest(
+                date: Date(),
+                level: level,
+                category: category,
+                rawMessage: message(),
+                rawMetadata: metadata,
+                file: file,
+                line: line,
+                function: function,
+                thread: LogFoxRuntime.currentThreadLabel()
+            )
+        case .buffer:
+            // start() öncesi → tamponla (start'ta flush edilir, erken loglar kaybolmaz).
+            runtime.buffer(
+                date: Date(),
+                level: level,
+                category: category,
+                rawMessage: message(),
+                rawMetadata: metadata,
+                file: file,
+                line: line,
+                function: function,
+                thread: LogFoxRuntime.currentThreadLabel()
+            )
+        }
     }
 
     public static func trace(_ message: @autoclosure () -> String, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {

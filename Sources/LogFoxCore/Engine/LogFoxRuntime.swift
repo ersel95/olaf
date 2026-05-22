@@ -9,6 +9,30 @@ final class LogFoxRuntime: @unchecked Sendable {
     private var _minimumLevel: LogLevel = .debug
     private var _enabled = true
 
+    /// `start()` çağrılmadan ÖNCE atılan loglar buraya tamponlanır ve start'ta flush edilir.
+    /// (Uygulama açılışındaki erken loglar — örn. splash — kaybolmasın.)
+    private var _pending: [PendingLog] = []
+    private let maxPending = 1000
+
+    private struct PendingLog {
+        let date: Date
+        let level: LogLevel
+        let category: LogCategory
+        let rawMessage: String
+        let rawMetadata: [String: String]
+        let file: String
+        let line: Int
+        let function: String
+        let thread: String
+    }
+
+    /// Bir log çağrısının nereye gideceği.
+    enum LogTarget {
+        case store(LogStore)   // başlatıldı + seviye eşiğini geçti → doğrudan yaz
+        case buffer            // henüz başlatılmadı → tamponla (start'ta flush)
+        case drop              // kapalı veya seviye eşiğin altında → at
+    }
+
     // MARK: - Yaşam döngüsü
 
     /// İdempotent başlatma. İlk çağrı kazanır.
@@ -39,6 +63,24 @@ final class LogFoxRuntime: @unchecked Sendable {
             osLogMirror: mirror
         )
         _minimumLevel = configuration.minimumLevel
+
+        // start öncesi tamponlanan logları (seviye eşiğine göre) flush et.
+        if let store = _store, !_pending.isEmpty {
+            for pending in _pending where pending.level >= _minimumLevel {
+                store.ingest(
+                    date: pending.date,
+                    level: pending.level,
+                    category: pending.category,
+                    rawMessage: pending.rawMessage,
+                    rawMetadata: pending.rawMetadata,
+                    file: pending.file,
+                    line: pending.line,
+                    function: pending.function,
+                    thread: pending.thread
+                )
+            }
+            _pending.removeAll()
+        }
     }
 
     // MARK: - Erişim
@@ -58,12 +100,37 @@ final class LogFoxRuntime: @unchecked Sendable {
         set { lock.lock(); _enabled = newValue; lock.unlock() }
     }
 
-    /// Hızlı kapı: log işlenecekse aktif store'u döndürür, aksi halde `nil`.
-    /// (kill switch kapalı veya seviye eşiğin altındaysa mesaj compute edilmez.)
-    func activeStore(for level: LogLevel) -> LogStore? {
+    /// Bir log çağrısının hedefini belirler (mesaj yalnız `.drop` değilse compute edilir).
+    func target(for level: LogLevel) -> LogTarget {
         lock.lock(); defer { lock.unlock() }
-        guard _enabled, let store = _store, level >= _minimumLevel else { return nil }
-        return store
+        guard _enabled else { return .drop }
+        if let store = _store {
+            return level >= _minimumLevel ? .store(store) : .drop
+        }
+        return .buffer   // henüz başlatılmadı → tamponla
+    }
+
+    /// Start öncesi log'u tamponlar (start bu arada çağrıldıysa doğrudan store'a yazar).
+    func buffer(
+        date: Date,
+        level: LogLevel,
+        category: LogCategory,
+        rawMessage: String,
+        rawMetadata: [String: String],
+        file: String,
+        line: Int,
+        function: String,
+        thread: String
+    ) {
+        lock.lock(); defer { lock.unlock() }
+        if let store = _store {
+            store.ingest(date: date, level: level, category: category, rawMessage: rawMessage, rawMetadata: rawMetadata, file: file, line: line, function: function, thread: thread)
+            return
+        }
+        _pending.append(PendingLog(date: date, level: level, category: category, rawMessage: rawMessage, rawMetadata: rawMetadata, file: file, line: line, function: function, thread: thread))
+        if _pending.count > maxPending {
+            _pending.removeFirst(_pending.count - maxPending)
+        }
     }
 
     // MARK: - Yardımcılar
