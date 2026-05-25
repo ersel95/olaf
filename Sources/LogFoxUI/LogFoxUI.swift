@@ -18,7 +18,8 @@ public enum LogFoxUI {
 
     /// Cihaz sallandığında viewer'ı açacak gözlemciyi kurar ve verilen dış araçları kaydeder.
     /// İdempotent; bir kez çağırın.
-    /// - Parameter tools: Host'un etkinleştirmeye karar verdiği geçiş köprüleri (Netfox, Pulse...).
+    /// - Parameter tools: Host'un eklemek istediği özel dış araç köprüleri. (Netfox için ayrı
+    ///   `LogFoxNetfox` ürünü + `LogFoxNetfox.install()` kullanın.)
     @MainActor
     public static func install(tools: [any ExternalToolBridge] = []) {
         #if canImport(UIKit)
@@ -29,7 +30,7 @@ public enum LogFoxUI {
         }
     }
 
-    /// Tek bir dış araç köprüsü kaydeder (örn. Netfox/Pulse). Viewer'da geçiş butonu olur.
+    /// Tek bir özel dış araç köprüsü kaydeder. Viewer'da geçiş butonu olur. (Netfox için `LogFoxNetfox`.)
     public static func register(_ bridge: any ExternalToolBridge) {
         ExternalToolRegistry.shared.register(bridge)
     }
@@ -55,11 +56,10 @@ public enum LogFoxUI {
         #endif
     }
 
-    /// Gömülebilir bir SwiftUI aracını (örn. Pulse `ConsoleView`) LogFox'un kendi penceresi
-    /// üzerinde modal olarak sunar. Kapanınca LogFox viewer'a geri dönülür.
+    /// Gömülebilir bir SwiftUI aracını LogFox'un kendi penceresi üzerinde modal olarak sunar.
+    /// Kapanınca LogFox viewer'a geri dönülür.
     ///
-    /// Netfox gibi kendini sunan UIKit araçları bunun yerine `dismiss()` + kendi `show()`'unu
-    /// kullanmalıdır.
+    /// Netfox gibi kendini sunan UIKit araçları bunun yerine `dismiss()` + kendi `show()`'unu kullanmalıdır.
     @MainActor
     public static func presentExternal<Content: View>(@ViewBuilder _ content: () -> Content) {
         #if canImport(UIKit)

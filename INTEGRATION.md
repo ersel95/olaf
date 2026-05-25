@@ -1,220 +1,145 @@
 # LogFox — Entegrasyon Rehberi
 
-LogFox'u uygulamaya, **Netfox** ve **Pulse** ile uyumlu olacak şekilde bağlamak için rehber.
+LogFox'u uygulamaya bağlamak için rehber. **Netfox** geçişi opsiyonel `LogFoxNetfox` ürünüyle gelir.
 
-> **Tasarım ilkesi:** Paket Netfox/Pulse'a **bağlı değildir**. Bu araçlara geçiş host app tarafında, `#if canImport(...)` ile opsiyonel olarak kurulur. Bir projede **yalnız bir** network logger aktiftir; host hangisini kullandığını bir enum (`.netfox` / `.pulse` / `.none`) ile **init sırasında** seçer. Hızlı yol için: tek-dosya template [`Integration/LogFoxIntegration.swift`](Integration/LogFoxIntegration.swift) ve makine-takipli [`AGENTS.md`](AGENTS.md).
+> **Tasarım ilkesi:** Çekirdek (LogFoxCore/UI) hiçbir dış araca bağlı değildir. Netfox entegrasyonu
+> **ayrı bir ürün** (`LogFoxNetfox`) ile izole edilmiştir — host bunu seçtiğinde netfox linklenir; host
+> doğrudan `import netfox` yapmaz. Başka araçlar (örn. Pulse) jenerik `ExternalToolBridge` ile host'ta eklenebilir.
+> Hızlı yol: tek-dosya template [`Integration/LogFoxIntegration.swift`](Integration/LogFoxIntegration.swift)
+> ve makine-takipli [`AGENTS.md`](AGENTS.md).
 
-> **Gating notu:** TestFlight build'i genelde UAT/Prod config'tedir; `#if DEBUG` yalnız Test config'te tanımlıdır. LogFox'u `#if DEBUG`'a bağlama — **runtime feature flag** kullan. PROD davranışını siz ayarlarsınız.
-
----
-
-## Neden `canImport` host tarafında?
-
-`#if canImport(PulseUI)` derleme zamanında **modül o target'a link'liyse** doğrudur. LogFox paketi Netfox/Pulse'a bağlı olmadığından, paket içinde `canImport(PulseUI)` **her zaman `false`** döner. Bu yüzden tespit, Netfox/Pulse'ın gerçekten link'lendiği **host app**'te yapılır. Host, sonucu (etkin köprüler listesini) init'te pakete verir → "karar SPM'e init'te gönderilir".
-
-```
-Host app  ──(seçili logger: .netfox/.pulse/.none + canImport)──►  LogFoxUI.install(tools: [...])
-                                                                        │
-shake ──► LogFox viewer ──► [Netfox] veya [Pulse] butonu (seçilen tek araç)
-```
+> **Gating notu:** TestFlight build'i genelde UAT/Prod config'tedir; `#if DEBUG` yalnız Test config'te tanımlıdır.
+> LogFox'u `#if DEBUG`'a bağlama — `#if !PROD` derleme sınırı (önerilen, capture kodu prod binary'sine girmez)
+> veya runtime feature flag kullan.
 
 ---
 
 ## 1. Paketi ekle
 
-Xcode → Add Packages → `https://github.com/ersel95/logfox` → ana app target'ına:
-- `LogFoxCore`
-- `LogFoxUI`
-- `LogFoxNetwork` *(opsiyonel — network loglarını LogFox'ta görmek isterseniz, §7)*
+Xcode → Add Packages → `https://github.com/ersel95/logfox` → ana app target'ına ("Choose Package Products"):
+- `LogFoxCore` (motor) + `LogFoxUI` (viewer) — zorunlu
+- `LogFoxNetwork` — network loglarını LogFox'ta görmek için (§4)
+- `LogFoxNetfox` — Netfox geçişi için (§3)
 
 (App extension'lara yalnız `LogFoxCore`.)
 
 ## 2. Entegrasyon dosyasını kopyala
 
-[`Integration/LogFoxIntegration.swift`](Integration/LogFoxIntegration.swift) dosyasını host app'e (örn. `Core/Utils/`) kopyalayın. İçinde `LogFoxManager`, `LogFoxNetworkLogger` enum'u ve canImport-gate'li `NetfoxBridge` + `PulseBridge` hazırdır. `// ADAPT:` satırlarını uyarlayın.
-
-Özet (tam içerik template dosyasında):
+[`Integration/LogFoxIntegration.swift`](Integration/LogFoxIntegration.swift) dosyasını host app'e (örn. `Core/Utils/`)
+kopyalayın. İçinde `LogFoxManager` (başlatma + loglama) ve `LogFoxNetworkLogger` enum'u hazırdır.
+**Köprü tanımı içermez** — Netfox köprüsü pakettedir. `// ADAPT:` satırlarını uyarlayın.
 
 ```swift
-import LogFoxCore
+@_exported import LogFoxCore
 import LogFoxUI
-#if canImport(netfox)
-import netfox
+#if canImport(LogFoxNetwork)
+import LogFoxNetwork
 #endif
-#if canImport(PulseUI)
-import PulseUI
+#if canImport(LogFoxNetfox)
+import LogFoxNetfox
 #endif
 
-/// Projede aktif olan tek network logger.
-public enum LogFoxNetworkLogger { case netfox, pulse, none }
+public enum LogFoxNetworkLogger { case netfox, none }
 
 public final class LogFoxManager {
     public static let shared = LogFoxManager()
     private init() {}
+    private var activeNetwork: LogFoxNetworkLogger = .none
 
-    public func initialize(networkLogger: LogFoxNetworkLogger = .none) {
+    public func initialize(network: LogFoxNetworkLogger = .none) {
         #if !PROD
+        activeNetwork = network
         LogFox.start(.bankingDefault)
+        #if canImport(LogFoxNetwork)
+        LogFoxNetwork.startAutomaticCapture()
+        #endif
+        if network == .netfox {
+            #if canImport(LogFoxNetfox)
+            LogFoxNetfox.startCapture()      // NFX.start + shake'i LogFox'a bırak
+            #endif
+        }
         Task { @MainActor in
-            var bridges: [any ExternalToolBridge] = []
-            switch networkLogger {
-            case .netfox:
-                #if canImport(netfox)
-                bridges.append(NetfoxBridge())
+            LogFoxUI.install()
+            if network == .netfox {
+                #if canImport(LogFoxNetfox)
+                LogFoxNetfox.install()       // viewer'da "Netfox" butonu
                 #endif
-            case .pulse:
-                #if canImport(PulseUI)
-                bridges.append(PulseBridge())
-                #endif
-            case .none:
-                break
             }
-            LogFoxUI.install(tools: bridges)
         }
         #endif
     }
 }
 ```
 
-### Netfox köprüsü (kendini sunan UIKit aracı)
-```swift
-#if canImport(netfox)
-struct NetfoxBridge: ExternalToolBridge {
-    let title = "Netfox"
-    var systemImage: String? { "network" }
-    @MainActor func open() {
-        LogFoxUI.dismiss()
-        NFX.sharedInstance().show()
-    }
-}
-#endif
-```
-
-### Pulse köprüsü (gömülebilir SwiftUI aracı)
-```swift
-#if canImport(PulseUI)
-struct PulseBridge: ExternalToolBridge {
-    let title = "Pulse"
-    var systemImage: String? { "waveform.path.ecg" }
-    @MainActor func open() {
-        LogFoxUI.presentExternal { PulseConsoleScreen() }
-    }
-}
-
-private struct PulseConsoleScreen: View {
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        NavigationStack {
-            ConsoleView()
-                .navigationTitle("Pulse")
-                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Kapat") { dismiss() } } }
-        }
-    }
-}
-#endif
-```
-
-> **İki sunum modeli:** Netfox kendi penceresinde açılır → köprü `dismiss()` + `NFX.show()` yapar. Pulse gömülebilir bir SwiftUI ekranıdır → `LogFoxUI.presentExternal { ... }` ile LogFox'un kendi penceresi üzerinde modal sunulur; "Kapat" LogFox viewer'a döner.
-
 ## 3. Başlatmayı bağla
 
-App giriş noktanızda (SwiftUI `App.init` veya `AppDelegate.didFinishLaunching`, mevcut Netfox init'inin yanına):
+App giriş noktanızda — **paylaşılan URLSession kurulmadan ÖNCE** (SwiftUI `App.init` veya
+`AppDelegate.didFinishLaunching` başı, session preload'undan önce):
 ```swift
-DispatchQueue.main.async {
-    NetfoxManager.shared.initialize()   // (Netfox kullanılıyorsa) içinde setGesture(.custom)
-    LogFoxManager.shared.initialize(networkLogger: .netfox)   // .netfox / .pulse / .none
-}
+LogFoxManager.shared.initialize(network: .netfox)   // .netfox / .none
 ```
+`LogFoxNetfox.startCapture()` Netfox'u başlatır ve shake'ini otomatik kapatır (`NFX.setGesture(.custom)`) →
+shake artık LogFox'a aittir, içeriden Netfox'a geçilir. Host'un ayrıca `NFX.start()` çağırmasına gerek yoktur.
 
-## 4. Netfox'u shake'ten çıkar (çakışma çözümü)
+## 4. Network loglarını LogFox'ta listelemek — `LogFoxNetwork`
 
-`NetfoxManager.initialize()` içinde, `NFX.sharedInstance().start()` ardına:
-```swift
-NFX.sharedInstance().setGesture(.custom)   // shake artık LogFox'a ait
-```
-Böylece **shake → LogFox açılır**; içeriden Netfox/Pulse'a geçilir. (Pulse'ın shake'i yoktur, ek işlem gerekmez.)
-
-## 5. Developer Options toggle (opsiyonel)
-
-`DeveloperConfigView`'a "LogFox" satırı: `LogFox.isEnabled` aç/kapat, "Logları göster" (`LogFoxUI.present()`), "Temizle" (`LogFox.clear()`), "Paylaş" (`LogFox.exportFileURL()`).
-
-## 6. (Opsiyonel) Network loglarını LogFox'ta listelemek — `LogFoxNetwork`
-
-LogFox kendi `URLProtocol`'ü ile istek/yanıtları yakalayıp `.network` kategorisinde, **BankingRedactor'dan
-geçirerek** (PAN/IBAN/token maskeli) loglar. Böylece app + network logları tek listede görünür; Netfox/Pulse'a
-geçiş butonu derin inceleme için kalır.
+İstek/yanıtları `.network` kategorisinde, **BankingRedactor'dan geçirerek** (PAN/IBAN/token maskeli) loglar.
 
 ### ÖNERİLEN: tek satır otomatik capture (networking koduna dokunmadan)
-
-`startAutomaticCapture()`, `URLSessionConfiguration`'ı swizzle ederek **tüm** session'lara (Alamofire dahil)
-protokolü otomatik enjekte eder ve proxy session sunucu trust'ını kabul eder → **SSL/sertifika kırılmaz**.
-`LogFoxManager.initialize()` içinde tek satır; **ağ katmanınıza (URLSession config'iniz) dokunmaya gerek yok** (drop-in template'te hazır):
-
+`startAutomaticCapture()`, `URLSessionConfiguration`'ı swizzle ederek tüm session'lara (Alamofire dahil)
+protokolü enjekte eder; proxy session sunucu trust'ını kabul eder → **SSL/sertifika kırılmaz**. `initialize` içinde hazır:
 ```swift
-import LogFoxNetwork
 LogFoxNetwork.startAutomaticCapture()                                // gövde+header default açık
-
-// Hangi baseURL'leri yakalayacağını init'te filtrele:
 LogFoxNetwork.startAutomaticCapture(LogFoxNetworkConfiguration(
     capturesBodies: false,
-    includedURLs: ["api-gateway"],                                   // YALNIZ kendi API'm
-    excludedURLs: ["firebaseio", "crashlytics", "googleapis", "app-measurement"] // SDK gürültüsünü gizle
+    includedURLs: ["api-gateway"],                                   // boş = tümü
+    excludedURLs: ["firebaseio", "crashlytics", "googleapis"]        // SDK gürültüsünü gizle (öncelikli)
 ))
 ```
-> `includedURLs` boşsa tümü yakalanır. `excludedURLs`, `includedURLs`'ten önceliklidir. Filtre dışı
-> istekler **hiç yakalanmaz** (olduğu gibi geçer, redaksiyon/log maliyeti de olmaz).
 
-> **Neden bu yöntem?** Eskiden önerilen `install(into: sessionConfiguration)` yaklaşımı, isteği kendi proxy
-> session'ında yeniden başlattığı için host'un `ServerTrustManager`'ını (pinned/internal sertifika) taşımıyor
-> ve iç UAT sertifikalarında "certificate invalid" hatasıyla **trafiği kırıyordu**. `startAutomaticCapture`
-> hem bu sorunu çözer (trust kabul) hem de ağ katmanınıza dokunmaz.
-
-### Gelişmiş (opsiyonel): manuel enjeksiyon
-
+### Kendi özel session'ınız varsa: deterministik enjeksiyon + Netfox zinciri
+Host kendi `URLSessionConfiguration`'ını kuruyorsa, otomatik swizzle yerine session kurulurken tek satır.
+Bu, `.netfox` modunda LogFox'u Netfox'a **zincirler** (URLProtocol "ilk eşleşen kazanır" → LogFox yakalar,
+proxy'sinden Netfox'a geçirir → ikisi de görür):
 ```swift
-LogFoxNetwork.install(into: sessionConfiguration)          // belirli bir config'e
-LogFoxNetwork.install(into: config, chainingTo: [NFXProtocol.self])  // Netfox ile zincirleme
+// LogFoxManager içindeki configureNetworkCapture(_:) yardımcısı:
+LogFoxManager.shared.configureNetworkCapture(configuration)
+// (içeride: LogFoxNetwork.install(into: configuration, chainingTo: LogFoxNetfox.chainProtocolClasses))
 ```
+Bunu kullanıyorsanız `startAutomaticCapture`'a gerek kalmaz.
 
-> **Güvenlik:** Gövde/header default açıktır → tüm trafik loglanır. Hepsi `BankingRedactor`'dan geçer
-> (PAN/IBAN/token, `Authorization`/`Cookie` header'ları maskelenir), ancak keyfi JSON'daki her PII garanti
-> yakalanamaz. Trust kabulü ve gövde loglama **yalnız non-prod debug** içindir → network capture PROD'da çalışmamalı.
+> **Güvenlik:** Gövde/header default açıktır → tüm trafik loglanır (BankingRedactor maskeler ama keyfi JSON'daki
+> her PII garanti değil). Trust kabulü ve gövde loglama **yalnız non-prod debug** içindir → PROD'da çalışmamalı.
 
-## 7. Uygulamada loglama — her zaman `LogFoxManager` üzerinden
+## 5. Uygulamada loglama — her zaman `LogFoxManager` üzerinden
 
-Uygulama kodu `LogFox`'a **doğrudan bağlanmaz**; tek entegrasyon noktası olan manager üzerinden loglar.
-`LogFoxManager` `trace/debug/info/notice/warning/error/critical` + `error(Error)` sağlar; çağıran dosya/satır
-korunur, LogFox başlatılmamışsa (PROD) no-op'tur.
-
+Uygulama kodu `LogFox`'a doğrudan bağlanmaz; manager üzerinden loglar (`trace/debug/info/notice/warning/error/critical`
++ `error(Error)`; çağıran dosya/satır korunur, PROD'da no-op).
 ```swift
-// önce:
-print("⚠️ token decode hatası")
-// sonra:
 LogFoxManager.shared.warning("token decode hatası", category: .security)
 LogFoxManager.shared.error(error, category: .payment, metadata: ["code": code])
 ```
-Kademeli göç önerilir. Network logları `LogFoxNetwork.startAutomaticCapture()` ile otomatik yakalanır;
-manager'a yalnız üst-seviye iş olayları girer.
 
 ### Kategorileri genişletme
-
-`LogCategory` string-backed'tir; entegrasyon dosyasındaki `extension LogCategory` bloğuna projenizin
-modüllerini ekleyin:
-
+Entegrasyon dosyasındaki `extension LogCategory` bloğuna projenizin modüllerini ekleyin:
 ```swift
 public extension LogCategory {
     static let cards: LogCategory = "cards"
-    static let accounts: LogCategory = "accounts"
     static let transfers: LogCategory = "transfers"
 }
 ```
-
-Entegrasyon dosyası `@_exported import LogFoxCore` içerir → çağrı yerlerinde `import LogFoxCore` yazmadan
-`LogFoxManager.shared.info("...", category: .cards)` kullanabilirsiniz. Viewer'da bu kategoriler filtre
-ve kategori chip'i olarak otomatik görünür.
+Dosya `@_exported import LogFoxCore` içerir → çağrı yerleri `import LogFoxCore` yazmadan kullanabilir.
 
 ---
 
-## Pulse hakkında not
-
-Pulse'ın **network yakalaması** host'un kendi Pulse kurulumudur (`URLSessionProxyDelegate` / `Experimental.URLSessionProxy`) — LogFox kapsamı dışındadır. LogFox yalnız Pulse konsoluna **geçiş** sağlar. Pulse'ı kendi loglama backend'iniz olarak da kullanmak isterseniz, gelecekte LogFox için bir `swift-log` / Pulse köprüsü (Faz 4) eklenebilir.
+## Netfox dışında bir araç eklemek
+Jenerik geçiş `ExternalToolBridge` ile yapılır:
+```swift
+struct SomeToolBridge: ExternalToolBridge {
+    let title = "SomeTool"
+    @MainActor func open() { /* dismiss + show, ya da LogFoxUI.presentExternal { ... } */ }
+}
+LogFoxUI.register(SomeToolBridge())
+```
+Gömülebilir SwiftUI araçları için `LogFoxUI.presentExternal { SomeView() }`; kendini sunan UIKit araçları için
+`LogFoxUI.dismiss()` + aracın kendi `show()`'u.

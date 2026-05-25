@@ -15,7 +15,7 @@ Tasarım/fizibilite detayları için ana projedeki `LOGFOX_REPORT.md`'ye bakın.
 | **0 — İskelet** | SPM, model'ler | ✅ |
 | **1 — Core motor** | Ring buffer, redaksiyon, NDJSON disk persistans + oturumlar arası geçmiş, OSLog köprüsü, facade | ✅ |
 | **2 — Viewer (LogFoxUI)** | Shake → SwiftUI düz metin viewer, **Oturum/Geçmiş** kapsamı, filtre/arama/paylaşım, canlı akış | ✅ |
-| **3 — Araç köprüleri** | `ExternalToolBridge` + `install(tools:)` + `presentExternal` → **Netfox & Pulse** geçişi, shake sahipliği devri (app tarafı: `INTEGRATION.md` / `AGENTS.md`) | ✅ |
+| **3 — Araç köprüleri** | `ExternalToolBridge` + `presentExternal`; **Netfox** geçişi opsiyonel `LogFoxNetfox` ürünüyle, shake sahipliği devri (app tarafı: `INTEGRATION.md` / `AGENTS.md`) | ✅ |
 | **N — Network capture (LogFoxNetwork)** | Opsiyonel URLProtocol; istek/yanıt `.network` kategorisinde, redaksiyonlu → app+network tek listede | ✅ |
 | **5 — UX & paylaşım** | Pulse tarzı detay (status banner, pretty-JSON gövde), Netfox tarzı paylaşım (Basit/Tam log + cURL), kopyalama toast, start öncesi log tamponlama, oturum bazlı geçmiş | ✅ |
 | 4 — Köprüler | OSLogStore importer, swift-log backend | ⏳ |
@@ -23,9 +23,10 @@ Tasarım/fizibilite detayları için ana projedeki `LOGFOX_REPORT.md`'ye bakın.
 ## Kurulum (SPM)
 
 ```swift
-.package(url: "https://github.com/ersel95/logfox.git", from: "0.9.0")
+.package(url: "https://github.com/ersel95/logfox.git", from: "0.15.0")
 ```
-Ürünler: `LogFoxCore` (motor) · `LogFoxUI` (viewer) · `LogFoxNetwork` (opsiyonel network capture).
+Ürünler: `LogFoxCore` (motor) · `LogFoxUI` (viewer) · `LogFoxNetwork` (opsiyonel network capture) ·
+`LogFoxNetfox` (opsiyonel Netfox köprüsü).
 
 > Uygulamada doğrudan `LogFox.x(...)` çağırmak yerine tek entegrasyon noktası olan `LogFoxManager`
 > üzerinden loglamanız önerilir — bkz. [`INTEGRATION.md`](INTEGRATION.md).
@@ -54,27 +55,25 @@ LogFox.clear()
 LogFox.isEnabled = false
 ```
 
-### In-app viewer (LogFoxUI) + Netfox / Pulse geçişi
+### In-app viewer (LogFoxUI) + Netfox geçişi
 
-LogFox, **Netfox** ve **Pulse** ile uyumludur. Paket bunlara bağlı değildir. Bir projede **yalnız bir**
-network logger aktiftir; host bunu bir enum ile init'te seçer. Köprüler host tarafında `#if canImport`
-ile tanımlıdır (`Integration/LogFoxIntegration.swift`):
+Shake → LogFox viewer. **Netfox** geçişi opsiyonel **`LogFoxNetfox` ürünüyle** gelir (host netfox'u
+doğrudan import etmez; köprü pakettedir). Host init'te `.netfox`/`.none` seçer:
 
 ```swift
-// Host entegrasyon dosyasında:
-public enum LogFoxNetworkLogger { case netfox, pulse, none }
+// Host entegrasyon dosyasında (Integration/LogFoxIntegration.swift):
+LogFoxManager.shared.initialize(network: .netfox)   // .netfox / .none
 
-LogFoxManager.shared.initialize(networkLogger: .netfox)   // .netfox / .pulse / .none
-
-// Paket API'si (host köprüleri bununla kaydeder):
-LogFoxUI.install(tools: bridges)              // shake → viewer
+// Paket API'si:
+LogFoxUI.install()                             // shake → viewer
+LogFoxNetfox.install()                         // viewer'da "Netfox" butonu (LogFoxNetfox ürünü gerekir)
 LogFoxUI.present(); LogFoxUI.dismiss()
-LogFoxUI.presentExternal { ConsoleView() }    // Pulse gibi gömülebilir araçlar için
+LogFoxUI.presentExternal { SomeView() }        // gömülebilir SwiftUI araçları için
 ```
 
-Shake sahibi LogFox'tur; viewer içinden **seçilen tek** araca (Netfox **veya** Pulse) geçilir.
-Geçiş butonu artık ••• menüsünde değil, viewer'ın **alt barında** belirgindir.
-Netfox kullanılıyorsa shake'ini kapatın (`NFX.sharedInstance().setGesture(.custom)`).
+Shake sahibi LogFox'tur; `LogFoxNetfox.startCapture()` Netfox'un shake'ini otomatik kapatır
+(`NFX.setGesture(.custom)`). Geçiş butonu viewer'ın **alt barındadır**.
+Netfox dışında bir araç eklemek için jenerik `ExternalToolBridge` + `LogFoxUI.register(_:)` kullanın.
 
 ### Network loglarını LogFox'ta listelemek (LogFoxNetwork)
 

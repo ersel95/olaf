@@ -2,7 +2,7 @@
 import SwiftUI
 import LogFoxCore
 
-/// Tek log satırı. `.network` kayıtları Pulse tarzı network satırı olarak, diğerleri
+/// Tek log satırı. `.network` kayıtları kompakt network satırı olarak, diğerleri
 /// seviye-renkli log satırı olarak render edilir.
 struct LogRowView: View {
     let entry: LogEntry

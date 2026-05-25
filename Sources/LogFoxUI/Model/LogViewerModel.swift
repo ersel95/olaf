@@ -18,7 +18,7 @@ public final class LogViewerModel: ObservableObject {
 
     /// Filtreler.
     @Published public var searchText: String = ""
-    /// Gösterilecek seviyeler (Pulse tarzı çoklu seçim). Boş = hepsi.
+    /// Gösterilecek seviyeler (çoklu seçim). Boş = hepsi.
     @Published public var enabledLevels: Set<LogLevel> = Set(LogLevel.allCases)
     @Published public var selectedCategories: Set<LogCategory> = []
 

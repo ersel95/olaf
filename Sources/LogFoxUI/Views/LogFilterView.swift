@@ -2,7 +2,7 @@
 import SwiftUI
 import LogFoxCore
 
-/// Pulse tarzı filtre ekranı: seviye ve kategori toggle'ları.
+/// Filtre ekranı: seviye ve kategori toggle'ları.
 struct LogFilterView: View {
     @ObservedObject var model: LogViewerModel
     @Environment(\.dismiss) private var dismiss

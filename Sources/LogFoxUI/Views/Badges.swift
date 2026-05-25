@@ -2,7 +2,7 @@
 import SwiftUI
 import LogFoxCore
 
-/// HTTP durum kodu / hata için renkli kapsül (Pulse tarzı).
+/// HTTP durum kodu / hata için renkli kapsül.
 struct StatusPill: View {
     let statusCode: Int?
     let isFailure: Bool

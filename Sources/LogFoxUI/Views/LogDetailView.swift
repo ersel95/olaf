@@ -2,7 +2,7 @@
 import SwiftUI
 import LogFoxCore
 
-/// Tek kaydın detayı — Pulse tarzı: renkli status başlığı + gruplu List + alt ekranlara
+/// Tek kaydın detayı: renkli status başlığı + gruplu List + alt ekranlara
 /// navigation (header'lar, gövde, cURL, metrikler). `.network` dışı kayıtlar seviye + mesaj + metadata.
 struct LogDetailView: View {
     let entry: LogEntry
@@ -203,7 +203,7 @@ struct LogDetailView: View {
 
 // MARK: - Banner'lar
 
-/// Network status başlığı (Pulse tarzı tam-genişlik renkli banner).
+/// Network status başlığı (tam-genişlik renkli banner).
 private struct StatusBanner: View {
     let info: NetworkLogInfo
 
