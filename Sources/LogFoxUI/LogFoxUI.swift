@@ -2,25 +2,18 @@ import Foundation
 import SwiftUI
 import LogFoxCore
 
-/// LogFoxUI'ın genel cephesi: shake → viewer kurulumu, dış araç (Netfox / Pulse) kaydı, sunum.
+/// LogFoxUI'ın genel cephesi: shake → viewer kurulumu, dış araç (Netfox) kaydı, sunum.
 ///
-/// Dış araçlar **host app tarafında** belirlenir ve init'te gönderilir. `#if canImport(...)`
-/// kontrolleri host'ta yapılmalıdır (Netfox/Pulse modülleri orada link'lenir; bu paket onlara
-/// bağlı değildir → paket içinde `canImport` her zaman `false` döner).
+/// Netfox köprüsü ayrı bir ürün/modüldedir (**LogFoxNetfox**). Tüketici bu ürünü target'a ekleyip
+/// init'te `LogFoxNetfox.install()` çağırınca köprü buraya kaydedilir ve viewer'da "Netfox" butonu çıkar.
 ///
 /// ```swift
 /// LogFox.start(.bankingDefault)
-///
-/// var tools: [any ExternalToolBridge] = []
-/// #if canImport(netfox)
-/// if config.enableNetfox { tools.append(NetfoxBridge()) }
-/// #endif
-/// #if canImport(PulseUI)
-/// if config.enablePulse { tools.append(PulseBridge()) }
-/// #endif
-///
-/// LogFoxUI.install(tools: tools)   // karar init'te gönderilir
+/// LogFoxUI.install()       // viewer (shake) kurulumu
+/// LogFoxNetfox.install()   // LogFoxNetfox ürünü eklendiyse: Netfox butonunu ekler
 /// ```
+///
+/// Kendi özel aracını eklemek istersen `install(tools:)` veya `register(_:)` kullanabilirsin.
 public enum LogFoxUI {
 
     /// Cihaz sallandığında viewer'ı açacak gözlemciyi kurar ve verilen dış araçları kaydeder.
