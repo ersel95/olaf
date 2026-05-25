@@ -41,7 +41,9 @@ public enum LogFoxNetwork {
     ) {
         self.configuration = networkConfiguration
         self.chainedProtocolClasses = chainedClasses
-        var classes = configuration.protocolClasses ?? []
+        // Var olan kopyaları ele, garantili en öne ekle (URLProtocol "ilk eşleşen kazanır").
+        let id = ObjectIdentifier(LogFoxURLProtocol.self)
+        var classes = (configuration.protocolClasses ?? []).filter { ObjectIdentifier($0) != id }
         classes.insert(LogFoxURLProtocol.self, at: 0)
         configuration.protocolClasses = classes
     }

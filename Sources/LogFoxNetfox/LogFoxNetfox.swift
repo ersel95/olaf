@@ -1,22 +1,27 @@
 import Foundation
 import LogFoxUI
 
-/// LogFox ↔ Netfox köprü ürünü.
-///
-/// Bu ürünü (`LogFoxNetfox`) hedefinize eklediğinizde netfox linklenir. Köprünün LogFox viewer'ında
-/// "Netfox" butonu olarak görünmesi için init sırasında **bir kez** `LogFoxNetfox.install()` çağırın:
-///
-/// ```swift
-/// LogFox.start(.bankingDefault)
-/// LogFoxUI.install()        // viewer
-/// LogFoxNetfox.install()    // Netfox butonu
-/// ```
-///
-/// (Swift'te bir modül linklenince kendi kodunu otomatik çalıştıramaz; bu yüzden tek satırlık
-/// `install()` çağrısı gerekir. `canImport(UIKit)` olmayan platformlarda no-op'tur.)
+/// LogFox ↔ Netfox köprü ürünü. Host'un netfox'u doğrudan import etmesi gerekmez.
 public enum LogFoxNetfox {
 
-    /// Netfox köprüsünü LogFox viewer'ına kaydeder. İdempotent değildir; bir kez çağırın.
+    /// Netfox'u başlatır ve shake jestini LogFox'a bırakır. İdempotent; `canImport(UIKit)` yoksa no-op.
+    public static func startCapture() {
+        #if canImport(UIKit)
+        NFX.sharedInstance().start()
+        NFX.sharedInstance().setGesture(.custom)
+        #endif
+    }
+
+    /// `LogFoxNetwork.install(chainingTo:)`'a verilecek Netfox URLProtocol'ü — LogFox proxy'sine zincirlenir.
+    public static var chainProtocolClasses: [AnyClass] {
+        #if canImport(UIKit)
+        return [NFXProtocol.self]
+        #else
+        return []
+        #endif
+    }
+
+    /// Netfox köprüsünü viewer'a kaydeder (toolbar'da "Netfox" butonu). Bir kez çağırın.
     @MainActor
     public static func install() {
         #if canImport(UIKit)
@@ -28,14 +33,13 @@ public enum LogFoxNetfox {
 #if canImport(UIKit)
 import netfox
 
-/// Netfox network logger'a geçiş köprüsü.
 struct NetfoxBridge: ExternalToolBridge {
     let title = "Netfox"
     var systemImage: String? { "network" }
 
     @MainActor func open() {
-        LogFoxUI.dismiss()          // önce LogFox'u kapat
-        NFX.sharedInstance().show() // Netfox kendi penceresinde açılır
+        LogFoxUI.dismiss()
+        NFX.sharedInstance().show()
     }
 }
 #endif

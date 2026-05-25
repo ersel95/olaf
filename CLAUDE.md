@@ -8,8 +8,10 @@ Generic, taşınabilir Swift logging + in-app log viewer paketi. Netfox'un netwo
   (oturum bazlı geçmiş), OSLog köprüsü, start-öncesi log tamponlama. Her platformda derlenir/test edilir.
 - **LogFoxUI** — SwiftUI viewer (shake → liste/detay, filtre, paylaşım). Tüm içerik `#if canImport(UIKit)` gate'li.
 - **LogFoxNetfox** — opsiyonel Netfox köprü ürünü (`Sources/LogFoxNetfox/`). netfox'a bağlı; "Choose Package
-  Products"ta ayrı ürün olarak görünür. Tüketici target'a ekler + `LogFoxNetfox.install()` çağırır → viewer'da
-  "Netfox" butonu. `NetfoxBridge` + köprü gövdesi `#if canImport(UIKit)` gate'li (netfox iOS-only). Bkz. Sürümleme.
+  Products"ta ayrı ürün olarak görünür. Host netfox'u DOĞRUDAN import etmez; Netfox yaşam döngüsü/zincirleme
+  buradan verilir: `startCapture()` (NFX.start + shake'i LogFox'a), `install()` (viewer'da "Netfox" butonu),
+  `chainProtocolClasses` (`[NFXProtocol.self]` — `LogFoxNetwork.install(chainingTo:)` ile paylaşılan session'da
+  LogFox→Netfox zinciri). Tümü `#if canImport(UIKit)` gate'li (netfox iOS-only).
 - **LogFoxNetwork** — opsiyonel URLProtocol network capture; `.network` kategorisinde, redaksiyonlu.
   - `startAutomaticCapture(config)` — URLSessionConfiguration swizzle ile tüm session'lara otomatik enjekte (host'un networking koduna dokunmadan); proxy session sunucu trust'ını kabul eder (SSL kırmaz).
   - `LogFoxNetworkConfiguration`: `capturesBodies/capturesHeaders` (default açık), `includedURLs`/`excludedURLs` (baseURL allow/deny filtresi — `canInit`'te uygulanır, exclude önceliklidir), `maxBodyLength`, `category`.
