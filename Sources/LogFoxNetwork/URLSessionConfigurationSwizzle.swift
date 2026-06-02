@@ -4,7 +4,7 @@ import ObjectiveC
 /// `URLSessionConfiguration.default` / `.ephemeral` getter'larını swizzle ederek, uygulamada
 /// oluşturulan TÜM session config'lerine `LogFoxURLProtocol`'ü otomatik enjekte eder.
 /// Böylece host'un networking koduna (BaseService vb.) **hiç dokunmadan** capture aktifleşir
-/// (Netfox'un tek-satır kurulum yaklaşımıyla aynı mantık).
+/// (tek-satır, sıfır-dokunuş kurulum yaklaşımı).
 extension URLSessionConfiguration {
 
     private static let logfoxSwizzleOnce: Void = {

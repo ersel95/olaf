@@ -4,19 +4,16 @@
 //  Host uygulamaya (örn. Core/Utils/) kopyalayın; `// ADAPT:` yerlerini projeye uyarlayın.
 //
 //  • LogFox'u tek noktadan başlatır,
-//  • `network: .netfox / .none` ile Netfox'u açıp kapatır,
-//  • Netfox köprüsü pakettedir (LogFoxNetfox ürünü) — host'ta köprü tanımı / `import netfox` GEREKMEZ.
+//  • (opsiyonel) LogFoxNetwork ile ağ trafiğini yakalar,
+//  • shake → viewer kurar.
 //
-//  Ürün seçimi: LogFoxCore + LogFoxUI zorunlu; ağ yakalama için LogFoxNetwork; Netfox için LogFoxNetfox.
+//  Ürün seçimi: LogFoxCore + LogFoxUI zorunlu; ağ yakalama için LogFoxNetwork.
 
 import Foundation
 @_exported import LogFoxCore
 import LogFoxUI
 #if canImport(LogFoxNetwork)
 import LogFoxNetwork
-#endif
-#if canImport(LogFoxNetfox)
-import LogFoxNetfox
 #endif
 
 // MARK: - App'e özel log kategorileri
@@ -28,14 +25,6 @@ public extension LogCategory {
     static let transfers: LogCategory = "transfers"
 }
 
-// MARK: - Network logger seçimi
-
-/// `.netfox` → Netfox başlatılır ve viewer'a köprü eklenir (LogFoxNetfox ürünü gerekir); `.none` → yalnız LogFox.
-public enum LogFoxNetworkLogger {
-    case netfox
-    case none
-}
-
 // MARK: - Entegrasyon yöneticisi
 
 public final class LogFoxManager {
@@ -43,15 +32,11 @@ public final class LogFoxManager {
     public static let shared = LogFoxManager()
     private init() {}
 
-    private var activeNetwork: LogFoxNetworkLogger = .none
-
     /// LogFox'u başlatır. Paylaşılan URLSession kurulmadan ÖNCE çağrılmalı (capture swizzle'ı session'dan önce).
-    public func initialize(network: LogFoxNetworkLogger = .none) {
+    public func initialize() {
         // ADAPT: prod'da kapalı tutun. Önerilen: derleme sınırı (capture kodu prod binary'sine girmez).
         // Alternatif: runtime feature flag (capture kodu binary'de kalır, çalışma-zamanı kapalı).
         #if !PROD
-        activeNetwork = network
-
         LogFox.start(.bankingDefault)
 
         #if canImport(LogFoxNetwork)
@@ -60,36 +45,18 @@ public final class LogFoxManager {
         LogFoxNetwork.startAutomaticCapture()
         #endif
 
-        if network == .netfox {
-            #if canImport(LogFoxNetfox)
-            LogFoxNetfox.startCapture()
-            #endif
-        }
-
         Task { @MainActor in
             LogFoxUI.install()
-            if network == .netfox {
-                #if canImport(LogFoxNetfox)
-                LogFoxNetfox.install()
-                #endif
-            }
         }
         #endif
     }
 
     /// (Opsiyonel) Host kendi `URLSessionConfiguration`'ını kuruyorsa: otomatik swizzle yerine bu config'e
-    /// LogFox'u en öne enjekte eder ve `.netfox` modunda Netfox'a zincirler (ikisi de yakalar).
-    /// Bunu kullanıyorsanız initialize içindeki startAutomaticCapture'a gerek yoktur.
+    /// LogFox'u en öne enjekte eder. Bunu kullanıyorsanız initialize içindeki startAutomaticCapture'a gerek yoktur.
     public func configureNetworkCapture(_ configuration: URLSessionConfiguration) {
         #if !PROD
         #if canImport(LogFoxNetwork)
-        var chain: [AnyClass] = []
-        if activeNetwork == .netfox {
-            #if canImport(LogFoxNetfox)
-            chain = LogFoxNetfox.chainProtocolClasses
-            #endif
-        }
-        LogFoxNetwork.install(into: configuration, chainingTo: chain)
+        LogFoxNetwork.install(into: configuration)
         #endif
         #endif
     }

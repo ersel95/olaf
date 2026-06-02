@@ -1,10 +1,9 @@
 # LogFox — Entegrasyon Rehberi
 
-LogFox'u uygulamaya bağlamak için rehber. **Netfox** geçişi opsiyonel `LogFoxNetfox` ürünüyle gelir.
+LogFox'u uygulamaya bağlamak için rehber.
 
-> **Tasarım ilkesi:** Çekirdek (LogFoxCore/UI) hiçbir dış araca bağlı değildir. Netfox entegrasyonu
-> **ayrı bir ürün** (`LogFoxNetfox`) ile izole edilmiştir — host bunu seçtiğinde netfox linklenir; host
-> doğrudan `import netfox` yapmaz. Başka araçlar (örn. Pulse) jenerik `ExternalToolBridge` ile host'ta eklenebilir.
+> **Tasarım ilkesi:** Çekirdek (LogFoxCore/UI) hiçbir dış araca bağlı değildir. Dış tanılama araçları
+> (örn. başka bir network logger) jenerik `ExternalToolBridge` ile host tarafında eklenebilir.
 > Hızlı yol: tek-dosya template [`Integration/LogFoxIntegration.swift`](Integration/LogFoxIntegration.swift)
 > ve makine-takipli [`AGENTS.md`](AGENTS.md).
 
@@ -19,15 +18,13 @@ LogFox'u uygulamaya bağlamak için rehber. **Netfox** geçişi opsiyonel `LogFo
 Xcode → Add Packages → `https://github.com/ersel95/logfox` → ana app target'ına ("Choose Package Products"):
 - `LogFoxCore` (motor) + `LogFoxUI` (viewer) — zorunlu
 - `LogFoxNetwork` — network loglarını LogFox'ta görmek için (§4)
-- `LogFoxNetfox` — Netfox geçişi için (§3)
 
 (App extension'lara yalnız `LogFoxCore`.)
 
 ## 2. Entegrasyon dosyasını kopyala
 
 [`Integration/LogFoxIntegration.swift`](Integration/LogFoxIntegration.swift) dosyasını host app'e (örn. `Core/Utils/`)
-kopyalayın. İçinde `LogFoxManager` (başlatma + loglama) ve `LogFoxNetworkLogger` enum'u hazırdır.
-**Köprü tanımı içermez** — Netfox köprüsü pakettedir. `// ADAPT:` satırlarını uyarlayın.
+kopyalayın. İçinde `LogFoxManager` (başlatma + loglama) hazırdır. `// ADAPT:` satırlarını uyarlayın.
 
 ```swift
 @_exported import LogFoxCore
@@ -35,36 +32,19 @@ import LogFoxUI
 #if canImport(LogFoxNetwork)
 import LogFoxNetwork
 #endif
-#if canImport(LogFoxNetfox)
-import LogFoxNetfox
-#endif
-
-public enum LogFoxNetworkLogger { case netfox, none }
 
 public final class LogFoxManager {
     public static let shared = LogFoxManager()
     private init() {}
-    private var activeNetwork: LogFoxNetworkLogger = .none
 
-    public func initialize(network: LogFoxNetworkLogger = .none) {
+    public func initialize() {
         #if !PROD
-        activeNetwork = network
         LogFox.start(.bankingDefault)
         #if canImport(LogFoxNetwork)
         LogFoxNetwork.startAutomaticCapture()
         #endif
-        if network == .netfox {
-            #if canImport(LogFoxNetfox)
-            LogFoxNetfox.startCapture()      // NFX.start + shake'i LogFox'a bırak
-            #endif
-        }
         Task { @MainActor in
             LogFoxUI.install()
-            if network == .netfox {
-                #if canImport(LogFoxNetfox)
-                LogFoxNetfox.install()       // viewer'da "Netfox" butonu
-                #endif
-            }
         }
         #endif
     }
@@ -76,10 +56,9 @@ public final class LogFoxManager {
 App giriş noktanızda — **paylaşılan URLSession kurulmadan ÖNCE** (SwiftUI `App.init` veya
 `AppDelegate.didFinishLaunching` başı, session preload'undan önce):
 ```swift
-LogFoxManager.shared.initialize(network: .netfox)   // .netfox / .none
+LogFoxManager.shared.initialize()
 ```
-`LogFoxNetfox.startCapture()` Netfox'u başlatır ve shake'ini otomatik kapatır (`NFX.setGesture(.custom)`) →
-shake artık LogFox'a aittir, içeriden Netfox'a geçilir. Host'un ayrıca `NFX.start()` çağırmasına gerek yoktur.
+Shake jesti LogFox'a aittir; cihaz sallanınca viewer açılır.
 
 ## 4. Network loglarını LogFox'ta listelemek — `LogFoxNetwork`
 
@@ -97,16 +76,15 @@ LogFoxNetwork.startAutomaticCapture(LogFoxNetworkConfiguration(
 ))
 ```
 
-### Kendi özel session'ınız varsa: deterministik enjeksiyon + Netfox zinciri
-Host kendi `URLSessionConfiguration`'ını kuruyorsa, otomatik swizzle yerine session kurulurken tek satır.
-Bu, `.netfox` modunda LogFox'u Netfox'a **zincirler** (URLProtocol "ilk eşleşen kazanır" → LogFox yakalar,
-proxy'sinden Netfox'a geçirir → ikisi de görür):
+### Kendi özel session'ınız varsa: deterministik enjeksiyon
+Host kendi `URLSessionConfiguration`'ını kuruyorsa, otomatik swizzle yerine session kurulurken tek satır:
 ```swift
 // LogFoxManager içindeki configureNetworkCapture(_:) yardımcısı:
 LogFoxManager.shared.configureNetworkCapture(configuration)
-// (içeride: LogFoxNetwork.install(into: configuration, chainingTo: LogFoxNetfox.chainProtocolClasses))
+// (içeride: LogFoxNetwork.install(into: configuration))
 ```
-Bunu kullanıyorsanız `startAutomaticCapture`'a gerek kalmaz.
+Bunu kullanıyorsanız `startAutomaticCapture`'a gerek kalmaz. Başka bir capture aracının URLProtocol'ünü
+aynı trafiğe zincirlemek için `LogFoxNetwork.install(into:chainingTo:)` kullanılabilir.
 
 > **Güvenlik:** Gövde/header default açıktır → tüm trafik loglanır (BankingRedactor maskeler ama keyfi JSON'daki
 > her PII garanti değil). Trust kabulü ve gövde loglama **yalnız non-prod debug** içindir → PROD'da çalışmamalı.
@@ -132,7 +110,7 @@ Dosya `@_exported import LogFoxCore` içerir → çağrı yerleri `import LogFox
 
 ---
 
-## Netfox dışında bir araç eklemek
+## Dış bir tanılama aracı eklemek
 Jenerik geçiş `ExternalToolBridge` ile yapılır:
 ```swift
 struct SomeToolBridge: ExternalToolBridge {

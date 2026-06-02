@@ -2,24 +2,19 @@ import Foundation
 import SwiftUI
 import LogFoxCore
 
-/// LogFoxUI'ın genel cephesi: shake → viewer kurulumu, dış araç (Netfox) kaydı, sunum.
-///
-/// Netfox köprüsü ayrı bir ürün/modüldedir (**LogFoxNetfox**). Tüketici bu ürünü target'a ekleyip
-/// init'te `LogFoxNetfox.install()` çağırınca köprü buraya kaydedilir ve viewer'da "Netfox" butonu çıkar.
+/// LogFoxUI'ın genel cephesi: shake → viewer kurulumu, dış araç kaydı, sunum.
 ///
 /// ```swift
 /// LogFox.start(.bankingDefault)
 /// LogFoxUI.install()       // viewer (shake) kurulumu
-/// LogFoxNetfox.install()   // LogFoxNetfox ürünü eklendiyse: Netfox butonunu ekler
 /// ```
 ///
-/// Kendi özel aracını eklemek istersen `install(tools:)` veya `register(_:)` kullanabilirsin.
+/// Kendi özel tanılama aracını eklemek istersen `install(tools:)` veya `register(_:)` kullanabilirsin.
 public enum LogFoxUI {
 
     /// Cihaz sallandığında viewer'ı açacak gözlemciyi kurar ve verilen dış araçları kaydeder.
     /// İdempotent; bir kez çağırın.
-    /// - Parameter tools: Host'un eklemek istediği özel dış araç köprüleri. (Netfox için ayrı
-    ///   `LogFoxNetfox` ürünü + `LogFoxNetfox.install()` kullanın.)
+    /// - Parameter tools: Host'un eklemek istediği özel dış araç köprüleri.
     @MainActor
     public static func install(tools: [any ExternalToolBridge] = []) {
         #if canImport(UIKit)
@@ -30,7 +25,7 @@ public enum LogFoxUI {
         }
     }
 
-    /// Tek bir özel dış araç köprüsü kaydeder. Viewer'da geçiş butonu olur. (Netfox için `LogFoxNetfox`.)
+    /// Tek bir özel dış araç köprüsü kaydeder. Viewer'da geçiş butonu olur.
     public static func register(_ bridge: any ExternalToolBridge) {
         ExternalToolRegistry.shared.register(bridge)
     }
@@ -49,8 +44,8 @@ public enum LogFoxUI {
     }
 
     /// Viewer'ı programatik kapat.
-    /// - Parameter completion: Viewer tamamen kapandıktan SONRA çalışır. Netfox gibi kendini sunan
-    ///   araçlar `show()`'u burada çağırmalı (dismiss animasyonu bitmeden sunum başarısız olur).
+    /// - Parameter completion: Viewer tamamen kapandıktan SONRA çalışır. Kendini sunan UIKit
+    ///   araçları `show()`'u burada çağırmalı (dismiss animasyonu bitmeden sunum başarısız olur).
     @MainActor
     public static func dismiss(completion: (() -> Void)? = nil) {
         #if canImport(UIKit)
@@ -63,7 +58,7 @@ public enum LogFoxUI {
     /// Gömülebilir bir SwiftUI aracını LogFox'un kendi penceresi üzerinde modal olarak sunar.
     /// Kapanınca LogFox viewer'a geri dönülür.
     ///
-    /// Netfox gibi kendini sunan UIKit araçları bunun yerine `dismiss()` + kendi `show()`'unu kullanmalıdır.
+    /// Kendini sunan UIKit araçları bunun yerine `dismiss()` + kendi `show()`'unu kullanmalıdır.
     @MainActor
     public static func presentExternal<Content: View>(@ViewBuilder _ content: () -> Content) {
         #if canImport(UIKit)

@@ -1,6 +1,6 @@
 # LogFox 🦊📝
 
-Netfox'un network trafiği için yaptığını **uygulama logları** için yapan, generic, taşınabilir bir Swift logging + in-app log viewer kütüphanesi.
+**Uygulama loglarını** cihazda görüntüleyip paylaşmayı sağlayan, generic ve taşınabilir bir Swift logging + in-app log viewer kütüphanesi.
 
 > **Amaç:** TestFlight'a özelliği açık gönderdiğiniz kullanıcıların loglarını cihazda görüntüleyip paylaşabilmek. Cihaz sallandığında loglar düz metin olarak açılır.
 >
@@ -15,18 +15,17 @@ Tasarım/fizibilite detayları için ana projedeki `LOGFOX_REPORT.md`'ye bakın.
 | **0 — İskelet** | SPM, model'ler | ✅ |
 | **1 — Core motor** | Ring buffer, redaksiyon, NDJSON disk persistans + oturumlar arası geçmiş, OSLog köprüsü, facade | ✅ |
 | **2 — Viewer (LogFoxUI)** | Shake → SwiftUI düz metin viewer, **Oturum/Geçmiş** kapsamı, filtre/arama/paylaşım, canlı akış | ✅ |
-| **3 — Araç köprüleri** | `ExternalToolBridge` + `presentExternal`; **Netfox** geçişi opsiyonel `LogFoxNetfox` ürünüyle, shake sahipliği devri (app tarafı: `INTEGRATION.md` / `AGENTS.md`) | ✅ |
+| **3 — Araç köprüleri** | Jenerik `ExternalToolBridge` + `presentExternal`; host kendi dış tanılama aracını viewer'a buton olarak ekleyebilir, shake sahipliği devri (app tarafı: `INTEGRATION.md` / `AGENTS.md`) | ✅ |
 | **N — Network capture (LogFoxNetwork)** | Opsiyonel URLProtocol; istek/yanıt `.network` kategorisinde, redaksiyonlu → app+network tek listede | ✅ |
-| **5 — UX & paylaşım** | Pulse tarzı detay (status banner, pretty-JSON gövde), Netfox tarzı paylaşım (Basit/Tam log + cURL), kopyalama toast, start öncesi log tamponlama, oturum bazlı geçmiş | ✅ |
+| **5 — UX & paylaşım** | Detay görünümü (status banner, pretty-JSON gövde), paylaşım (Basit/Tam log + cURL), kopyalama toast, start öncesi log tamponlama, oturum bazlı geçmiş | ✅ |
 | 4 — Köprüler | OSLogStore importer, swift-log backend | ⏳ |
 
 ## Kurulum (SPM)
 
 ```swift
-.package(url: "https://github.com/ersel95/logfox.git", from: "0.15.0")
+.package(url: "https://github.com/ersel95/logfox.git", from: "0.17.0")
 ```
-Ürünler: `LogFoxCore` (motor) · `LogFoxUI` (viewer) · `LogFoxNetwork` (opsiyonel network capture) ·
-`LogFoxNetfox` (opsiyonel Netfox köprüsü).
+Ürünler: `LogFoxCore` (motor) · `LogFoxUI` (viewer) · `LogFoxNetwork` (opsiyonel network capture).
 
 > Uygulamada doğrudan `LogFox.x(...)` çağırmak yerine tek entegrasyon noktası olan `LogFoxManager`
 > üzerinden loglamanız önerilir — bkz. [`INTEGRATION.md`](INTEGRATION.md).
@@ -55,25 +54,30 @@ LogFox.clear()
 LogFox.isEnabled = false
 ```
 
-### In-app viewer (LogFoxUI) + Netfox geçişi
+### In-app viewer (LogFoxUI)
 
-Shake → LogFox viewer. **Netfox** geçişi opsiyonel **`LogFoxNetfox` ürünüyle** gelir (host netfox'u
-doğrudan import etmez; köprü pakettedir). Host init'te `.netfox`/`.none` seçer:
+Shake → LogFox viewer. Host init'te kurar:
 
 ```swift
 // Host entegrasyon dosyasında (Integration/LogFoxIntegration.swift):
-LogFoxManager.shared.initialize(network: .netfox)   // .netfox / .none
+LogFoxManager.shared.initialize()
 
 // Paket API'si:
 LogFoxUI.install()                             // shake → viewer
-LogFoxNetfox.install()                         // viewer'da "Netfox" butonu (LogFoxNetfox ürünü gerekir)
 LogFoxUI.present(); LogFoxUI.dismiss()
 LogFoxUI.presentExternal { SomeView() }        // gömülebilir SwiftUI araçları için
 ```
 
-Shake sahibi LogFox'tur; `LogFoxNetfox.startCapture()` Netfox'un shake'ini otomatik kapatır
-(`NFX.setGesture(.custom)`). Geçiş butonu viewer'ın **alt barındadır**.
-Netfox dışında bir araç eklemek için jenerik `ExternalToolBridge` + `LogFoxUI.register(_:)` kullanın.
+Shake sahibi LogFox'tur. Viewer'a kendi dış tanılama aracınızı eklemek için jenerik
+`ExternalToolBridge` + `LogFoxUI.register(_:)` kullanın; buton viewer'ın **alt barında** görünür:
+
+```swift
+struct SomeToolBridge: ExternalToolBridge {
+    let title = "SomeTool"
+    @MainActor func open() { /* dismiss + show, ya da LogFoxUI.presentExternal { ... } */ }
+}
+LogFoxUI.register(SomeToolBridge())
+```
 
 ### Network loglarını LogFox'ta listelemek (LogFoxNetwork)
 

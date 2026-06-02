@@ -1,12 +1,11 @@
 import Foundation
 
-/// LogFox viewer'ından başka bir tanılama aracına (örn. Netfox) geçişi temsil eder.
+/// LogFox viewer'ından başka bir tanılama aracına geçişi temsil eder.
 ///
-/// Paket bilinçli olarak Netfox'a bağlı **değildir**: uygulama kendi `NetfoxBridge`'ini
-/// bu protokole uydurup `LogFoxUI.register(_:)` ile kaydeder. Böylece Netfox kullanmayan
-/// projeler LogFox'u temiz alır; kayıtlı köprü yoksa viewer'da buton görünmez.
+/// Paket hiçbir dış araca bağlı **değildir**: uygulama kendi köprüsünü bu protokole uydurup
+/// `LogFoxUI.register(_:)` ile kaydeder. Kayıtlı köprü yoksa viewer'da buton görünmez.
 public protocol ExternalToolBridge: Sendable {
-    /// Viewer toolbar'ında görünecek başlık (örn. "Netfox").
+    /// Viewer toolbar'ında görünecek başlık.
     var title: String { get }
     /// Sistem sembol adı (SF Symbol), opsiyonel.
     var systemImage: String? { get }

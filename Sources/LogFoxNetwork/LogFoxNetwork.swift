@@ -7,8 +7,8 @@ import Foundation
 /// // Tüm istekleri yakalamak için (Alamofire/URLSession custom config):
 /// LogFoxNetwork.install(into: sessionConfiguration)
 ///
-/// // Netfox gibi başka bir capture aracıyla BİRLİKTE çalışmak için zincirle:
-/// LogFoxNetwork.install(into: sessionConfiguration, chainingTo: [NFXProtocol.self])
+/// // Başka bir capture aracıyla BİRLİKTE çalışmak için zincirle:
+/// LogFoxNetwork.install(into: sessionConfiguration, chainingTo: [OtherCaptureProtocol.self])
 /// ```
 public enum LogFoxNetwork {
 
@@ -21,19 +21,19 @@ public enum LogFoxNetwork {
     }
 
     /// LogFox isteği yeniden başlatırken kendi (yakalanmayan) proxy session'ına eklenecek
-    /// ek `URLProtocol` sınıfları. Netfox/başka capture araçlarının da yakalaması için kullanılır.
+    /// ek `URLProtocol` sınıfları. Başka capture araçlarının da yakalaması için kullanılır.
     public static var chainedProtocolClasses: [AnyClass] {
         get { box.chained }
         set { box.chained = newValue }
     }
 
     /// Yakalama protokolünü verilen `URLSessionConfiguration`'a enjekte eder ve yakalama
-    /// parametrelerini **init'te** ayarlar (mevcut `NFXProtocol` enjeksiyonuyla aynı patern).
+    /// parametrelerini **init'te** ayarlar.
     /// - Parameters:
     ///   - configuration: Protokolün başa ekleneceği session config.
     ///   - networkConfiguration: Yakalama filtreleri (gövde/header default açık).
     ///   - chainingTo: LogFox yakaladıktan sonra isteğin geçmesi gereken ek `URLProtocol`'ler
-    ///     (örn. `[NFXProtocol.self]`) — böylece Netfox de aynı trafiği yakalar.
+    ///     — böylece başka bir capture aracı da aynı trafiği yakalar.
     public static func install(
         into configuration: URLSessionConfiguration,
         with networkConfiguration: LogFoxNetworkConfiguration = .default,
@@ -58,7 +58,7 @@ public enum LogFoxNetwork {
         URLProtocol.registerClass(LogFoxURLProtocol.self)
     }
 
-    /// **En kolay kurulum (Netfox tarzı) — host networking koduna DOKUNMADAN.**
+    /// **En kolay kurulum — host networking koduna DOKUNMADAN.**
     /// `URLSessionConfiguration.default/.ephemeral` swizzle edilerek tüm session'lara (Alamofire dahil)
     /// otomatik enjekte edilir + shared session için global kayıt yapılır.
     ///

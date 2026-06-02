@@ -15,8 +15,8 @@ final class ExternalToolRegistryTests: XCTestCase {
     }
 
     func testRegisterAddsBridge() {
-        ExternalToolRegistry.shared.register(StubBridge(title: "Netfox"))
-        XCTAssertEqual(ExternalToolRegistry.shared.all.map(\.title), ["Netfox"])
+        ExternalToolRegistry.shared.register(StubBridge(title: "DevTool"))
+        XCTAssertEqual(ExternalToolRegistry.shared.all.map(\.title), ["DevTool"])
     }
 
     func testRegisterPreservesOrder() {

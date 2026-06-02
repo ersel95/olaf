@@ -55,8 +55,8 @@ final class LogFoxPresenter {
         container.present(host, animated: true)
     }
 
-    /// - Parameter completion: Pencere tamamen kaldırıldıktan SONRA çalışır. Netfox gibi kendini
-    ///   sunan araçlar `show()`'u burada çağırmalı; aksi halde dismiss animasyonu sürerken sunum
+    /// - Parameter completion: Pencere tamamen kaldırıldıktan SONRA çalışır. Kendini sunan UIKit
+    ///   araçları `show()`'u burada çağırmalı; aksi halde dismiss animasyonu sürerken sunum
     ///   "presentation in progress" hatasıyla sessizce başarısız olur.
     func dismiss(completion: (() -> Void)? = nil) {
         guard let window else { completion?(); return }

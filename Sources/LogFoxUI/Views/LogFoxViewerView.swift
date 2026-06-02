@@ -147,7 +147,7 @@ public struct LogFoxViewerView: View {
         }
     }
 
-    /// Ana ekranda her zaman görünen, seçilen network logger'a (Netfox) tek dokunuşla
+    /// Ana ekranda her zaman görünen, kayıtlı dış araçlara tek dokunuşla
     /// geçiş için belirgin alt bar. Kayıtlı araç yoksa hiç görünmez.
     @ViewBuilder
     private var externalToolBar: some View {

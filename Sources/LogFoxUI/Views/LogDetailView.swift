@@ -28,7 +28,7 @@ struct LogDetailView: View {
         .copyToast($didCopy)
     }
 
-    /// Netfox tarzı paylaşım menüsü: network için Basit/Tam/cURL, log için tam metin; ayrıca kopyala.
+    /// Paylaşım menüsü: network için Basit/Tam/cURL, log için tam metin; ayrıca kopyala.
     @ViewBuilder
     private var shareMenu: some View {
         Menu {

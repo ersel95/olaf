@@ -1,13 +1,13 @@
 import Foundation
 import LogFoxCore
 
-/// Paylaşım metinlerini üretir (Netfox'un Simple/Full log eşdeğerleri). Saf fonksiyonlar → test edilebilir.
+/// Paylaşım metinlerini üretir (Basit/Tam log formatları). Saf fonksiyonlar → test edilebilir.
 /// İçerik zaten redakte edilmiş `LogEntry`/`NetworkLogInfo`'dan üretilir → paylaşıma güvenli.
 enum ShareFormatter {
 
     // MARK: - Network
 
-    /// Netfox "Simple Log" eşdeğeri: özet + header'lar (gövde yok).
+    /// "Basit Log": özet + header'lar (gövde yok).
     static func simpleNetworkLog(entry: LogEntry, info: NetworkLogInfo) -> String {
         var lines: [String] = []
         lines.append("\(info.method ?? "GET") \(info.url ?? "-")")
@@ -29,7 +29,7 @@ enum ShareFormatter {
         return lines.joined(separator: "\n")
     }
 
-    /// Netfox "Full Log" eşdeğeri: Simple + istek/yanıt gövdeleri + cURL.
+    /// "Tam Log": Basit + istek/yanıt gövdeleri + cURL.
     static func fullNetworkLog(entry: LogEntry, info: NetworkLogInfo) -> String {
         var text = simpleNetworkLog(entry: entry, info: info)
         if let body = info.requestBody, !body.isEmpty {

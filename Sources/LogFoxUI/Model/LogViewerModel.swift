@@ -183,7 +183,7 @@ public final class LogViewerModel: ObservableObject {
         await LogFox.exportFileURL()
     }
 
-    /// Kayıtlı dış araçlar (örn. Netfox geçiş butonu).
+    /// Kayıtlı dış araçlar (geçiş butonları).
     public var externalTools: [any ExternalToolBridge] {
         ExternalToolRegistry.shared.all
     }
