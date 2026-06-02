@@ -40,6 +40,9 @@ final class ShareFormatterTests: XCTestCase {
         XCTAssertTrue(text.contains("İstek Gövdesi"))
         XCTAssertTrue(text.contains("\"a\":1"))
         XCTAssertTrue(text.contains("\"ok\":true"))
+        // Tam log artık cURL bloğunu da içerir.
+        XCTAssertTrue(text.contains("-- cURL --"))
+        XCTAssertTrue(text.contains("curl -X POST"))
     }
 
     func testCurlContainsMethodURLHeaderAndBody() {

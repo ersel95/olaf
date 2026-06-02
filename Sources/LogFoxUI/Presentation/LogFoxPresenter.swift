@@ -38,18 +38,35 @@ final class LogFoxPresenter {
     func present() {
         guard window == nil, let scene = Self.activeScene() else { return }
 
+        // Saydam bir kök VC üzerinde viewer'ı **modal** sunarak alttan yukarı (coverVertical)
+        // kayma animasyonu elde ediyoruz; düz `rootViewController` ataması animasyonsuz olurdu.
         let window = UIWindow(windowScene: scene)
         window.windowLevel = .alert + 1
-        window.rootViewController = UIHostingController(
-            rootView: LogFoxViewerView(onClose: { [weak self] in self?.dismiss() })
-        )
+        let container = UIViewController()
+        container.view.backgroundColor = .clear
+        window.rootViewController = container
         window.makeKeyAndVisible()
         self.window = window
+
+        let host = UIHostingController(
+            rootView: LogFoxViewerView(onClose: { [weak self] in self?.dismiss() })
+        )
+        host.modalPresentationStyle = .fullScreen
+        container.present(host, animated: true)
     }
 
     func dismiss() {
-        window?.isHidden = true
-        window = nil
+        guard let window else { return }
+        let teardown = { [weak self] in
+            self?.window?.isHidden = true
+            self?.window = nil
+        }
+        // Modal sunum varsa aşağı kayarak kapansın; yoksa pencereyi doğrudan kaldır.
+        if let presented = window.rootViewController?.presentedViewController {
+            presented.dismiss(animated: true, completion: teardown)
+        } else {
+            teardown()
+        }
     }
 
     /// Gömülebilir SwiftUI aracını LogFox penceresi üzerinde modal olarak sunar.

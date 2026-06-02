@@ -29,7 +29,7 @@ enum ShareFormatter {
         return lines.joined(separator: "\n")
     }
 
-    /// Netfox "Full Log" eşdeğeri: Simple + istek/yanıt gövdeleri.
+    /// Netfox "Full Log" eşdeğeri: Simple + istek/yanıt gövdeleri + cURL.
     static func fullNetworkLog(entry: LogEntry, info: NetworkLogInfo) -> String {
         var text = simpleNetworkLog(entry: entry, info: info)
         if let body = info.requestBody, !body.isEmpty {
@@ -38,6 +38,7 @@ enum ShareFormatter {
         if let body = info.responseBody, !body.isEmpty {
             text += "\n\n-- Yanıt Gövdesi --\n" + body
         }
+        text += "\n\n-- cURL --\n" + CurlBuilder.curl(from: info)
         return text
     }
 
