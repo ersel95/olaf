@@ -38,8 +38,11 @@ struct NetfoxBridge: ExternalToolBridge {
     var systemImage: String? { "network" }
 
     @MainActor func open() {
-        LogFoxUI.dismiss()
-        NFX.sharedInstance().show()
+        // LogFox penceresi tamamen kapandıktan SONRA Netfox'u sun; aksi halde dismiss
+        // animasyonu sürerken sunum "presentation in progress" ile sessizce başarısız olur.
+        LogFoxUI.dismiss {
+            NFX.sharedInstance().show()
+        }
     }
 }
 #endif

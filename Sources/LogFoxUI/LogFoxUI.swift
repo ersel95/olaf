@@ -49,10 +49,14 @@ public enum LogFoxUI {
     }
 
     /// Viewer'ı programatik kapat.
+    /// - Parameter completion: Viewer tamamen kapandıktan SONRA çalışır. Netfox gibi kendini sunan
+    ///   araçlar `show()`'u burada çağırmalı (dismiss animasyonu bitmeden sunum başarısız olur).
     @MainActor
-    public static func dismiss() {
+    public static func dismiss(completion: (() -> Void)? = nil) {
         #if canImport(UIKit)
-        LogFoxPresenter.shared.dismiss()
+        LogFoxPresenter.shared.dismiss(completion: completion)
+        #else
+        completion?()
         #endif
     }
 

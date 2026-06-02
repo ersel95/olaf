@@ -55,11 +55,15 @@ final class LogFoxPresenter {
         container.present(host, animated: true)
     }
 
-    func dismiss() {
-        guard let window else { return }
+    /// - Parameter completion: Pencere tamamen kaldırıldıktan SONRA çalışır. Netfox gibi kendini
+    ///   sunan araçlar `show()`'u burada çağırmalı; aksi halde dismiss animasyonu sürerken sunum
+    ///   "presentation in progress" hatasıyla sessizce başarısız olur.
+    func dismiss(completion: (() -> Void)? = nil) {
+        guard let window else { completion?(); return }
         let teardown = { [weak self] in
             self?.window?.isHidden = true
             self?.window = nil
+            completion?()
         }
         // Modal sunum varsa aşağı kayarak kapansın; yoksa pencereyi doğrudan kaldır.
         if let presented = window.rootViewController?.presentedViewController {
