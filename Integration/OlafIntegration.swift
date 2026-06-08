@@ -15,6 +15,9 @@ import OlafUI
 #if canImport(OlafNetwork)
 import OlafNetwork
 #endif
+#if canImport(OlafUpload)
+import OlafUpload
+#endif
 
 // MARK: - App'e özel log kategorileri
 
@@ -48,7 +51,48 @@ public final class OlafManager {
         Task { @MainActor in
             OlafUI.install()
         }
+
+        // OPT-IN bug-reporter (screenshot → banner → upload). VARSAYILAN KAPALI.
+        // `enabled: false` iken hiçbir remote config / detector / tracker / upload kodu çalışmaz
+        // (shake → log görüntüleme bundan bağımsız, etkilenmez).
+        //
+        // Açmak için: `enabled: true` + appKey/apiKey/baseURL'i HOST tarafından (xcconfig/secrets)
+        // sağlayın — repo'ya ASLA commit etmeyin (public repo). Aşağıdaki erişimcileri kendi
+        // güvenli kaynağınıza (Info.plist'e xcconfig'ten enjekte edilen değer vb.) bağlayın.
+        #if canImport(OlafUpload)
+        if let baseURL = Self.olafUploadBaseURL {
+            OlafUpload.configure(
+                enabled: Self.bugReporterEnabled,      // ADAPT: build-time flag (default false önerilir)
+                appKey: Self.olafAppKey,               // ADAPT: xcconfig/secrets'tan
+                apiKey: Self.olafApiKey,               // ADAPT: xcconfig/secrets'tan
+                baseURL: baseURL,                      // ADAPT: xcconfig/secrets'tan
+                environment: Self.olafEnvironment      // ADAPT: "staging"/"uat" vb.
+            )
+        }
         #endif
+        #endif
+    }
+
+    // MARK: - Bug-reporter konfig kaynakları (HOST sağlar — repoya commit edilmez)
+    // ADAPT: Bu değerleri Info.plist'e xcconfig'ten enjekte edip burada okuyun. Hard-code ETMEYİN.
+
+    /// Bug-reporter açık mı? Default `false` (opt-in). xcconfig/build flag'inden besleyin.
+    private static var bugReporterEnabled: Bool {
+        (Bundle.main.object(forInfoDictionaryKey: "OLAF_BUG_REPORTER_ENABLED") as? String)?.lowercased() == "true"
+    }
+    private static var olafAppKey: String {
+        Bundle.main.object(forInfoDictionaryKey: "OLAF_APP_KEY") as? String ?? ""
+    }
+    private static var olafApiKey: String {
+        Bundle.main.object(forInfoDictionaryKey: "OLAF_API_KEY") as? String ?? ""
+    }
+    private static var olafEnvironment: String {
+        Bundle.main.object(forInfoDictionaryKey: "OLAF_ENVIRONMENT") as? String ?? "staging"
+    }
+    private static var olafUploadBaseURL: URL? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "OLAF_API_BASE_URL") as? String,
+              !raw.isEmpty else { return nil }
+        return URL(string: raw)
     }
 
     /// (Opsiyonel) Host kendi `URLSessionConfiguration`'ını kuruyorsa: otomatik swizzle yerine bu config'e

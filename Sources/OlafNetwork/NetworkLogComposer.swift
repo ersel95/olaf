@@ -47,6 +47,9 @@ enum NetworkLogComposer {
         ]
         if let status = event.statusCode { metadata["status"] = String(status) }
         if let error = event.error { metadata["error"] = error }
+        // Gövdeler ayrı `requestBody`/`responseBody` anahtarlarıyla → BankingRedactor JSON ise
+        // derin key-bazlı (token/balance/iban/pan/cvv…) recursive maskelemeden geçirir;
+        // JSON değilse value-pattern (kart/IBAN/email) redaksiyonu uygulanır.
         if let body = event.requestBody { metadata["requestBody"] = body }
         if let body = event.responseBody { metadata["responseBody"] = body }
         // Header'lar ayrı anahtarlarla → BankingRedactor key-bazlı maskeleme (Authorization/Cookie/token) çalışır.

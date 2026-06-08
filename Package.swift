@@ -14,7 +14,10 @@ let package = Package(
         .library(name: "OlafUI", targets: ["OlafUI"]),
         // Opsiyonel network capture (URLProtocol). İstek/yanıtları .network kategorisinde,
         // BankingRedactor'dan geçerek Olaf'a loglar. UIKit'siz, her platformda.
-        .library(name: "OlafNetwork", targets: ["OlafNetwork"])
+        .library(name: "OlafNetwork", targets: ["OlafNetwork"]),
+        // Opsiyonel bug-reporter upload katmanı (screenshot → banner → multipart upload).
+        // OPT-IN, varsayılan KAPALI. OlafCore'a bağımlı; recursion önleme için OlafNetwork'e zayıf bağlı.
+        .library(name: "OlafUpload", targets: ["OlafUpload"])
     ],
     targets: [
         .target(
@@ -25,7 +28,7 @@ let package = Package(
         ),
         .target(
             name: "OlafUI",
-            dependencies: ["OlafCore"],
+            dependencies: ["OlafCore", "OlafUpload"],
             resources: [
                 .process("Resources")
             ],
@@ -36,6 +39,13 @@ let package = Package(
         .target(
             name: "OlafNetwork",
             dependencies: ["OlafCore"]
+        ),
+        .target(
+            name: "OlafUpload",
+            dependencies: ["OlafCore", "OlafNetwork"],
+            swiftSettings: [
+                .enableExperimentalFeature("StrictConcurrency")
+            ]
         ),
         .testTarget(
             name: "OlafCoreTests",
@@ -48,6 +58,10 @@ let package = Package(
         .testTarget(
             name: "OlafNetworkTests",
             dependencies: ["OlafNetwork"]
+        ),
+        .testTarget(
+            name: "OlafUploadTests",
+            dependencies: ["OlafUpload"]
         )
     ]
 )

@@ -26,4 +26,8 @@ public struct LogCategory: RawRepresentable, Hashable, Sendable, Codable, Expres
     public static let network: LogCategory = "network"
     public static let session: LogCategory = "session"
     public static let security: LogCategory = "security"
+    /// Ekran geçişleri (push/sheet/popup/root). `Olaf.trackScreen(_:kind:)` bu kategoriye yazar.
+    public static let navigation: LogCategory = "navigation"
+    /// Kullanıcı ekran görüntüsü aldığında bug-reporter akışının ürettiği kayıtlar.
+    public static let screenshot: LogCategory = "screenshot"
 }

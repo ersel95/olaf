@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import OlafCore
+import OlafUpload
 
 /// OlafUI'ın genel cephesi: shake → viewer kurulumu, dış araç kaydı, sunum.
 ///
@@ -19,11 +20,26 @@ public enum OlafUI {
     public static func install(tools: [any ExternalToolBridge] = []) {
         #if canImport(UIKit)
         OlafPresenter.shared.installShakeObserver()
+        registerBugReportInstaller()
         #endif
         for tool in tools {
             ExternalToolRegistry.shared.register(tool)
         }
     }
+
+    #if canImport(UIKit)
+    /// Bug-reporter (screenshot → banner → upload) detector kurulum hook'unu `OlafUpload`'a kaydeder.
+    /// Bu **kurulum kodunu çalıştırmaz**; yalnız hook'u verir. Banner/detector ancak host
+    /// `OlafUpload.configure(enabled: true, appKey:...)` ile bug-reporter'ı açtığında kurulur.
+    /// (Opt-in kapalıyken hiçbir screenshot observer / pencere oluşmaz.)
+    private static func registerBugReportInstaller() {
+        OlafUpload.setDetectorInstaller {
+            Task { @MainActor in
+                BugReportBanner.shared.install()
+            }
+        }
+    }
+    #endif
 
     /// Tek bir özel dış araç köprüsü kaydeder. Viewer'da geçiş butonu olur.
     public static func register(_ bridge: any ExternalToolBridge) {

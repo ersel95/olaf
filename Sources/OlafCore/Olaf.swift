@@ -109,6 +109,39 @@ public enum Olaf {
         log(.error, error.localizedDescription, category: category, metadata: enriched, file: file, line: line, function: function)
     }
 
+    // MARK: - Navigation tracking
+
+    /// Bir ekran geçişini `.navigation` kategorisinde loglar. Generic, string-tabanlı API —
+    /// SDK herhangi bir navigasyon kütüphanesine (Coordinator vb.) **bağımlı değildir**; host
+    /// kendi navigasyon hook'undan bu metodu çağırır.
+    ///
+    /// ```swift
+    /// // Coordinator observer adapter'ından (host tarafı):
+    /// Olaf.trackScreen("dashboard", kind: "push")
+    /// Olaf.trackScreen("paymentSheet", kind: "sheet")
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - name: Ekran kimliği / adı (örn. `CoordinatorEntryPoint.id`). Mesaj olarak loglanır.
+    ///   - kind: Geçiş türü ("push", "sheet", "popup", "root", "dismiss" …). Metadata'ya yazılır.
+    public static func trackScreen(
+        _ name: String,
+        kind: String = "push",
+        file: String = #fileID,
+        line: Int = #line,
+        function: String = #function
+    ) {
+        log(
+            .info,
+            name,
+            category: .navigation,
+            metadata: ["screen": name, "kind": kind],
+            file: file,
+            line: line,
+            function: function
+        )
+    }
+
     // MARK: - Okuma & yönetim (viewer bu API üzerinden besler)
 
     /// Mevcut tampondaki (bu oturum, bellek) kayıtların anlık kopyası (eskiden yeniye).

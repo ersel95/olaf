@@ -12,9 +12,11 @@ public struct BankingRedactor: Redactor {
     public init(additionalSensitiveKeys: [String] = []) {
         self.sensitiveKeyTokens = ([
             "password", "passwd", "pwd", "pin", "cvv", "cvc", "cvc2",
-            "otp", "token", "secret", "authorization", "auth",
-            "seal", "pan", "iban", "apikey", "api_key", "accesstoken",
-            "refreshtoken", "session", "cookie", "signature"
+            "otp", "token", "accesstoken", "refreshtoken", "secret",
+            "authorization", "auth", "seal", "pan", "iban", "apikey",
+            "api_key", "session", "cookie", "signature",
+            // Bankacılık gövdesi: bakiye ve kart bilgileri (kısmi, case-insensitive eşleşme).
+            "balance", "cardnumber", "card_no", "cardno", "cardnum"
         ] + additionalSensitiveKeys).map { $0.lowercased() }
     }
 
@@ -35,7 +37,7 @@ public struct BankingRedactor: Redactor {
             if isSensitiveKey(key) {
                 output[key] = mask
             } else {
-                output[key] = redact(value)
+                output[key] = redactBodyOrValue(value)
             }
         }
         return output
@@ -44,6 +46,68 @@ public struct BankingRedactor: Redactor {
     private func isSensitiveKey(_ key: String) -> Bool {
         let lowered = key.lowercased()
         return sensitiveKeyTokens.contains { lowered.contains($0) }
+    }
+
+    // MARK: - Gövde (JSON) redaksiyonu
+
+    /// Bir metadata değerini redakte eder. Değer geçerli bir JSON gövdesi (object/array) ise
+    /// **derin, key-bazlı recursive** redaksiyon uygulanır (token/balance/iban… anahtarları
+    /// maskelenir, string yaprakları örüntü-maskelemeden geçer). Parse edilemezse mevcut
+    /// value-pattern redaksiyonu (kart/IBAN/email) uygulanır.
+    func redactBodyOrValue(_ value: String) -> String {
+        if let redactedJSON = redactJSONBody(value) {
+            return redactedJSON
+        }
+        return redact(value)
+    }
+
+    /// String bir JSON gövdesiyse (object/array) parse edip recursive redakte eder ve yeniden
+    /// serialize eder. JSON değilse (veya skaler JSON ise) `nil` döner → çağıran value-pattern
+    /// redaksiyonuna düşer.
+    func redactJSONBody(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Yalnız object/array gövdelerini JSON olarak ele al; skaler ("42", "true", "\"x\"")
+        // metinleri value-pattern redaksiyonuna bırak.
+        guard let first = trimmed.first, first == "{" || first == "[" else { return nil }
+        guard let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+        else { return nil }
+
+        let redacted = redactJSONValue(object, keyIsSensitive: false)
+
+        guard JSONSerialization.isValidJSONObject(redacted),
+              let out = try? JSONSerialization.data(
+                  withJSONObject: redacted,
+                  options: [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]
+              ),
+              let text = String(data: out, encoding: .utf8)
+        else { return nil }
+        return text
+    }
+
+    /// JSON ağacını recursive redakte eder.
+    /// - Parameter keyIsSensitive: Üst anahtar hassas ise bu değerin TAMAMI maskelenir
+    ///   (nested object/array dahil — örn. `"card": { "pan": ..., "cvv": ... }`).
+    private func redactJSONValue(_ value: Any, keyIsSensitive: Bool) -> Any {
+        if keyIsSensitive {
+            return mask
+        }
+        switch value {
+        case let dict as [String: Any]:
+            var output: [String: Any] = [:]
+            output.reserveCapacity(dict.count)
+            for (key, child) in dict {
+                output[key] = redactJSONValue(child, keyIsSensitive: isSensitiveKey(key))
+            }
+            return output
+        case let array as [Any]:
+            return array.map { redactJSONValue($0, keyIsSensitive: false) }
+        case let string as String:
+            return redact(string)
+        default:
+            // Sayı / bool / null: anahtar hassas değilse olduğu gibi bırak (yukarıda maskelendi).
+            return value
+        }
     }
 
     // MARK: - Örüntü maskeleme

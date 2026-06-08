@@ -70,6 +70,9 @@ public struct OlafConfiguration: Sendable {
     public static let `default` = OlafConfiguration()
 
     /// Bankacılık uygulamaları için önerilen profil (redaksiyon **açık**, diske yazar).
+    /// `BankingRedactor` ile network gövdeleri (`requestBody`/`responseBody`) JSON ise
+    /// derin key-bazlı (token/balance/iban/pan/cvv…) recursive maskelemeden geçer; gövde
+    /// redaksiyonu bu profilde her zaman uygulanır.
     public static let bankingDefault = OlafConfiguration(
         minimumLevel: .trace,   // default açık: tüm seviyeler
         inMemoryCapacity: 3000,
