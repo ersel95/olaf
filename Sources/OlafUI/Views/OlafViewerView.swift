@@ -22,7 +22,7 @@ public struct OlafViewerView: View {
                 Divider()
                 logList
             }
-            .navigationTitle("Olaf")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $model.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Loglarda ara")
             .toolbar { toolbarContent }
@@ -117,6 +117,14 @@ public struct OlafViewerView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
             Button("Kapat") { onClose() }
+        }
+        ToolbarItem(placement: .principal) {
+            Image("OlafLogo", bundle: .module)
+                .resizable()
+                .scaledToFit()
+                .frame(height: 28)
+                .foregroundStyle(.primary)
+                .accessibilityLabel("Olaf")
         }
         ToolbarItem(placement: .topBarTrailing) {
             Button {

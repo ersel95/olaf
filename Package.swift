@@ -26,6 +26,9 @@ let package = Package(
         .target(
             name: "OlafUI",
             dependencies: ["OlafCore"],
+            resources: [
+                .process("Resources")
+            ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]

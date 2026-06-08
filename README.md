@@ -1,4 +1,8 @@
-# Olaf 🦊📝
+<p align="center">
+  <img src="docs/olaf-logo.png" alt="Olaf" width="140">
+</p>
+
+# Olaf
 
 **Uygulama loglarını** cihazda görüntüleyip paylaşmayı sağlayan, generic ve taşınabilir bir Swift logging + in-app log viewer kütüphanesi.
 
