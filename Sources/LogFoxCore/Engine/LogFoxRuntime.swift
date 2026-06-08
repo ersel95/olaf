@@ -60,7 +60,7 @@ final class LogFoxRuntime: @unchecked Sendable {
 
         _store = LogStore(
             capacity: configuration.inMemoryCapacity,
-            redactor: configuration.redactor,
+            redactor: configuration.effectiveRedactor,
             persistence: persistence,
             exportFormatter: configuration.exportFormatter,
             osLogMirror: mirror,

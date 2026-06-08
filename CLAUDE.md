@@ -22,7 +22,7 @@ xcodebuild -scheme LogFoxUI -destination 'generic/platform=iOS' build  # iOS vie
 Her değişiklikte macOS test + iOS build yeşil olmalı.
 
 ## Değişmez kurallar
-- **Redaksiyon default açık** (PAN/IBAN/email/Authorization/Cookie/token). Ham PII buffer'a/diske/konsola yazılmaz.
+- **Redaksiyon opt-in** (`LogFoxConfiguration.redactionEnabled`, **default `false`**). Açıkken (PAN/IBAN/email/Authorization/Cookie/token) maskelenir; kapalıyken ham veri saklanır (`effectiveRedactor` → `NoopRedactor`). `bankingDefault` profili redaksiyonu açar — bankacılık/PII içeren akışlarda mutlaka `redactionEnabled: true` verilmeli.
 - **Paket hiçbir dış araca bağlı DEĞİLDİR.** Dış tanılama aracı geçişi yalnız jenerik `ExternalToolBridge`
   + `LogFoxUI.register(_:)` ile host tarafında eklenir; gerekirse `LogFoxNetwork.install(chainingTo:)` ile
   başka bir capture aracının URLProtocol'ü paylaşılan session'a zincirlenebilir.

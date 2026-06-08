@@ -18,8 +18,19 @@ public struct LogFoxConfiguration: Sendable {
     /// Diskte tutulacak en fazla dosya sayısı (eskiler silinir).
     public var maxFileCount: Int
 
-    /// Yazma anında uygulanan redaksiyon. Varsayılan banking-grade ve **açık**.
+    /// Redaksiyon kuralları çalışsın mı? `true` → `redactor` uygulanır (her şey maskelenir);
+    /// `false` → hiçbir şey gizlenmez (ham veri saklanır). **Varsayılan `false`**.
+    public var redactionEnabled: Bool
+
+    /// `redactionEnabled == true` iken yazma anında uygulanan redaksiyon (banking-grade).
+    /// Kapalıyken yok sayılır.
     public var redactor: any Redactor
+
+    /// Yazma anında gerçekten uygulanacak redaktör: redaksiyon kapalıysa hiçbir şey yapmayan
+    /// `NoopRedactor`, açıksa yapılandırılmış `redactor`.
+    public var effectiveRedactor: any Redactor {
+        redactionEnabled ? redactor : NoopRedactor()
+    }
 
     /// Export (.log paylaşımı) sırasında kullanılan **insan-okur** biçim. Disk depolaması
     /// her zaman NDJSON'dur (geri okunabilirlik için); bu formatter yalnız paylaşım metnini üretir.
@@ -37,6 +48,7 @@ public struct LogFoxConfiguration: Sendable {
         persistsToDisk: Bool = true,
         maxFileSize: Int = 1_048_576,        // 1 MB
         maxFileCount: Int = 5,
+        redactionEnabled: Bool = false,
         redactor: any Redactor = BankingRedactor(),
         exportFormatter: any LogFormatter = PlainTextFormatter(),
         mirrorsToOSLog: Bool = true,
@@ -47,6 +59,7 @@ public struct LogFoxConfiguration: Sendable {
         self.persistsToDisk = persistsToDisk
         self.maxFileSize = max(4096, maxFileSize)
         self.maxFileCount = max(1, maxFileCount)
+        self.redactionEnabled = redactionEnabled
         self.redactor = redactor
         self.exportFormatter = exportFormatter
         self.mirrorsToOSLog = mirrorsToOSLog
@@ -56,11 +69,12 @@ public struct LogFoxConfiguration: Sendable {
     /// Genel amaçlı varsayılan.
     public static let `default` = LogFoxConfiguration()
 
-    /// Bankacılık uygulamaları için önerilen profil (redaksiyon açık, diske yazar).
+    /// Bankacılık uygulamaları için önerilen profil (redaksiyon **açık**, diske yazar).
     public static let bankingDefault = LogFoxConfiguration(
         minimumLevel: .trace,   // default açık: tüm seviyeler
         inMemoryCapacity: 3000,
         persistsToDisk: true,
+        redactionEnabled: true,
         redactor: BankingRedactor()
     )
 }

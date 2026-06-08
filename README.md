@@ -113,13 +113,13 @@ PAN/IBAN/token maskelenir. `includedURLs`/`excludedURLs` ile **baseURL filtrelem
 LogFox (facade)
   └─ LogFoxRuntime          # yaşam döngüsü, kill switch, seviye eşiği (kilitle korunur)
        └─ LogStore          # serial kuyruk: redaksiyon → ring buffer → disk → OSLog → canlı akış
-            ├─ Redactor               # BankingRedactor: PAN/IBAN/email/hassas-key maskeleme (default)
+            ├─ Redactor               # BankingRedactor: PAN/IBAN/email/hassas-key maskeleme (redactionEnabled ile opt-in)
             ├─ FilePersistence        # boyut bazlı rotation + retention + data protection
             ├─ LogFormatter           # PlainText / JSON (NDJSON)
             └─ OSLogMirror            # os.Logger köprüsü (Console.app)
 ```
 
-- **Banking-grade redaksiyon varsayılan açık** — ham PII (PAN/CVV/IBAN/OTP/token) buffer'a, diske veya konsola asla yazılmaz.
+- **Banking-grade redaksiyon (opt-in)** — `LogFoxConfiguration(redactionEnabled: true)` (veya `.bankingDefault`) ile açılır; açıkken ham PII (PAN/CVV/IBAN/OTP/token) buffer'a, diske veya konsola asla yazılmaz. **Default `false`** → açıkça etkinleştirilmezse maskeleme yapılmaz.
 - **UIKit/SwiftUI bağımlılığı yok** → her platformda derlenir, test edilebilir.
 - **Async/non-blocking** — `@autoclosure` ile seviye eşiğin altındaysa mesaj compute edilmez; yazma serial kuyrukta.
 

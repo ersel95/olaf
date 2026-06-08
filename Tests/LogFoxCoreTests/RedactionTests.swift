@@ -70,4 +70,27 @@ final class RedactionTests: XCTestCase {
         let input = "kart 4508034012345678"
         XCTAssertEqual(NoopRedactor().redact(input), input)
     }
+
+    // MARK: - redactionEnabled flag
+
+    func testRedactionDisabledByDefaultLeavesDataUntouched() {
+        let config = LogFoxConfiguration()
+        XCTAssertFalse(config.redactionEnabled)
+        let input = "kart 4508034012345678"
+        XCTAssertEqual(config.effectiveRedactor.redact(input), input)
+        XCTAssertTrue(config.effectiveRedactor is NoopRedactor)
+    }
+
+    func testRedactionEnabledMasksData() {
+        let config = LogFoxConfiguration(redactionEnabled: true)
+        XCTAssertTrue(config.redactionEnabled)
+        let output = config.effectiveRedactor.redact("kart 4508034012345678")
+        XCTAssertTrue(output.contains("5678"))
+        XCTAssertFalse(output.contains("4508034012345678"))
+        XCTAssertTrue(config.effectiveRedactor is BankingRedactor)
+    }
+
+    func testBankingDefaultEnablesRedaction() {
+        XCTAssertTrue(LogFoxConfiguration.bankingDefault.redactionEnabled)
+    }
 }
