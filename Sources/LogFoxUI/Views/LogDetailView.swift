@@ -68,9 +68,11 @@ struct LogDetailView: View {
     @ViewBuilder
     private func networkSections(_ info: NetworkLogInfo) -> some View {
         Section {
-            StatusBanner(info: info)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
+            StatusBanner(info: info) {
+                logFoxCopy(info.url ?? info.path, showing: $didCopy)
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
         }
 
         Section("Özet") {
@@ -206,6 +208,8 @@ struct LogDetailView: View {
 /// Network status başlığı (tam-genişlik renkli banner).
 private struct StatusBanner: View {
     let info: NetworkLogInfo
+    /// Sağdaki kopyala butonuna basıldığında tam URL'i panoya kopyalar.
+    var onCopyURL: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -217,6 +221,15 @@ private struct StatusBanner: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Spacer(minLength: 0)
+            Button(action: onCopyURL) {
+                Image(systemName: "doc.on.doc")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(6)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("URL'i kopyala")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
