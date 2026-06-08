@@ -1,53 +1,53 @@
-# LogFox — AI Agent Entegrasyon Talimatı
+# Olaf — AI Agent Entegrasyon Talimatı
 
-Bir AI agent "LogFox'u entegre et" komutu aldığında **bu dosyayı** takip eder. Adımlar mekanik ve sıralıdır.
+Bir AI agent "Olaf'u entegre et" komutu aldığında **bu dosyayı** takip eder. Adımlar mekanik ve sıralıdır.
 
 ## Ön koşullar
 - Hedef: iOS 17+ uygulaması.
-- LogFox paketi: `https://github.com/ersel95/logfox`
-- Ürünler: `LogFoxCore` (motor) + `LogFoxUI` (viewer) zorunlu; `LogFoxNetwork` (ağ yakalama) opsiyonel.
+- Olaf paketi: `https://github.com/ersel95/olaf`
+- Ürünler: `OlafCore` (motor) + `OlafUI` (viewer) zorunlu; `OlafNetwork` (ağ yakalama) opsiyonel.
 - Dış tanılama araçları jenerik `ExternalToolBridge` ile host tarafında eklenebilir (paket hiçbir dış araca bağlı değildir).
 
 ## Adımlar
 
 ### 1. Paket bağımlılığını ekle
 Xcode → Add Package → "Choose Package Products":
-- Ana app target'ına: `LogFoxCore` **ve** `LogFoxUI` (zorunlu), ağ logları için `LogFoxNetwork`.
-- App extension'lara (varsa): yalnız `LogFoxCore`.
+- Ana app target'ına: `OlafCore` **ve** `OlafUI` (zorunlu), ağ logları için `OlafNetwork`.
+- App extension'lara (varsa): yalnız `OlafCore`.
 
 ### 2. Entegrasyon dosyasını kopyala (ZORUNLU)
-`Integration/LogFoxIntegration.swift` dosyasını host app kaynaklarına kopyala (örn. `Core/Utils/`).
-Tek entegrasyon noktasıdır: `LogFoxManager` (başlatma + loglama).
+`Integration/OlafIntegration.swift` dosyasını host app kaynaklarına kopyala (örn. `Core/Utils/`).
+Tek entegrasyon noktasıdır: `OlafManager` (başlatma + loglama).
 `// ADAPT:` satırlarını uyarla:
 - Gating: `#if !PROD` (önerilen — capture kodu prod binary'sine girmez) veya runtime feature flag.
 - Log kategorilerini projeye göre düzenle.
 
-> Uygulama **`LogFox`'a doğrudan bağlanmaz**; loglar manager üzerinden atılır:
-> `LogFoxManager.shared.info("...", category: .auth)`, `LogFoxManager.shared.error(error, category: .payment)`.
-> LogFox başlatılmamışsa (PROD) çağrılar no-op'tur.
+> Uygulama **`Olaf`'a doğrudan bağlanmaz**; loglar manager üzerinden atılır:
+> `OlafManager.shared.info("...", category: .auth)`, `OlafManager.shared.error(error, category: .payment)`.
+> Olaf başlatılmamışsa (PROD) çağrılar no-op'tur.
 
 ### 3. Başlatmayı bağla
 App giriş noktasında — **paylaşılan URLSession kurulmadan ÖNCE** (SwiftUI `App.init` veya
 `AppDelegate.didFinishLaunching` başı, session preload'undan önce):
 ```swift
-LogFoxManager.shared.initialize()
+OlafManager.shared.initialize()
 ```
 
 ### 4. Özel Alamofire/URLSession session'ı varsa
 Host kendi `URLSessionConfiguration`'ını kuruyorsa (otomatik swizzle yerine deterministik enjeksiyon):
 session kurulurken tek satır:
 ```swift
-LogFoxManager.shared.configureNetworkCapture(configuration)
+OlafManager.shared.configureNetworkCapture(configuration)
 ```
 
 ### 5. Doğrula
-- Derle. Cihazı salla → LogFox viewer açılır.
+- Derle. Cihazı salla → Olaf viewer açılır.
 
 ## Loglama (app her zaman manager üzerinden loglar)
-Uygulama kodunda `import LogFoxCore` + `LogFox.x(...)` KULLANMA. Manager'ı kullan:
+Uygulama kodunda `import OlafCore` + `Olaf.x(...)` KULLANMA. Manager'ı kullan:
 ```swift
-LogFoxManager.shared.info("Login başarılı", category: .auth)
-LogFoxManager.shared.error(error, category: .payment)
+OlafManager.shared.info("Login başarılı", category: .auth)
+OlafManager.shared.error(error, category: .payment)
 ```
 Manager `trace/debug/info/notice/warning/error/critical` + `error(Error)` sağlar; çağıran dosya/satır korunur.
 `print()` çağrılarını kademeli olarak bu metodlara taşı.
@@ -60,21 +60,21 @@ public extension LogCategory {
     static let transfers: LogCategory = "transfers"
 }
 ```
-Dosya `@_exported import LogFoxCore` içerdiğinden çağrı yerleri `import LogFoxCore` yazmadan kullanabilir.
+Dosya `@_exported import OlafCore` içerdiğinden çağrı yerleri `import OlafCore` yazmadan kullanabilir.
 
 ## Davranış kuralları (agent için)
 - Paketin `Sources/` içeriğini DEĞİŞTİRME; entegrasyon host tarafındadır (yalnız template + ürün seçimi).
 - `initialize(...)` paylaşılan session'dan ÖNCE çağrılmalı; aksi halde ilk istekler yakalanmayabilir.
-- `LogFox.start(...)` / `initialize(...)` yalnız bir kez çağrılır.
+- `Olaf.start(...)` / `initialize(...)` yalnız bir kez çağrılır.
 - Gating'i `#if DEBUG`'a bağlama (TestFlight UAT release config). `#if !PROD` veya runtime flag kullan.
 
-## (Opsiyonel) Network loglarını listele — `LogFoxNetwork`
-`LogFoxNetwork` ürününü ekle. **En kolay (networking koduna dokunmadan):** `initialize` içinde zaten çağrılan
+## (Opsiyonel) Network loglarını listele — `OlafNetwork`
+`OlafNetwork` ürününü ekle. **En kolay (networking koduna dokunmadan):** `initialize` içinde zaten çağrılan
 ```swift
-LogFoxNetwork.startAutomaticCapture()   // URLSessionConfiguration swizzle + global; SSL kırmaz
+OlafNetwork.startAutomaticCapture()   // URLSessionConfiguration swizzle + global; SSL kırmaz
 ```
-İstek/yanıtlar `.network` kategorisinde redaksiyonla LogFox'a düşer. Gövde + header **default açık**;
-kısmak için `startAutomaticCapture(LogFoxNetworkConfiguration(capturesBodies: false))`.
+İstek/yanıtlar `.network` kategorisinde redaksiyonla Olaf'a düşer. Gövde + header **default açık**;
+kısmak için `startAutomaticCapture(OlafNetworkConfiguration(capturesBodies: false))`.
 Kendi session'ına manuel/deterministik enjekte için (adım 4) `configureNetworkCapture(_:)` / `install(into:chainingTo:)`.
 
 ## Genişletme: dış bir tanılama aracı eklemek
@@ -82,7 +82,7 @@ Jenerik geçiş için `ExternalToolBridge`'e uyan bir tip yazıp host'ta kaydet:
 ```swift
 struct SomeToolBridge: ExternalToolBridge {
     let title = "SomeTool"
-    @MainActor func open() { /* dismiss + show, ya da LogFoxUI.presentExternal { ... } */ }
+    @MainActor func open() { /* dismiss + show, ya da OlafUI.presentExternal { ... } */ }
 }
-LogFoxUI.register(SomeToolBridge())
+OlafUI.register(SomeToolBridge())
 ```

@@ -1,50 +1,50 @@
-# LogFox — Entegrasyon Rehberi
+# Olaf — Entegrasyon Rehberi
 
-LogFox'u uygulamaya bağlamak için rehber.
+Olaf'u uygulamaya bağlamak için rehber.
 
-> **Tasarım ilkesi:** Çekirdek (LogFoxCore/UI) hiçbir dış araca bağlı değildir. Dış tanılama araçları
+> **Tasarım ilkesi:** Çekirdek (OlafCore/UI) hiçbir dış araca bağlı değildir. Dış tanılama araçları
 > (örn. başka bir network logger) jenerik `ExternalToolBridge` ile host tarafında eklenebilir.
-> Hızlı yol: tek-dosya template [`Integration/LogFoxIntegration.swift`](Integration/LogFoxIntegration.swift)
+> Hızlı yol: tek-dosya template [`Integration/OlafIntegration.swift`](Integration/OlafIntegration.swift)
 > ve makine-takipli [`AGENTS.md`](AGENTS.md).
 
 > **Gating notu:** TestFlight build'i genelde UAT/Prod config'tedir; `#if DEBUG` yalnız Test config'te tanımlıdır.
-> LogFox'u `#if DEBUG`'a bağlama — `#if !PROD` derleme sınırı (önerilen, capture kodu prod binary'sine girmez)
+> Olaf'u `#if DEBUG`'a bağlama — `#if !PROD` derleme sınırı (önerilen, capture kodu prod binary'sine girmez)
 > veya runtime feature flag kullan.
 
 ---
 
 ## 1. Paketi ekle
 
-Xcode → Add Packages → `https://github.com/ersel95/logfox` → ana app target'ına ("Choose Package Products"):
-- `LogFoxCore` (motor) + `LogFoxUI` (viewer) — zorunlu
-- `LogFoxNetwork` — network loglarını LogFox'ta görmek için (§4)
+Xcode → Add Packages → `https://github.com/ersel95/olaf` → ana app target'ına ("Choose Package Products"):
+- `OlafCore` (motor) + `OlafUI` (viewer) — zorunlu
+- `OlafNetwork` — network loglarını Olaf'ta görmek için (§4)
 
-(App extension'lara yalnız `LogFoxCore`.)
+(App extension'lara yalnız `OlafCore`.)
 
 ## 2. Entegrasyon dosyasını kopyala
 
-[`Integration/LogFoxIntegration.swift`](Integration/LogFoxIntegration.swift) dosyasını host app'e (örn. `Core/Utils/`)
-kopyalayın. İçinde `LogFoxManager` (başlatma + loglama) hazırdır. `// ADAPT:` satırlarını uyarlayın.
+[`Integration/OlafIntegration.swift`](Integration/OlafIntegration.swift) dosyasını host app'e (örn. `Core/Utils/`)
+kopyalayın. İçinde `OlafManager` (başlatma + loglama) hazırdır. `// ADAPT:` satırlarını uyarlayın.
 
 ```swift
-@_exported import LogFoxCore
-import LogFoxUI
-#if canImport(LogFoxNetwork)
-import LogFoxNetwork
+@_exported import OlafCore
+import OlafUI
+#if canImport(OlafNetwork)
+import OlafNetwork
 #endif
 
-public final class LogFoxManager {
-    public static let shared = LogFoxManager()
+public final class OlafManager {
+    public static let shared = OlafManager()
     private init() {}
 
     public func initialize() {
         #if !PROD
-        LogFox.start(.bankingDefault)
-        #if canImport(LogFoxNetwork)
-        LogFoxNetwork.startAutomaticCapture()
+        Olaf.start(.bankingDefault)
+        #if canImport(OlafNetwork)
+        OlafNetwork.startAutomaticCapture()
         #endif
         Task { @MainActor in
-            LogFoxUI.install()
+            OlafUI.install()
         }
         #endif
     }
@@ -56,11 +56,11 @@ public final class LogFoxManager {
 App giriş noktanızda — **paylaşılan URLSession kurulmadan ÖNCE** (SwiftUI `App.init` veya
 `AppDelegate.didFinishLaunching` başı, session preload'undan önce):
 ```swift
-LogFoxManager.shared.initialize()
+OlafManager.shared.initialize()
 ```
-Shake jesti LogFox'a aittir; cihaz sallanınca viewer açılır.
+Shake jesti Olaf'a aittir; cihaz sallanınca viewer açılır.
 
-## 4. Network loglarını LogFox'ta listelemek — `LogFoxNetwork`
+## 4. Network loglarını Olaf'ta listelemek — `OlafNetwork`
 
 İstek/yanıtları `.network` kategorisinde, **BankingRedactor'dan geçirerek** (PAN/IBAN/token maskeli) loglar.
 
@@ -68,8 +68,8 @@ Shake jesti LogFox'a aittir; cihaz sallanınca viewer açılır.
 `startAutomaticCapture()`, `URLSessionConfiguration`'ı swizzle ederek tüm session'lara (Alamofire dahil)
 protokolü enjekte eder; proxy session sunucu trust'ını kabul eder → **SSL/sertifika kırılmaz**. `initialize` içinde hazır:
 ```swift
-LogFoxNetwork.startAutomaticCapture()                                // gövde+header default açık
-LogFoxNetwork.startAutomaticCapture(LogFoxNetworkConfiguration(
+OlafNetwork.startAutomaticCapture()                                // gövde+header default açık
+OlafNetwork.startAutomaticCapture(OlafNetworkConfiguration(
     capturesBodies: false,
     includedURLs: ["api-gateway"],                                   // boş = tümü
     excludedURLs: ["firebaseio", "crashlytics", "googleapis"]        // SDK gürültüsünü gizle (öncelikli)
@@ -79,23 +79,23 @@ LogFoxNetwork.startAutomaticCapture(LogFoxNetworkConfiguration(
 ### Kendi özel session'ınız varsa: deterministik enjeksiyon
 Host kendi `URLSessionConfiguration`'ını kuruyorsa, otomatik swizzle yerine session kurulurken tek satır:
 ```swift
-// LogFoxManager içindeki configureNetworkCapture(_:) yardımcısı:
-LogFoxManager.shared.configureNetworkCapture(configuration)
-// (içeride: LogFoxNetwork.install(into: configuration))
+// OlafManager içindeki configureNetworkCapture(_:) yardımcısı:
+OlafManager.shared.configureNetworkCapture(configuration)
+// (içeride: OlafNetwork.install(into: configuration))
 ```
 Bunu kullanıyorsanız `startAutomaticCapture`'a gerek kalmaz. Başka bir capture aracının URLProtocol'ünü
-aynı trafiğe zincirlemek için `LogFoxNetwork.install(into:chainingTo:)` kullanılabilir.
+aynı trafiğe zincirlemek için `OlafNetwork.install(into:chainingTo:)` kullanılabilir.
 
 > **Güvenlik:** Gövde/header default açıktır → tüm trafik loglanır (BankingRedactor maskeler ama keyfi JSON'daki
 > her PII garanti değil). Trust kabulü ve gövde loglama **yalnız non-prod debug** içindir → PROD'da çalışmamalı.
 
-## 5. Uygulamada loglama — her zaman `LogFoxManager` üzerinden
+## 5. Uygulamada loglama — her zaman `OlafManager` üzerinden
 
-Uygulama kodu `LogFox`'a doğrudan bağlanmaz; manager üzerinden loglar (`trace/debug/info/notice/warning/error/critical`
+Uygulama kodu `Olaf`'a doğrudan bağlanmaz; manager üzerinden loglar (`trace/debug/info/notice/warning/error/critical`
 + `error(Error)`; çağıran dosya/satır korunur, PROD'da no-op).
 ```swift
-LogFoxManager.shared.warning("token decode hatası", category: .security)
-LogFoxManager.shared.error(error, category: .payment, metadata: ["code": code])
+OlafManager.shared.warning("token decode hatası", category: .security)
+OlafManager.shared.error(error, category: .payment, metadata: ["code": code])
 ```
 
 ### Kategorileri genişletme
@@ -106,7 +106,7 @@ public extension LogCategory {
     static let transfers: LogCategory = "transfers"
 }
 ```
-Dosya `@_exported import LogFoxCore` içerir → çağrı yerleri `import LogFoxCore` yazmadan kullanabilir.
+Dosya `@_exported import OlafCore` içerir → çağrı yerleri `import OlafCore` yazmadan kullanabilir.
 
 ---
 
@@ -115,9 +115,9 @@ Jenerik geçiş `ExternalToolBridge` ile yapılır:
 ```swift
 struct SomeToolBridge: ExternalToolBridge {
     let title = "SomeTool"
-    @MainActor func open() { /* dismiss + show, ya da LogFoxUI.presentExternal { ... } */ }
+    @MainActor func open() { /* dismiss + show, ya da OlafUI.presentExternal { ... } */ }
 }
-LogFoxUI.register(SomeToolBridge())
+OlafUI.register(SomeToolBridge())
 ```
-Gömülebilir SwiftUI araçları için `LogFoxUI.presentExternal { SomeView() }`; kendini sunan UIKit araçları için
-`LogFoxUI.dismiss()` + aracın kendi `show()`'u.
+Gömülebilir SwiftUI araçları için `OlafUI.presentExternal { SomeView() }`; kendini sunan UIKit araçları için
+`OlafUI.dismiss()` + aracın kendi `show()`'u.

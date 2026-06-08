@@ -2,49 +2,49 @@
 import PackageDescription
 
 let package = Package(
-    name: "LogFox",
+    name: "Olaf",
     platforms: [
         .iOS(.v17),
         .macOS(.v14) // Core, UIKit'siz olduğu için macOS'ta da test edilebilir
     ],
     products: [
         // Çekirdek motor (UIKit/SwiftUI'sız, her platformda).
-        .library(name: "LogFoxCore", targets: ["LogFoxCore"]),
+        .library(name: "OlafCore", targets: ["OlafCore"]),
         // In-app viewer (shake → liste/detay, filtre, paylaşım). iOS hedefli; içerik `#if canImport(UIKit)` gate'li.
-        .library(name: "LogFoxUI", targets: ["LogFoxUI"]),
+        .library(name: "OlafUI", targets: ["OlafUI"]),
         // Opsiyonel network capture (URLProtocol). İstek/yanıtları .network kategorisinde,
-        // BankingRedactor'dan geçerek LogFox'a loglar. UIKit'siz, her platformda.
-        .library(name: "LogFoxNetwork", targets: ["LogFoxNetwork"])
+        // BankingRedactor'dan geçerek Olaf'a loglar. UIKit'siz, her platformda.
+        .library(name: "OlafNetwork", targets: ["OlafNetwork"])
     ],
     targets: [
         .target(
-            name: "LogFoxCore",
+            name: "OlafCore",
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]
         ),
         .target(
-            name: "LogFoxUI",
-            dependencies: ["LogFoxCore"],
+            name: "OlafUI",
+            dependencies: ["OlafCore"],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]
         ),
         .target(
-            name: "LogFoxNetwork",
-            dependencies: ["LogFoxCore"]
+            name: "OlafNetwork",
+            dependencies: ["OlafCore"]
         ),
         .testTarget(
-            name: "LogFoxCoreTests",
-            dependencies: ["LogFoxCore"]
+            name: "OlafCoreTests",
+            dependencies: ["OlafCore"]
         ),
         .testTarget(
-            name: "LogFoxUITests",
-            dependencies: ["LogFoxUI"]
+            name: "OlafUITests",
+            dependencies: ["OlafUI"]
         ),
         .testTarget(
-            name: "LogFoxNetworkTests",
-            dependencies: ["LogFoxNetwork"]
+            name: "OlafNetworkTests",
+            dependencies: ["OlafNetwork"]
         )
     ]
 )
