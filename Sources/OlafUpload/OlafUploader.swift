@@ -34,7 +34,6 @@ final class OlafUploader: @unchecked Sendable {
     func upload(body: Data, boundary: String) async -> OlafUploadResult {
         var request = URLRequest(url: configuration.reportsURL)
         request.httpMethod = "POST"
-        request.setValue(configuration.appKey, forHTTPHeaderField: "x-olaf-app-key")
         request.setValue(configuration.apiKey, forHTTPHeaderField: "x-olaf-api-key")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 

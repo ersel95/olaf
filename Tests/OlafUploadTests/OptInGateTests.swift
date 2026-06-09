@@ -7,7 +7,6 @@ final class OptInGateTests: XCTestCase {
         // enabled: false (varsayılan) → configure erken döner, servis kurulmaz.
         OlafUpload.configure(
             enabled: false,
-            appKey: "demo",
             apiKey: "secret",
             baseURL: URL(string: "https://olaf-api.example.com")!,
             environment: "staging"
@@ -16,12 +15,11 @@ final class OptInGateTests: XCTestCase {
         XCTAssertNil(OlafUpload.bugReportService)
     }
 
-    func testEnabledWithEmptyAppKeyIsNoOp() {
-        // enabled: true ama appKey boş → no-op (hangi projeden config çekileceği bilinemez).
+    func testEnabledWithEmptyApiKeyIsNoOp() {
+        // enabled: true ama apiKey boş → no-op (app apiKey'den çözülemez).
         OlafUpload.configure(
             enabled: true,
-            appKey: "   ",
-            apiKey: "secret",
+            apiKey: "   ",
             baseURL: URL(string: "https://olaf-api.example.com")!,
             environment: "staging"
         )

@@ -80,7 +80,7 @@ Kendi session'ına manuel/deterministik enjekte için (adım 4) `configureNetwor
 ## (Opsiyonel) Bug-reporter — screenshot → banner → upload (`OlafUpload`)
 **OPT-IN, varsayılan KAPALI.** Detaylı adımlar: `INTEGRATION.md` §6–§8.
 1. `OlafUpload` ürününü ana app target'ına ekle.
-2. `initialize()` template'i opt-in `OlafUpload.configure(enabled:appKey:apiKey:baseURL:environment:)`'ı
+2. `initialize()` template'i opt-in `OlafUpload.configure(enabled:apiKey:baseURL:environment:)`'ı
    zaten içerir (hepsi `#if !PROD`). Değerleri **host xcconfig → Info.plist** ile sağla — **repoya commit ETME** (public repo).
    `enabled` default `false`; açmak için `OLAF_BUG_REPORTER_ENABLED = true`.
 3. Navigation breadcrumb için host'ta `OlafNavigationObserver` adapter'ı (Coordinator) ekle veya manuel

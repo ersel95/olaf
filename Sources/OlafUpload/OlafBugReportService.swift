@@ -120,7 +120,6 @@ public final class OlafBugReportService: @unchecked Sendable {
 
         let payload = OlafReportPayload(
             app: .init(
-                key: configuration.appKey,
                 bundleId: OlafDeviceIdentity.bundleIdentifier,
                 version: OlafDeviceIdentity.appVersion,
                 build: OlafDeviceIdentity.appBuild,

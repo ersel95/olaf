@@ -56,11 +56,10 @@ final class OlafRemoteConfigClient: @unchecked Sendable {
         self.session = URLSession(configuration: sessionConfig)
     }
 
-    /// `GET /config?appKey=`. Hata/ulaşılamaz durumda `.disabled` döner (güvenli taraf).
+    /// `GET /config` (app, x-olaf-api-key'den çözülür). Hata/ulaşılamaz → `.disabled` (güvenli taraf).
     func fetch() async -> OlafRemoteConfig {
         var request = URLRequest(url: configuration.configURL)
         request.httpMethod = "GET"
-        request.setValue(configuration.appKey, forHTTPHeaderField: "x-olaf-app-key")
         request.setValue(configuration.apiKey, forHTTPHeaderField: "x-olaf-api-key")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 

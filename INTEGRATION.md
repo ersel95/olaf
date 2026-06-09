@@ -30,7 +30,7 @@ Xcode → Add Packages → `https://github.com/ersel95/olaf` → ana app target'
 > | Shake → log viewer | `OlafCore` + `OlafUI` | `OlafUI.install()` |
 > | Network capture | + `OlafNetwork` | `OlafNetwork.startAutomaticCapture()` |
 > | Navigation breadcrumb | `OlafCore` | `Olaf.trackScreen(...)` (§7) |
-> | **Bug-reporter** (screenshot→banner→upload) | + `OlafUpload` | `OlafUpload.configure(enabled: true, appKey:…)` (§6) — **opt-in** |
+> | **Bug-reporter** (screenshot→banner→upload) | + `OlafUpload` | `OlafUpload.configure(enabled: true, apiKey:…)` (§6) — **opt-in** |
 
 ## 2. Entegrasyon dosyasını kopyala
 
@@ -136,13 +136,13 @@ Dosya `@_exported import OlafCore` içerir → çağrı yerleri `import OlafCore
 > Hata olursa rapor diske kuyruklanır ve daha sonra otomatik gönderilir (offline retry + backoff).
 
 ### 6.1 ÜÇ savunma katmanı (varsayılan KAPALI)
-Bug-reporter **opt-in**'dir. `OlafUpload.configure(enabled: true, appKey:…)` çağrılmadıkça **hiçbir**
+Bug-reporter **opt-in**'dir. `OlafUpload.configure(enabled: true, apiKey:…)` çağrılmadıkça **hiçbir**
 remote config / screenshot detector / upload kodu çalışmaz. Üç gate:
 1. **Local opt-in** `enabled` (build-time, varsayılan `false`).
 2. **`#if !PROD`** derleme sınırı (en kritik kural — canlıya asla çıkmaz).
-3. **Server-side `captureEnabled`** (`GET /config?appKey=` ile uzaktan kill-switch).
+3. **Server-side `captureEnabled`** (`GET /config` ile uzaktan kill-switch).
 
-`enabled == false` iken **sıfır ağ aktivitesi**: remote config bile çağrılmaz. `appKey` boşsa no-op + dev uyarısı.
+`enabled == false` iken **sıfır ağ aktivitesi**: remote config bile çağrılmaz. `apiKey` boşsa no-op + dev uyarısı.
 
 ### 6.2 Başlatma (opt-in configure)
 `OlafManager.initialize()` template'i (§2) bunu zaten içerir; tek yapılacak değerleri **host tarafından**
@@ -159,9 +159,8 @@ Task { @MainActor in OlafUI.install() }   // bug-reporter detector hook'unu da k
 if let baseURL = Self.olafUploadBaseURL {       // değer yoksa hiç configure edilmez
     OlafUpload.configure(
         enabled: Self.bugReporterEnabled,        // default false — opt-in
-        appKey: Self.olafAppKey,                 // host (xcconfig) sağlar
-        apiKey: Self.olafApiKey,                 // host (xcconfig) sağlar
-        baseURL: baseURL,                        // host (xcconfig) sağlar
+        apiKey: Self.olafApiKey,                 // host (xcconfig) — TEK secret; backend app'i bundan tanır
+        baseURL: baseURL,                        // sabit origin (host'ta hard-code edilebilir)
         environment: Self.olafEnvironment
     )
 }
@@ -172,23 +171,22 @@ if let baseURL = Self.olafUploadBaseURL {       // değer yoksa hiç configure e
 > detector / banner ancak `OlafUpload.configure(enabled: true)` başarılı olunca kurulur. İkisinin
 > çağrı sırası önemli değildir.
 
-### 6.3 Konfig değerleri — HOST sağlar, repoya ASLA commit edilmez (public repo)
+### 6.3 Konfig değerleri — HOST sağlar (public repo)
 Olaf SDK **tamamen public**'tir → hiçbir gerçek URL / şirket adı / sır SDK koduna **veya** bu repoya girmez.
-`appKey` / `apiKey` / `baseURL` host uygulamada runtime'da enjekte edilir. Önerilen yol: **xcconfig → Info.plist**.
+**Tek SECRET `apiKey`'dir** (backend app'i ondan tanır — ayrı appKey/slug yok). `baseURL` gizli değildir,
+sabit bir origin'dir → host'ta sabit verilebilir. Önerilen yol: apiKey **xcconfig → Info.plist**.
 
-1. Host repo'da (Olaf'ta değil) `Secrets.xcconfig` — **`.gitignore`'a ekleyin**:
+1. Host repo'da (Olaf'ta değil) apiKey'i `Secrets.xcconfig`'e — **`.gitignore`'a ekleyin** (yalnız non-prod):
    ```
    OLAF_BUG_REPORTER_ENABLED = true
-   OLAF_APP_KEY = <APP_KEY>
-   OLAF_API_KEY = <API_KEY>
-   OLAF_API_BASE_URL = https:/$()/<your-olaf-host>     // xcconfig'te // yorum sayılır; $() ile kaçış
-   OLAF_ENVIRONMENT = staging
+   OLAF_API_KEY = <API_KEY>            # TEK secret
+   OLAF_ENVIRONMENT = test
    ```
-2. `Info.plist`'e bu anahtarları `$(OLAF_APP_KEY)` vb. değişken referanslarıyla ekleyin.
-3. Template'teki `Self.olafAppKey` vb. erişimciler bunları `Bundle.main.object(forInfoDictionaryKey:)` ile okur.
+2. `Info.plist`'e `OLAF_API_KEY`'i `$(OLAF_API_KEY)` referansıyla ekleyin.
+3. `baseURL`'i host kodunda sabit verin (gizli değil) ya da yine xcconfig'ten okuyun.
 
-> CI/Fastlane kullanıyorsanız değerleri ortam değişkeninden xcconfig'e/Info.plist'e enjekte edin. Placeholder'lar
-> (`<APP_KEY>`, `<your-olaf-host>`) **örnektir**; gerçek değerleri yalnız host CI/secrets'ta tutun.
+> CI/Fastlane kullanıyorsanız apiKey'i ortam değişkeninden enjekte edin. `<API_KEY>` **örnektir**;
+> gerçek değeri yalnız host CI/secrets'ta tutun.
 
 ### 6.4 Recursion önleme (otomatik)
 `OlafUpload.configure`, upload + config endpoint'lerini (host + `/reports` + `/config`) otomatik olarak
@@ -241,7 +239,7 @@ Ekran göründüğünde manuel çağırın:
 ## 8. Doğrulama & sorun giderme
 
 ### 8.1 Doğrulama adımları
-1. `#if !PROD` aktif bir config'te (Debug/UAT) build alın; `OLAF_BUG_REPORTER_ENABLED = true` + `OLAF_APP_KEY`/
+1. `#if !PROD` aktif bir config'te (Debug/UAT) build alın; `OLAF_BUG_REPORTER_ENABLED = true` + 
    `OLAF_API_KEY`/`OLAF_API_BASE_URL` sağlanmış olsun.
 2. Uygulamayı çalıştırın, birkaç ekranda gezinin (network/log birikir).
 3. **Ekran görüntüsü alın** (cihaz/simülatör: ⌘S simülatörde Save Screen).
@@ -254,8 +252,8 @@ Ekran göründüğünde manuel çağırın:
 ### 8.2 Sorun giderme
 - **Banner çıkmıyor**:
   - `OlafUpload.configure(enabled: true, …)` çağrıldı mı? `OlafUpload.isConfigured` `true` mu?
-  - `appKey` dolu mu? (boşsa no-op + dev log uyarısı.)
-  - Server-side `captureEnabled` `false` olabilir → `GET /config?appKey=` yanıtını kontrol edin
+  - `apiKey` dolu mu? (boşsa no-op + dev log uyarısı.)
+  - Server-side `captureEnabled` `false` olabilir → `GET /config` yanıtını kontrol edin
     (kill-switch). Banner yalnız `captureEnabled == true` iken gösterilir.
   - `#if !PROD` aktif mi? PROD config'te tüm akış derlenmez.
 - **Screenshot siyah/eksik**: secure (gizli) alanlar `drawHierarchy` ile render'da siyah çıkabilir — bilinen, kabul edilen sınır.

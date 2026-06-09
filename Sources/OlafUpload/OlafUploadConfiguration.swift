@@ -3,7 +3,7 @@ import Foundation
 /// Bug-reporter (upload) yapılandırması. `OlafUpload.configure(...)` ile bir kez verilir.
 ///
 /// ⚠️ **Public repo kuralı**: Hiçbir gerçek URL / şirket adı / sır bu yapıya gömülü
-/// **default** değer olarak girmez. `appKey` / `apiKey` / `baseURL` host uygulama tarafından
+/// **default** değer olarak girmez. `apiKey` / `baseURL` host uygulama tarafından
 /// runtime'da (xcconfig/secrets) sağlanır.
 public struct OlafUploadConfiguration: Sendable {
 
@@ -11,10 +11,9 @@ public struct OlafUploadConfiguration: Sendable {
     /// `false` iken `OlafUpload.configure` erken döner: sıfır ağ / detector / tracker.
     public var enabled: Bool
 
-    /// Hangi proje? Remote config + ingestion bu key ile çalışır. Boşsa configure no-op olur.
-    public var appKey: String
-
-    /// Ingestion auth sırrı. `x-olaf-api-key` header'ı olarak gönderilir.
+    /// Ingestion auth sırrı. `x-olaf-api-key` header'ı olarak gönderilir. Backend app'i
+    /// bu key'den tanır (apiKey benzersiz → ayrıca appKey/slug taşımaya gerek yok).
+    /// Boşsa configure no-op olur.
     public var apiKey: String
 
     /// Olaf backend kök adresi (örn. `https://olaf-api.example.com`). Host tarafından sağlanır.
@@ -46,7 +45,6 @@ public struct OlafUploadConfiguration: Sendable {
 
     public init(
         enabled: Bool = false,
-        appKey: String = "",
         apiKey: String = "",
         baseURL: URL,
         environment: String = "staging",
@@ -62,7 +60,6 @@ public struct OlafUploadConfiguration: Sendable {
         maxScreenshotBytes: Int = 4 * 1_048_576
     ) {
         self.enabled = enabled
-        self.appKey = appKey
         self.apiKey = apiKey
         self.baseURL = baseURL
         self.environment = environment
@@ -80,11 +77,9 @@ public struct OlafUploadConfiguration: Sendable {
         url(appending: reportsPath)
     }
 
-    /// `GET /config?appKey=` tam URL'i.
+    /// `GET /config` tam URL'i. App, `x-olaf-api-key` header'ından çözülür (query yok).
     public var configURL: URL {
-        var comps = URLComponents(url: url(appending: configPath), resolvingAgainstBaseURL: false)
-        comps?.queryItems = [URLQueryItem(name: "appKey", value: appKey)]
-        return comps?.url ?? url(appending: configPath)
+        url(appending: configPath)
     }
 
     /// Recursion önleme için `OlafNetwork.excludedURLs`'e eklenecek host/path parçaları.

@@ -30,7 +30,7 @@ public enum OlafUI {
     #if canImport(UIKit)
     /// Bug-reporter (screenshot → banner → upload) detector kurulum hook'unu `OlafUpload`'a kaydeder.
     /// Bu **kurulum kodunu çalıştırmaz**; yalnız hook'u verir. Banner/detector ancak host
-    /// `OlafUpload.configure(enabled: true, appKey:...)` ile bug-reporter'ı açtığında kurulur.
+    /// `OlafUpload.configure(enabled: true, apiKey:...)` ile bug-reporter'ı açtığında kurulur.
     /// (Opt-in kapalıyken hiçbir screenshot observer / pencere oluşmaz.)
     private static func registerBugReportInstaller() {
         OlafUpload.setDetectorInstaller {

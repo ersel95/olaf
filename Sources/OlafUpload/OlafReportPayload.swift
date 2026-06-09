@@ -9,7 +9,6 @@ import OlafCore
 public struct OlafReportPayload: Codable, Sendable {
 
     public struct App: Codable, Sendable {
-        public let key: String
         public let bundleId: String
         public let version: String
         public let build: String

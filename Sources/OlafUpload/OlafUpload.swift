@@ -11,10 +11,9 @@ import OlafNetwork
 /// görüntüleme (OlafUI viewer) bundan tamamen bağımsızdır, etkilenmez.
 ///
 /// ```swift
-/// // Default: kapalı. Açmak için (host xcconfig'ten değerleri sağlar):
+/// // Default: kapalı. Açmak için (host apiKey'i xcconfig'ten sağlar; baseURL host sabiti):
 /// OlafUpload.configure(
 ///     enabled: true,
-///     appKey: "<APP_KEY>",
 ///     apiKey: "<API_KEY>",
 ///     baseURL: URL(string: "<BASE_URL>")!,
 ///     environment: "staging"
@@ -32,20 +31,17 @@ public enum OlafUpload {
     ///
     /// - `enabled == false` → **erken return**: remote config YOK, detector YOK, tracker YOK,
     ///   upload YOK. Sıfır ağ aktivitesi.
-    /// - `enabled == true` ama `appKey` boş → no-op + dev uyarısı (hangi projeden config
-    ///   çekileceği bilinemez).
+    /// - `enabled == true` ama `apiKey` boş → no-op + dev uyarısı (app apiKey'den çözülür).
     ///
     /// İdempotenttir; tekrar çağrılırsa ilki korunur.
     public static func configure(
         enabled: Bool = false,
-        appKey: String = "",
         apiKey: String = "",
         baseURL: URL,
         environment: String = "staging"
     ) {
         let config = OlafUploadConfiguration(
             enabled: enabled,
-            appKey: appKey,
             apiKey: apiKey,
             baseURL: baseURL,
             environment: environment
@@ -68,10 +64,10 @@ public enum OlafUpload {
         // Gate 1: local opt-in (build-time savunma). Kapalıysa hiçbir şey yapma — erken return.
         guard configuration.enabled else { return }
 
-        // appKey zorunlu.
-        guard !configuration.appKey.trimmingCharacters(in: .whitespaces).isEmpty else {
+        // apiKey zorunlu — app bundan çözülür.
+        guard !configuration.apiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
             Olaf.warning(
-                "OlafUpload.configure: appKey boş — bug-reporter başlatılmadı (remote config çekilemez).",
+                "OlafUpload.configure: apiKey boş — bug-reporter başlatılmadı (app çözülemez).",
                 category: .general
             )
             return
@@ -96,7 +92,7 @@ public enum OlafUpload {
 
     // MARK: - Erişim
 
-    /// Aktif bug-reporter servisi. `configure(enabled: true, appKey:...)` çağrılmadıysa `nil`.
+    /// Aktif bug-reporter servisi. `configure(enabled: true, apiKey:...)` çağrılmadıysa `nil`.
     /// OlafUI bunu kullanarak rapor besler; `nil` ise hiçbir UI kurmaz.
     public static var bugReportService: OlafBugReportService? {
         box.service

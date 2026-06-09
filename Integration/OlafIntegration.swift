@@ -56,17 +56,16 @@ public final class OlafManager {
         // `enabled: false` iken hiçbir remote config / detector / tracker / upload kodu çalışmaz
         // (shake → log görüntüleme bundan bağımsız, etkilenmez).
         //
-        // Açmak için: `enabled: true` + appKey/apiKey/baseURL'i HOST tarafından (xcconfig/secrets)
-        // sağlayın — repo'ya ASLA commit etmeyin (public repo). Aşağıdaki erişimcileri kendi
-        // güvenli kaynağınıza (Info.plist'e xcconfig'ten enjekte edilen değer vb.) bağlayın.
+        // Açmak için: `enabled: true` + `apiKey`'i HOST tarafından (xcconfig/secrets) sağlayın —
+        // repo'ya ASLA commit etmeyin. apiKey TEK gizli değerdir; backend app'i ondan tanır
+        // (appKey/slug taşınmaz). baseURL gizli değildir, sabittir → host'ta sabit verilebilir.
         #if canImport(OlafUpload)
         if let baseURL = Self.olafUploadBaseURL {
             OlafUpload.configure(
                 enabled: Self.bugReporterEnabled,      // ADAPT: build-time flag (default false önerilir)
-                appKey: Self.olafAppKey,               // ADAPT: xcconfig/secrets'tan
-                apiKey: Self.olafApiKey,               // ADAPT: xcconfig/secrets'tan
-                baseURL: baseURL,                      // ADAPT: xcconfig/secrets'tan
-                environment: Self.olafEnvironment      // ADAPT: "staging"/"uat" vb.
+                apiKey: Self.olafApiKey,               // ADAPT: xcconfig/secrets'tan (TEK secret)
+                baseURL: baseURL,                      // ADAPT: sabit origin (host'ta hard-code edilebilir)
+                environment: Self.olafEnvironment      // ADAPT: "test"/"uat" vb.
             )
         }
         #endif
@@ -79,9 +78,6 @@ public final class OlafManager {
     /// Bug-reporter açık mı? Default `false` (opt-in). xcconfig/build flag'inden besleyin.
     private static var bugReporterEnabled: Bool {
         (Bundle.main.object(forInfoDictionaryKey: "OLAF_BUG_REPORTER_ENABLED") as? String)?.lowercased() == "true"
-    }
-    private static var olafAppKey: String {
-        Bundle.main.object(forInfoDictionaryKey: "OLAF_APP_KEY") as? String ?? ""
     }
     private static var olafApiKey: String {
         Bundle.main.object(forInfoDictionaryKey: "OLAF_API_KEY") as? String ?? ""

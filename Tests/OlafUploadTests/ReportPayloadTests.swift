@@ -18,7 +18,7 @@ final class ReportPayloadTests: XCTestCase {
             sessionID: "s1"
         )
         let payload = OlafReportPayload(
-            app: .init(key: "demo", bundleId: "com.example.demo", version: "1.0", build: "10", environment: "staging"),
+            app: .init(bundleId: "com.example.demo", version: "1.0", build: "10", environment: "staging"),
             device: .init(id: "dev-1", name: "Tester", model: "iPhone15,3", osVersion: "17.5", locale: "en_US", screen: "1179x2556"),
             report: .init(whatHappened: "crash", whatExpected: "no crash", capturedAt: "2026-06-08T10:22:00Z", sessionId: "s1"),
             entries: [entry]
@@ -31,7 +31,7 @@ final class ReportPayloadTests: XCTestCase {
         XCTAssertNotNil(object?["report"])
 
         let app = object?["app"] as? [String: Any]
-        XCTAssertEqual(app?["key"] as? String, "demo")
+        XCTAssertEqual(app?["bundleId"] as? String, "com.example.demo")
 
         let device = object?["device"] as? [String: Any]
         XCTAssertEqual(device?["id"] as? String, "dev-1")
