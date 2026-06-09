@@ -126,17 +126,25 @@ extension OlafURLProtocol: URLSessionDataDelegate {
         client?.urlProtocol(self, didLoad: data)
     }
 
-    /// Sunucu trust challenge'ı: capture katmanı TLS doğrulamasını ASLA gevşetmez. Tüm
-    /// challenge'lar (server-trust dahil) sistem doğrulamasına bırakılır
-    /// (`.performDefaultHandling`). Böylece proxy session, host'un cert pinning'ini ya da
-    /// işletim sistemi trust zincirini ezmez; geçersiz/pinlenmemiş sertifika sistem
-    /// tarafından reddedilir. (Eski davranış `URLCredential(trust:)` ile pinning'i baypas
-    /// ediyordu — bu güvenlik açığı kaldırıldı.)
+    /// Sunucu trust challenge'ı. **Varsayılan**: sistem doğrulaması (`.performDefaultHandling`) →
+    /// proxy session host'un cert pinning'ini/OS trust zincirini ezmez; geçersiz/pinlenmemiş sertifika
+    /// reddedilir (eski `URLCredential(trust:)` baypası kaldırıldı).
+    ///
+    /// **Opt-in (yalnız non-prod)**: `allowsArbitraryServerTrustForCapture == true` ise server-trust
+    /// challenge'ında sunucunun sunduğu trust koşulsuz kabul edilir. Host kendi özel CA'sına / iç test
+    /// gateway'ine güveniyorsa (capture proxy'si host'un trust delegate'ini PAYLAŞMAZ → default doğrulama
+    /// TLS -9807 verir), bu bayrak capture'ın o trafiği geçirmesini sağlar. Olaf zaten `#if !PROD`'da derlenir.
     func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+           OlafNetwork.current.allowsArbitraryServerTrustForCapture,
+           let trust = challenge.protectionSpace.serverTrust {
+            completionHandler(.useCredential, URLCredential(trust: trust))
+            return
+        }
         completionHandler(.performDefaultHandling, nil)
     }
 

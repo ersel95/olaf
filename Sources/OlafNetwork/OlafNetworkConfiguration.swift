@@ -25,13 +25,22 @@ public struct OlafNetworkConfiguration: Sendable {
     /// Örn. SDK gürültüsünü gizlemek: `["firebaseio", "crashlytics", "googleapis", "app-measurement"]`.
     public var excludedURLs: [String]
 
+    /// **Yalnız capture proxy'si için** sunucu sertifikasını koşulsuz kabul et. **Varsayılan `false`** (güvenli:
+    /// sistem doğrulaması). Capture, isteği kendi URLSession'ından yeniden gönderir; host kendi özel CA'sına
+    /// (örn. iç test gateway'i) veya pinning'e güveniyorsa, default sistem doğrulaması bu trafiği reddeder
+    /// (TLS -9807). Host bu trafiği zaten güveniyorsa, **yalnız non-prod** için bunu `true` yapıp capture'ın
+    /// host'un güvendiği sertifikaları kabul etmesini sağlayabilir. Olaf zaten `#if !PROD` ile derlenir;
+    /// canlı trafik etkilenmez. Prod'da ASLA açma.
+    public var allowsArbitraryServerTrustForCapture: Bool
+
     public init(
         capturesBodies: Bool = true,
         capturesHeaders: Bool = true,
         maxBodyLength: Int = 8000,
         category: LogCategory = .network,
         includedURLs: [String] = [],
-        excludedURLs: [String] = []
+        excludedURLs: [String] = [],
+        allowsArbitraryServerTrustForCapture: Bool = false
     ) {
         self.capturesBodies = capturesBodies
         self.capturesHeaders = capturesHeaders
@@ -39,6 +48,7 @@ public struct OlafNetworkConfiguration: Sendable {
         self.category = category
         self.includedURLs = includedURLs.map { $0.lowercased() }
         self.excludedURLs = excludedURLs.map { $0.lowercased() }
+        self.allowsArbitraryServerTrustForCapture = allowsArbitraryServerTrustForCapture
     }
 
     /// Bu URL yakalanmalı mı? (allow/deny filtresi — `OlafURLProtocol.canInit`'te kullanılır)
