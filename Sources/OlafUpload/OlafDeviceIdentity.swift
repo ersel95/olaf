@@ -43,16 +43,27 @@ public struct OlafDeviceIdentity: Sendable {
     }
 
     /// Bir kerelik tester ismini saklar. Boş/whitespace ise yok sayar.
+    /// Cihaz id'si gibi **Keychain'de** saklanır → uygulama silinip yeniden
+    /// kurulsa bile isim korunur (UserDefaults reinstall'da silinirdi → isim
+    /// her kurulumda yeniden sorulurdu).
     public static func storeName(_ name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        UserDefaults.standard.set(trimmed, forKey: nameDefaultsKey)
+        KeychainStore.write(trimmed, account: nameAccount)
     }
 
     static func storedName() -> String? {
-        let value = UserDefaults.standard.string(forKey: nameDefaultsKey)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return (value?.isEmpty == false) ? value : nil
+        if let value = KeychainStore.read(account: nameAccount)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty {
+            return value
+        }
+        // Geriye dönük: eski UserDefaults değerini Keychain'e taşı (tek seferlik migrasyon).
+        if let legacy = UserDefaults.standard.string(forKey: nameDefaultsKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !legacy.isEmpty {
+            KeychainStore.write(legacy, account: nameAccount)
+            return legacy
+        }
+        return nil
     }
 
     // MARK: - Kalıcı cihaz kimliği (Keychain → idfv → rastgele)
@@ -135,6 +146,7 @@ public struct OlafDeviceIdentity: Sendable {
     // MARK: - Keys
 
     private static let nameDefaultsKey = "com.olaf.upload.testerName"
+    private static let nameAccount = "com.olaf.upload.testerName"
     private static let deviceIDAccount = "com.olaf.upload.deviceID"
 }
 

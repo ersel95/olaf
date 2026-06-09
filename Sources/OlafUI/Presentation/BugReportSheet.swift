@@ -18,6 +18,11 @@ struct BugReportSheet: View {
         case failed(String)
     }
 
+    /// Klavye/odak sırası için alanlar.
+    private enum Field: Hashable {
+        case name, happened, expected
+    }
+
     let screenshot: UIImage?
     /// Sheet kapanırken (başarılı gönderim sonrası) çağrılır.
     let onClose: (_ didSend: Bool) -> Void
@@ -26,8 +31,28 @@ struct BugReportSheet: View {
     @State private var whatExpected: String = ""
     @State private var testerName: String = ""
     @State private var state: SubmitState = .idle
+    @FocusState private var focusedField: Field?
 
     private let requiresName: Bool = !OlafDeviceIdentity.hasStoredName
+
+    /// Görünen alanların odak sırası (isim yalnızca ilk seferde vardır).
+    private var fieldOrder: [Field] {
+        (requiresName ? [Field.name] : []) + [.happened, .expected]
+    }
+
+    private var isLastFieldFocused: Bool {
+        guard let f = focusedField, let i = fieldOrder.firstIndex(of: f) else { return false }
+        return i == fieldOrder.count - 1
+    }
+
+    /// Sonraki alana geç; son alandaysa klavyeyi kapat.
+    private func focusNext() {
+        guard let f = focusedField, let i = fieldOrder.firstIndex(of: f) else {
+            focusedField = fieldOrder.first
+            return
+        }
+        focusedField = (i + 1 < fieldOrder.count) ? fieldOrder[i + 1] : nil
+    }
 
     private var trimmedHappened: String { whatHappened.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedExpected: String { whatExpected.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -41,29 +66,44 @@ struct BugReportSheet: View {
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if let screenshot {
-                        previewSection(screenshot)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        if let screenshot {
+                            previewSection(screenshot)
+                        }
+                        if requiresName {
+                            nameSection.id(Field.name)
+                        }
+                        fieldSection(
+                            title: "Ne yaşadın?",
+                            placeholder: "Karşılaştığın sorunu anlat…",
+                            text: $whatHappened,
+                            field: .happened
+                        )
+                        .id(Field.happened)
+                        fieldSection(
+                            title: "Ne olmalıydı?",
+                            placeholder: "Beklediğin doğru davranış neydi?",
+                            text: $whatExpected,
+                            field: .expected
+                        )
+                        .id(Field.expected)
+                        if case let .failed(message) = state {
+                            errorBanner(message)
+                        }
+                        // Klavyenin son alanı örtmemesi için alt boşluk.
+                        Color.clear.frame(height: 8)
                     }
-                    if requiresName {
-                        nameSection
-                    }
-                    fieldSection(
-                        title: "Ne yaşadın?",
-                        placeholder: "Karşılaştığın sorunu anlat…",
-                        text: $whatHappened
-                    )
-                    fieldSection(
-                        title: "Ne olmalıydı?",
-                        placeholder: "Beklediğin doğru davranış neydi?",
-                        text: $whatExpected
-                    )
-                    if case let .failed(message) = state {
-                        errorBanner(message)
+                    .padding(20)
+                }
+                // Odak değişince odaklanan alanı klavyenin üstüne kaydır.
+                .onChange(of: focusedField) { _, newValue in
+                    guard let f = newValue else { return }
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        proxy.scrollTo(f, anchor: .center)
                     }
                 }
-                .padding(20)
             }
             .navigationTitle("Sorun Bildir")
             .toolbar {
@@ -73,6 +113,15 @@ struct BugReportSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     sendButton
+                }
+                // Klavye üstü gezinme: son alanda "Bitti", değilse "Sonraki".
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    if isLastFieldFocused {
+                        Button("Bitti") { focusedField = nil }
+                    } else {
+                        Button("Sonraki") { focusNext() }
+                    }
                 }
             }
         }
@@ -128,10 +177,18 @@ struct BugReportSheet: View {
             TextField("Adını gir (yalnızca ilk seferde sorulur)", text: $testerName)
                 .textFieldStyle(.roundedBorder)
                 .disabled(state == .sending)
+                .focused($focusedField, equals: .name)
+                .submitLabel(.next)
+                .onSubmit { focusNext() }
         }
     }
 
-    private func fieldSection(title: String, placeholder: String, text: Binding<String>) -> some View {
+    private func fieldSection(
+        title: String,
+        placeholder: String,
+        text: Binding<String>,
+        field: Field
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.headline)
@@ -145,6 +202,7 @@ struct BugReportSheet: View {
                 TextEditor(text: text)
                     .frame(minHeight: 96)
                     .disabled(state == .sending)
+                    .focused($focusedField, equals: field)
             }
             .padding(4)
             .overlay(
