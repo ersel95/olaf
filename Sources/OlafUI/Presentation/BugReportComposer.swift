@@ -26,13 +26,16 @@ enum BugReportComposer {
         let jpeg = screenshot.flatMap { encodeJPEG($0, quality: quality, maxBytes: maxBytes) }
 
         let identity = OlafDeviceIdentity.current()
+        // Anlık cihaz durumunu (pil/ağ/termal/disk/bellek…) raporun alındığı anda topla.
+        let telemetry = OlafTelemetry.capture()
 
         return await service.sendReport(
             whatHappened: whatHappened,
             whatExpected: whatExpected,
             testerName: testerName,
             screenshotJPEG: jpeg,
-            identity: identity
+            identity: identity,
+            telemetry: telemetry
         )
     }
 

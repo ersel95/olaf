@@ -32,6 +32,8 @@ final class BugReportBanner {
     func install() {
         guard screenshotObserver == nil else { return }
         ScreenshotDetector.shared.install()
+        // Pil izleme + ağ monitörünü erkenden başlat ki ilk raporda telemetri dolu gelsin.
+        OlafTelemetry.prepare()
         screenshotObserver = NotificationCenter.default.addObserver(
             forName: .olafScreenshotCaptured,
             object: nil,

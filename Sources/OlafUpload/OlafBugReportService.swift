@@ -99,7 +99,8 @@ public final class OlafBugReportService: @unchecked Sendable {
         whatExpected: String,
         testerName: String?,
         screenshotJPEG: Data?,
-        identity: OlafDeviceIdentity
+        identity: OlafDeviceIdentity,
+        telemetry: OlafReportPayload.Telemetry? = nil
     ) async -> Bool {
         if let testerName, !testerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             OlafDeviceIdentity.storeName(testerName)
@@ -139,6 +140,7 @@ public final class OlafBugReportService: @unchecked Sendable {
                 capturedAt: Self.iso8601String(from: Date()),
                 sessionId: Olaf.currentSessionID
             ),
+            telemetry: telemetry,
             entries: redactedEntries   // TÜM kategoriler, ZORLA redakte edilmiş LogEntry[]
         )
 
