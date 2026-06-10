@@ -110,12 +110,29 @@ public struct BankingRedactor: Redactor {
         }
     }
 
+    // MARK: - Önceden derlenmiş regex'ler
+
+    /// Pattern'ler statik literal olduğundan regex'ler **bir kez** derlenir ve paylaşılır.
+    /// `NSRegularExpression` thread-safe'tir (eşzamanlı `matches` güvenli) → her log'da yeniden
+    /// derleme maliyeti (hot path) ortadan kalkar. `try!` güvenli: pattern'ler derleme-zamanı sabiti.
+    private enum Patterns {
+        /// 13–19 haneli kart numaraları (boşluk/tire ile ayrılmış olabilir).
+        static let card = try! NSRegularExpression(pattern: #"\b\d(?:[ -]?\d){12,18}\b"#)
+        /// IBAN (2 harf + 2 kontrol hanesi + 11–30 alfasayısal).
+        static let iban = try! NSRegularExpression(pattern: #"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b"#)
+        /// E-posta.
+        static let email = try! NSRegularExpression(pattern: #"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"#)
+    }
+
     // MARK: - Örüntü maskeleme
 
     /// 13–19 haneli kart numaraları (boşluk/tire ile ayrılmış olabilir) → son 4 hane görünür.
+    ///
+    /// - Note: Bilinçli olarak **fazla-maskeler** (Luhn doğrulaması yapmaz): 13–19 haneli her
+    ///   ardışık dizi (örn. uzun request/trace ID, epoch-ms timestamp) kart sanılıp maskelenebilir.
+    ///   Bankacılık redaktörü için güvenli yön budur (kaçırmaktansa fazladan maskele).
     static func maskCardNumbers(in text: String) -> String {
-        let pattern = #"\b\d(?:[ -]?\d){12,18}\b"#
-        return replaceMatches(of: pattern, in: text) { match in
+        replaceMatches(of: Patterns.card, in: text) { match in
             let digits = match.filter(\.isNumber)
             guard digits.count >= 13, digits.count <= 19 else { return match }
             let last4 = String(digits.suffix(4))
@@ -125,8 +142,7 @@ public struct BankingRedactor: Redactor {
 
     /// IBAN (2 harf + 2 kontrol hanesi + 11–30 alfasayısal) → ilk 4 + son 4 görünür.
     static func maskIBANs(in text: String) -> String {
-        let pattern = #"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b"#
-        return replaceMatches(of: pattern, in: text) { match in
+        replaceMatches(of: Patterns.iban, in: text) { match in
             let compact = match.replacingOccurrences(of: " ", with: "")
             guard compact.count >= 12 else { return match }
             let prefix = compact.prefix(4)
@@ -137,8 +153,7 @@ public struct BankingRedactor: Redactor {
 
     /// E-posta → local kısmının ilk karakteri görünür: `e***@domain`.
     static func maskEmails(in text: String) -> String {
-        let pattern = #"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"#
-        return replaceMatches(of: pattern, in: text) { match in
+        replaceMatches(of: Patterns.email, in: text) { match in
             guard let atIndex = match.firstIndex(of: "@") else { return match }
             let local = match[match.startIndex..<atIndex]
             let domain = match[atIndex...]
@@ -150,11 +165,10 @@ public struct BankingRedactor: Redactor {
     // MARK: - Regex yardımcısı
 
     private static func replaceMatches(
-        of pattern: String,
+        of regex: NSRegularExpression,
         in text: String,
         transform: (String) -> String
     ) -> String {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
         let fullRange = NSRange(text.startIndex..<text.endIndex, in: text)
         let matches = regex.matches(in: text, range: fullRange)
         guard !matches.isEmpty else { return text }

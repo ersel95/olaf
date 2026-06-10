@@ -44,6 +44,21 @@ final class LogStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.map(\.message), ["3", "4", "5"])
     }
 
+    func testRingBufferMultipleWrapsPreserveOrder() {
+        // Kapasitenin katından fazla yazım → head birden çok kez sarmalı, sıra korunmalı.
+        let store = makeStore(capacity: 3)
+        for i in 1...8 { ingest(store, "\(i)") }
+        let snapshot = store.snapshot()
+        XCTAssertEqual(snapshot.map(\.message), ["6", "7", "8"])
+    }
+
+    func testSnapshotAsyncMatchesSnapshot() async {
+        let store = makeStore(capacity: 5)
+        for i in 1...3 { ingest(store, "\(i)") }
+        let async = await store.snapshotAsync()
+        XCTAssertEqual(async.map(\.message), ["1", "2", "3"])
+    }
+
     func testRedactionAppliedBeforeStorage() {
         let store = makeStore(capacity: 10, redactor: BankingRedactor())
         ingest(store, "PAN=4508034012345678")

@@ -38,7 +38,11 @@ let package = Package(
         ),
         .target(
             name: "OlafNetwork",
-            dependencies: ["OlafCore"]
+            dependencies: ["OlafCore"],
+            swiftSettings: [
+                // Tutarlılık: URLProtocol (mutable state) en riskli yer; strict checking burada da açık.
+                .enableExperimentalFeature("StrictConcurrency")
+            ]
         ),
         .target(
             name: "OlafUpload",
@@ -49,19 +53,23 @@ let package = Package(
         ),
         .testTarget(
             name: "OlafCoreTests",
-            dependencies: ["OlafCore"]
+            dependencies: ["OlafCore"],
+            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
         .testTarget(
             name: "OlafUITests",
-            dependencies: ["OlafUI"]
+            dependencies: ["OlafUI"],
+            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
         .testTarget(
             name: "OlafNetworkTests",
-            dependencies: ["OlafNetwork"]
+            dependencies: ["OlafNetwork"],
+            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         ),
         .testTarget(
             name: "OlafUploadTests",
-            dependencies: ["OlafUpload"]
+            dependencies: ["OlafUpload"],
+            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         )
     ]
 )

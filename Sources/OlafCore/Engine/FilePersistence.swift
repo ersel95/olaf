@@ -22,6 +22,9 @@ final class FilePersistence: @unchecked Sendable {
 
     private var handle: FileHandle?
     private var currentSize: Int = 0
+    /// Aynı saniye içinde birden çok rotation olduğunda dosya adı çakışmasını (→ log kaybı)
+    /// önlemek için monotonik sayaç. Serial kuyrukta arttığından yarış yoktur.
+    private var rotationCounter = 0
 
     init?(directory: URL, maxFileSize: Int, maxFileCount: Int) {
         self.directory = directory
@@ -57,7 +60,8 @@ final class FilePersistence: @unchecked Sendable {
         var data = json
         data.append(0x0A) // '\n'
         do {
-            try handle.seekToEnd()
+            // Handle açılışta (ve rotate'te) sona konumlandırılır; tek yazıcı olduğundan pointer
+            // sonda kalır → her yazımda `seekToEnd()` syscall'ı gereksiz, kaldırıldı.
             try handle.write(contentsOf: data)
             currentSize += data.count
             if currentSize >= maxFileSize {
@@ -75,10 +79,11 @@ final class FilePersistence: @unchecked Sendable {
         try? handle?.synchronize()
         var result: [LogEntry] = []
         for file in rotatedFilesSortedAscending() + [activeFileURL] {
-            guard let content = try? String(contentsOf: file, encoding: .utf8) else { continue }
-            for line in content.split(separator: "\n", omittingEmptySubsequences: true) {
-                guard let data = line.data(using: .utf8),
-                      let entry = try? decoder.decode(LogEntry.self, from: data) else { continue }
+            // NDJSON'u Data olarak okuyup `\n` (0x0A) üzerinden böl → her satırı String'e çevirip
+            // tekrar UTF-8'e encode etme (çift dönüşüm) maliyetinden kaçınılır.
+            guard let data = try? Data(contentsOf: file) else { continue }
+            for lineData in data.split(separator: 0x0A, omittingEmptySubsequences: true) {
+                guard let entry = try? decoder.decode(LogEntry.self, from: lineData) else { continue }
                 result.append(entry)
             }
         }
@@ -99,6 +104,9 @@ final class FilePersistence: @unchecked Sendable {
     /// Diskteki tüm kayıtları, verilen formatter ile **insan-okur düz metin** bir dosyaya
     /// dönüştürür ve paylaşılabilir URL döndürür.
     func consolidatedTextURL(using formatter: any LogFormatter) -> URL? {
+        // Önceki export'ları temizle → tmp'de süresiz birikmesinler (hassas log içerebilir).
+        purgeOldExports()
+
         let entries = loadEntries()
         let text = entries.map { formatter.string(from: $0) }.joined(separator: "\n")
 
@@ -109,6 +117,17 @@ final class FilePersistence: @unchecked Sendable {
             return exportURL
         } catch {
             return nil
+        }
+    }
+
+    private static let exportPrefix = "olaf-export-"
+
+    /// tmp'deki eski `olaf-export-*.log` dosyalarını siler (yeni export'tan önce çağrılır).
+    private func purgeOldExports() {
+        let tmp = fileManager.temporaryDirectory
+        let contents = (try? fileManager.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil)) ?? []
+        for url in contents where url.lastPathComponent.hasPrefix(Self.exportPrefix) && url.pathExtension == "log" {
+            try? fileManager.removeItem(at: url)
         }
     }
 
@@ -132,9 +151,18 @@ final class FilePersistence: @unchecked Sendable {
         try? handle?.close()
         handle = nil
 
-        let rotatedURL = directory.appendingPathComponent(
-            "\(rotatedPrefix)\(Int(Date().timeIntervalSince1970)).\(fileExtension)"
+        rotationCounter += 1
+        let stamp = Int(Date().timeIntervalSince1970)
+        // Saniye (sabit genişlik) + monotonik sayaç → aynı saniyedeki çok sayıda rotation çakışmaz.
+        var rotatedURL = directory.appendingPathComponent(
+            String(format: "\(rotatedPrefix)%010d-%06d.\(fileExtension)", stamp, rotationCounter)
         )
+        // Süreç yeniden başlayıp aynı saniyede rotate ederse (sayaç sıfırlanır) yine de benzersizleştir.
+        if fileManager.fileExists(atPath: rotatedURL.path) {
+            rotatedURL = directory.appendingPathComponent(
+                "\(rotatedPrefix)\(stamp)-\(UUID().uuidString.prefix(8)).\(fileExtension)"
+            )
+        }
         try? fileManager.moveItem(at: activeFileURL, to: rotatedURL)
 
         currentSize = 0
@@ -169,7 +197,13 @@ final class FilePersistence: @unchecked Sendable {
                     && $0.lastPathComponent != activeFileName
                     && $0.pathExtension == fileExtension
             }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            // Önce oluşturma tarihi (isim şemasından bağımsız doğru kronolojik sıra), eşitlikte isim.
+            .sorted { lhs, rhs in
+                let lDate = (try? lhs.resourceValues(forKeys: [.creationDateKey]))?.creationDate
+                let rDate = (try? rhs.resourceValues(forKeys: [.creationDateKey]))?.creationDate
+                if let lDate, let rDate, lDate != rDate { return lDate < rDate }
+                return lhs.lastPathComponent < rhs.lastPathComponent
+            }
     }
 
     private func applyProtection(to url: URL) {

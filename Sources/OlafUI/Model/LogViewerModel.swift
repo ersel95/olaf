@@ -18,6 +18,10 @@ public final class LogViewerModel: ObservableObject {
 
     /// Filtreler.
     @Published public var searchText: String = ""
+    /// `searchText`'in debounce edilmiş, normalize edilmiş (trim + lowercase) hâli. Her tuş
+    /// vuruşunda değil, kullanıcı yazmayı bıraktıktan sonra güncellenir → her keystroke'ta tüm
+    /// listeyi taramayız. `filteredEntries` bunu kullanır.
+    @Published private var effectiveQuery: String = ""
     /// Gösterilecek seviyeler (çoklu seçim). Boş = hepsi.
     @Published public var enabledLevels: Set<LogLevel> = Set(LogLevel.allCases)
     @Published public var selectedCategories: Set<LogCategory> = []
@@ -28,10 +32,25 @@ public final class LogViewerModel: ObservableObject {
     private var pendingWhilePaused: [LogEntry] = []
     private var streamTask: Task<Void, Never>?
 
+    /// Canlı akış coalescing tamponu: gelen kayıtlar tek tek `entries`'e (her biri bir
+    /// `@Published` yayını → tam SwiftUI diff + `filteredEntries` yeniden hesabı) eklenmek
+    /// yerine burada birikir ve kısa aralıkla **toplu** flush edilir. Yoğun loglamada (network
+    /// capture) ana thread churn'ü ciddi düşer.
+    private var incoming: [LogEntry] = []
+    private var flushScheduled = false
+    private static let coalesceInterval: UInt64 = 100_000_000  // 100 ms
+
     /// Geçmiş (disk) yüklenirken `true`.
     @Published public private(set) var isLoading: Bool = false
 
-    public init() {}
+    public init() {
+        // Arama debounce: searchText → (trim+lowercase) → 200ms sessizlik → effectiveQuery.
+        $searchText
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .removeDuplicates()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .assign(to: &$effectiveQuery)
+    }
 
     deinit { streamTask?.cancel() }
 
@@ -48,12 +67,18 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
-    /// Kapsama göre kayıtları (yeniden) yükler. Geçmiş modunda disk **asenkron** okunur (UI bloke olmaz).
+    /// Kapsama göre kayıtları (yeniden) yükler. Hem oturum (bellek) hem geçmiş (disk) modunda
+    /// okuma **asenkron** yapılır → UI/ana thread bloke olmaz (çekirdek kuyruk yoğun olsa bile).
     public func reload() {
         pendingWhilePaused.removeAll()
+        incoming.removeAll()
         switch scope {
         case .session:
-            entries = Olaf.snapshot()
+            Task { [weak self] in
+                let snapshot = await Olaf.snapshotAsync()
+                guard let self else { return }
+                self.entries = snapshot
+            }
         case .history:
             isLoading = true
             Task { [weak self] in
@@ -72,10 +97,26 @@ public final class LogViewerModel: ObservableObject {
     }
 
     private func append(_ entry: LogEntry) {
-        if isFollowing {
-            entries.append(entry)
-        } else {
-            pendingWhilePaused.append(entry)
+        incoming.append(entry)
+        scheduleFlush()
+    }
+
+    /// Birikmiş `incoming` kayıtları kısa bir gecikmeyle **bir kerede** flush eder (coalescing).
+    private func scheduleFlush() {
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.coalesceInterval)
+            guard let self else { return }
+            self.flushScheduled = false
+            guard !self.incoming.isEmpty else { return }
+            // Duraklatılmışsa kayıtlar "devam et"e dek beklesin (pause semantiği korunur).
+            if self.isFollowing {
+                self.entries.append(contentsOf: self.incoming)
+            } else {
+                self.pendingWhilePaused.append(contentsOf: self.incoming)
+            }
+            self.incoming.removeAll(keepingCapacity: true)
         }
     }
 
@@ -102,7 +143,7 @@ public final class LogViewerModel: ObservableObject {
 
     /// Filtre uygulanmış, en yeni en üstte sıralı kayıtlar.
     public var filteredEntries: [LogEntry] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = effectiveQuery   // debounce edilmiş, zaten trim+lowercase
         return entries.reversed().filter { entry in
             if !enabledLevels.isEmpty, !enabledLevels.contains(entry.level) { return false }
             if !selectedCategories.isEmpty, !selectedCategories.contains(entry.category) {
@@ -177,6 +218,7 @@ public final class LogViewerModel: ObservableObject {
         Olaf.clear()
         entries.removeAll()
         pendingWhilePaused.removeAll()
+        incoming.removeAll()
     }
 
     public func exportFileURL() async -> URL? {

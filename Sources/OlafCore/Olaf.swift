@@ -149,6 +149,13 @@ public enum Olaf {
         runtime.store?.snapshot() ?? []
     }
 
+    /// `snapshot()`'ın bloke etmeyen sürümü. Çekirdek kuyruk yoğun redaksiyon burst'ü işlerken
+    /// ana thread'i `queue.sync` ile bekletmemek için viewer bunu kullanır.
+    public static func snapshotAsync() async -> [LogEntry] {
+        guard let store = runtime.store else { return [] }
+        return await store.snapshotAsync()
+    }
+
     /// Diskteki tüm kayıtlar — **önceki oturumlar dahil** (ring buffer kapasitesinden bağımsız).
     /// Ağır dosya I/O arka planda yapılır; çağıran (ör. ana thread) bloke olmaz.
     public static func loadPersistedEntries() async -> [LogEntry] {

@@ -15,9 +15,19 @@ final class LogStore: @unchecked Sendable {
     private let sessionID: String
 
     /// Sabit kapasiteli halka tampon (en yeni `capacity` kayıt).
-    private var buffer: [LogEntry] = []
+    /// `ring` kapasiteye ulaşana dek büyür; dolunca `head`'deki (en eski) kayıt üzerine yazılır.
+    /// Append + evict **O(1)** (eski `Array.removeFirst` O(n) kaydırması yerine).
+    private var ring: [LogEntry] = []
+    /// Tampon doluyken en eski kaydın `ring` içindeki indeksi.
+    private var head = 0
     /// Canlı dinleyiciler (viewer). Kuyrukta erişilir.
     private var continuations: [UUID: AsyncStream<LogEntry>.Continuation] = [:]
+
+    /// Tampondaki kayıtlar (eskiden yeniye), kuyruk içinde çağrılır.
+    private var orderedBuffer: [LogEntry] {
+        if ring.count < capacity { return ring }   // dolmadıysa head == 0, ekleme sırası korunur
+        return Array(ring[head...] + ring[..<head])
+    }
 
     init(
         capacity: Int,
@@ -33,7 +43,7 @@ final class LogStore: @unchecked Sendable {
         self.exportFormatter = exportFormatter
         self.osLogMirror = osLogMirror
         self.sessionID = sessionID
-        self.buffer.reserveCapacity(capacity)
+        self.ring.reserveCapacity(capacity)
     }
 
     // MARK: - Yazma
@@ -64,9 +74,11 @@ final class LogStore: @unchecked Sendable {
                 sessionID: sessionID
             )
 
-            buffer.append(entry)
-            if buffer.count > capacity {
-                buffer.removeFirst(buffer.count - capacity)
+            if ring.count < capacity {
+                ring.append(entry)
+            } else {
+                ring[head] = entry            // en eski kaydın üzerine yaz
+                head = (head + 1) % capacity  // O(1) evict
             }
 
             persistence?.write(entry)
@@ -82,12 +94,24 @@ final class LogStore: @unchecked Sendable {
 
     /// Mevcut tampondaki tüm kayıtların anlık kopyası (eskiden yeniye).
     func snapshot() -> [LogEntry] {
-        queue.sync { buffer }
+        queue.sync { orderedBuffer }
+    }
+
+    /// `snapshot()`'ın bloke etmeyen sürümü: çağıran (ör. ana thread) `.utility` kuyruğu yoğun
+    /// redaksiyon burst'ü işlerken `queue.sync` ile beklemesin diye.
+    func snapshotAsync() async -> [LogEntry] {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                continuation.resume(returning: orderedBuffer)
+            }
+        }
     }
 
     /// Yeni kayıtları canlı yayınlayan akış. Viewer abone olur.
     func makeStream() -> AsyncStream<LogEntry> {
-        AsyncStream { continuation in
+        // Sınırlı tampon: viewer yavaşsa (veya duraklatılmışsa) bellek sınırsız büyümesin —
+        // en yeni `capacity` kayıt tutulur, eskiler düşer (tampon zaten en yeniyi gösterir).
+        AsyncStream(bufferingPolicy: .bufferingNewest(capacity)) { continuation in
             let id = UUID()
             queue.async { [self] in
                 continuations[id] = continuation
@@ -104,7 +128,8 @@ final class LogStore: @unchecked Sendable {
 
     func clear() {
         queue.async { [self] in
-            buffer.removeAll(keepingCapacity: true)
+            ring.removeAll(keepingCapacity: true)
+            head = 0
             persistence?.clear()
         }
     }

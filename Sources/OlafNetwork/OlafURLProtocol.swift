@@ -9,7 +9,11 @@ final class OlafURLProtocol: URLProtocol {
 
     private var proxySession: URLSession?
     private var proxyTask: URLSessionDataTask?
+    /// Yalnız gövde yakalama açıkken (`capturesBodies`) doldurulur; kapalıyken büyük indirmeleri
+    /// gereksiz yere RAM'de tutmamak için boş kalır (sayım `responseByteCount`'tan gelir).
     private var responseData = Data()
+    private var responseByteCount = 0
+    private var capturesBodies = true
     private var capturedResponse: URLResponse?
     private var startDate = Date()
 
@@ -28,6 +32,7 @@ final class OlafURLProtocol: URLProtocol {
 
     override func startLoading() {
         startDate = Date()
+        capturesBodies = OlafNetwork.current.capturesBodies
 
         guard let mutable = (request as NSURLRequest).mutableCopy() as? NSMutableURLRequest else {
             client?.urlProtocol(self, didFailWithError: URLError(.unknown))
@@ -35,7 +40,8 @@ final class OlafURLProtocol: URLProtocol {
         }
         URLProtocol.setProperty(true, forKey: Self.handledKey, in: mutable)
 
-        let config = URLSessionConfiguration.default
+        // Proxy session: capture'a özel, izole (shared cookie/cache havuzunu kullanmasın).
+        let config = URLSessionConfiguration.ephemeral
         // Zincirlenen protokoller (başka capture araçları) proxy session'da yakalasın diye eklenir.
         // OlafURLProtocol bu listeye girmez (sonsuz döngüyü handledKey + dışlama önler).
         let selfID = ObjectIdentifier(OlafURLProtocol.self)
@@ -68,7 +74,7 @@ final class OlafURLProtocol: URLProtocol {
             statusCode: http?.statusCode,
             durationMs: durationMs,
             requestBytes: request.httpBody?.count ?? 0,
-            responseBytes: responseData.count,
+            responseBytes: responseByteCount,
             error: error.map { ($0 as NSError).localizedDescription },
             requestBody: nil,
             responseBody: nil
@@ -122,7 +128,9 @@ extension OlafURLProtocol: URLSessionDataDelegate {
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        responseData.append(data)
+        responseByteCount += data.count
+        // Gövde yakalama kapalıysa veriyi biriktirme (yalnız byte say) → büyük indirmelerde RAM tasarrufu.
+        if capturesBodies { responseData.append(data) }
         client?.urlProtocol(self, didLoad: data)
     }
 
