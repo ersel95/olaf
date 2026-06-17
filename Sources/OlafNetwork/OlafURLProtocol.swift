@@ -15,6 +15,9 @@ final class OlafURLProtocol: URLProtocol {
     private var responseByteCount = 0
     private var capturesBodies = true
     private var capturedResponse: URLResponse?
+    /// İstek gövdesi: `URLSession` `httpBody`'yi `httpBodyStream`'e çevirdiğinden protokolde
+    /// `request.httpBody` çoğu zaman `nil`'dir; gövde `startLoading`'de buraya yakalanır.
+    private var capturedRequestBody: Data?
     private var startDate = Date()
 
     // MARK: - URLProtocol
@@ -39,6 +42,22 @@ final class OlafURLProtocol: URLProtocol {
             return
         }
         URLProtocol.setProperty(true, forKey: Self.handledKey, in: mutable)
+
+        // İstek gövdesini yakala. `URLSession`, `httpBody`'yi protokol görmeden `httpBodyStream`'e
+        // çevirdiği için çoğu POST/PUT'ta `httpBody == nil`'dir. Stream'i burada boşaltıp hem yakalar
+        // hem de proxy isteğine `httpBody` olarak geri koyarız (stream tek sefer okunur; geri koymazsak
+        // gövde sunucuya gitmez). Yalnız gövde yakalama açıkken yapılır; kapalıyken stream'e dokunmayız.
+        if capturesBodies {
+            if let body = request.httpBody {
+                capturedRequestBody = body
+            } else if let stream = request.httpBodyStream {
+                let drained = Self.drainStream(stream)
+                if !drained.isEmpty {
+                    capturedRequestBody = drained
+                    mutable.httpBody = drained
+                }
+            }
+        }
 
         // Proxy session: capture'a özel, izole (shared cookie/cache havuzunu kullanmasın).
         let config = URLSessionConfiguration.ephemeral
@@ -73,7 +92,7 @@ final class OlafURLProtocol: URLProtocol {
             url: request.url?.absoluteString ?? "-",
             statusCode: http?.statusCode,
             durationMs: durationMs,
-            requestBytes: request.httpBody?.count ?? 0,
+            requestBytes: capturedRequestBody?.count ?? request.httpBody?.count ?? 0,
             responseBytes: responseByteCount,
             error: error.map { ($0 as NSError).localizedDescription },
             requestBody: nil,
@@ -81,7 +100,7 @@ final class OlafURLProtocol: URLProtocol {
         )
 
         if config.capturesBodies {
-            event.requestBody = bodyString(from: request.httpBody, limit: config.maxBodyLength)
+            event.requestBody = bodyString(from: capturedRequestBody ?? request.httpBody, limit: config.maxBodyLength)
             event.responseBody = bodyString(from: responseData, limit: config.maxBodyLength)
         }
 
@@ -108,6 +127,22 @@ final class OlafURLProtocol: URLProtocol {
         }
         guard let text = String(data: data, encoding: .utf8) else { return "<\(data.count) bytes binary>" }
         return text.count > limit ? String(text.prefix(limit)) + "…" : text
+    }
+
+    /// `httpBodyStream`'i tamamen okuyup `Data`'ya çevirir. Stream tek sefer okunabildiğinden,
+    /// dönen veri proxy isteğine `httpBody` olarak geri konmalıdır (yoksa gövde sunucuya gitmez).
+    private static func drainStream(_ stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        let bufferSize = 8192
+        var buffer = [UInt8](repeating: 0, count: bufferSize)
+        while stream.hasBytesAvailable {
+            let read = stream.read(&buffer, maxLength: bufferSize)
+            if read <= 0 { break } // 0 = bitti, <0 = hata
+            data.append(buffer, count: read)
+        }
+        return data
     }
 }
 
