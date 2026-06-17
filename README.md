@@ -17,10 +17,10 @@ Tasarım/fizibilite detayları için ana projedeki `OLAF_REPORT.md`'ye bakın.
 | Faz | Kapsam | Durum |
 |---|---|---|
 | **0 — İskelet** | SPM, model'ler | ✅ |
-| **1 — Core motor** | Ring buffer, redaksiyon, NDJSON disk persistans + oturumlar arası geçmiş, OSLog köprüsü, facade | ✅ |
+| **1 — Core motor** | Ring buffer, NDJSON disk persistans + oturumlar arası geçmiş, OSLog köprüsü, facade | ✅ |
 | **2 — Viewer (OlafUI)** | Shake → SwiftUI düz metin viewer, **Oturum/Geçmiş** kapsamı, filtre/arama/paylaşım, canlı akış | ✅ |
 | **3 — Araç köprüleri** | Jenerik `ExternalToolBridge` + `presentExternal`; host kendi dış tanılama aracını viewer'a buton olarak ekleyebilir, shake sahipliği devri (app tarafı: `INTEGRATION.md` / `AGENTS.md`) | ✅ |
-| **N — Network capture (OlafNetwork)** | Opsiyonel URLProtocol; istek/yanıt `.network` kategorisinde, redaksiyonlu → app+network tek listede | ✅ |
+| **N — Network capture (OlafNetwork)** | Opsiyonel URLProtocol; istek/yanıt `.network` kategorisinde, ham → app+network tek listede | ✅ |
 | **5 — UX & paylaşım** | Detay görünümü (status banner, pretty-JSON gövde), paylaşım (Basit/Tam log + cURL), kopyalama toast, start öncesi log tamponlama, oturum bazlı geçmiş | ✅ |
 | 4 — Köprüler | OSLogStore importer, swift-log backend | ⏳ |
 
@@ -40,7 +40,7 @@ Tasarım/fizibilite detayları için ana projedeki `OLAF_REPORT.md`'ye bakın.
 import OlafCore
 
 // Uygulama başlangıcında (bir kez):
-Olaf.start(.bankingDefault)   // redaksiyon açık, diske yazar, OSLog'a yansıtır
+Olaf.start(.default)   // diske yazar, OSLog'a yansıtır
 
 // Loglama:
 Olaf.info("Login başarılı", category: .auth, metadata: ["method": "biometric"])
@@ -98,9 +98,9 @@ OlafNetwork.startAutomaticCapture(OlafNetworkConfiguration(
     excludedURLs: ["firebaseio", "crashlytics", "googleapis"]        // SDK gürültüsünü gizle
 ))
 ```
-İstek/yanıtlar `.network` kategorisinde, **BankingRedactor'dan geçerek** Olaf listesine düşer
-(app + network tek yerde). Gövde + header yakalama **default açık**; `Authorization`/`Cookie` ve
-PAN/IBAN/token maskelenir. `includedURLs`/`excludedURLs` ile **baseURL filtreleme**, `excludedURLs`
+İstek/yanıtlar `.network` kategorisinde **ham** olarak Olaf listesine düşer
+(app + network tek yerde). Gövde + header yakalama **default açık**; tüm veri (`Authorization`/`Cookie`
+dahil) maskelenmeden saklanır. `includedURLs`/`excludedURLs` ile **baseURL filtreleme**, `excludedURLs`
 önceliklidir; filtre dışı istekler hiç yakalanmaz.
 
 - **JSON gövdeler** otomatik **pretty-print + syntax renklendirme** ile gösterilir (detay → "Gövdeyi görüntüle").
@@ -116,14 +116,13 @@ PAN/IBAN/token maskelenir. `includedURLs`/`excludedURLs` ile **baseURL filtrelem
 ```
 Olaf (facade)
   └─ OlafRuntime          # yaşam döngüsü, kill switch, seviye eşiği (kilitle korunur)
-       └─ LogStore          # serial kuyruk: redaksiyon → ring buffer → disk → OSLog → canlı akış
-            ├─ Redactor               # BankingRedactor: PAN/IBAN/email/hassas-key maskeleme (redactionEnabled ile opt-in)
+       └─ LogStore          # serial kuyruk: ring buffer → disk → OSLog → canlı akış (ham, maskelemesiz)
             ├─ FilePersistence        # boyut bazlı rotation + retention + data protection
             ├─ LogFormatter           # PlainText / JSON (NDJSON)
             └─ OSLogMirror            # os.Logger köprüsü (Console.app)
 ```
 
-- **Banking-grade redaksiyon (opt-in)** — `OlafConfiguration(redactionEnabled: true)` (veya `.bankingDefault`) ile açılır; açıkken ham PII (PAN/CVV/IBAN/OTP/token) buffer'a, diske veya konsola asla yazılmaz. **Default `false`** → açıkça etkinleştirilmezse maskeleme yapılmaz.
+- **Maskeleme/filtreleme yok** — mesaj, metadata ve network gövde/header çağrı yerinden geldiği gibi **ham** saklanır ve gösterilir. Hassas veri sızıntısını önlemek host tarafının sorumluluğundadır: capture'ı yalnız non-prod debug'da (`#if !PROD`) çalıştırın.
 - **UIKit/SwiftUI bağımlılığı yok** → her platformda derlenir, test edilebilir.
 - **Async/non-blocking** — `@autoclosure` ile seviye eşiğin altındaysa mesaj compute edilmez; yazma serial kuyrukta.
 

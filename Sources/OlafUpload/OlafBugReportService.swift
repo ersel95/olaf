@@ -12,11 +12,6 @@ public final class OlafBugReportService: @unchecked Sendable {
     private let queue: OlafUploadQueue
     private let remoteConfigClient: OlafRemoteConfigClient
 
-    /// Bug-reporter, **build redaksiyon ayarından bağımsız olarak** upload edilecek log'ları
-    /// zorla redakte eder (banking-grade). Server yalnız DAHA kısıtlayıcı olabilir
-    /// (redaksiyonu zorlayabilir), gevşetemez. Bu yüzden bu redaktör sabittir.
-    private let redactor: any Redactor
-
     private let lock = NSLock()
     private var _remoteConfig: OlafRemoteConfig = .disabled
 
@@ -25,7 +20,6 @@ public final class OlafBugReportService: @unchecked Sendable {
         let uploader = OlafUploader(configuration: configuration)
         self.queue = OlafUploadQueue(configuration: configuration, uploader: uploader)
         self.remoteConfigClient = OlafRemoteConfigClient(configuration: configuration)
-        self.redactor = BankingRedactor()
     }
 
     // MARK: - Lifecycle (configure'dan çağrılır)
@@ -61,14 +55,6 @@ public final class OlafBugReportService: @unchecked Sendable {
 
     /// JPEG sıkıştırma kalitesi.
     public var screenshotJPEGQuality: Double { configuration.screenshotJPEGQuality }
-
-    /// Server'ın istediği redaksiyon durumu. Bug-reporter zaten her zaman redakte ettiğinden
-    /// bu yalnız **daha kısıtlayıcı** yönde anlamlıdır (server redaksiyonu zorlayabilir, kapatamaz).
-    /// Diagnostik/şeffaflık için açığa çıkarılır.
-    public var remoteRedactionEnabled: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return _remoteConfig.redactionEnabled
-    }
 
     private func setRemoteConfig(_ config: OlafRemoteConfig) {
         lock.lock(); _remoteConfig = config; lock.unlock()
@@ -107,18 +93,6 @@ public final class OlafBugReportService: @unchecked Sendable {
         }
         let effectiveName = testerName ?? identity.name ?? OlafDeviceIdentity.storedName()
 
-        // FAIL-CLOSED REDAKSİYON: upload edilecek log'lar build redaksiyon ayarından bağımsız
-        // olarak BankingRedactor'dan ZORLA geçirilir (server yalnız daha kısıtlayıcı olabilir).
-        // Redaksiyon hiçbir şekilde uygulanamıyorsa (redaktör NoopRedactor'a düşmüşse) upload iptal.
-        guard !(redactor is NoopRedactor) else {
-            Olaf.error(
-                "Bug raporu iptal edildi: redaksiyon uygulanamıyor (fail-closed).",
-                category: .general
-            )
-            return false
-        }
-        let redactedEntries = redactor.redact(entries: Olaf.snapshot())
-
         let payload = OlafReportPayload(
             app: .init(
                 bundleId: OlafDeviceIdentity.bundleIdentifier,
@@ -141,7 +115,7 @@ public final class OlafBugReportService: @unchecked Sendable {
                 sessionId: Olaf.currentSessionID
             ),
             telemetry: telemetry,
-            entries: redactedEntries   // TÜM kategoriler, ZORLA redakte edilmiş LogEntry[]
+            entries: Olaf.snapshot()   // TÜM kategoriler, ham LogEntry[] (maskeleme yok)
         )
 
         guard let reportJSON = try? payload.encodedJSON() else { return false }

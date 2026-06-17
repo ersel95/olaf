@@ -1,6 +1,6 @@
 import Foundation
 
-/// Olaf'un çekirdek deposu: redaksiyon → in-memory ring buffer → (ops.) disk → canlı yayın.
+/// Olaf'un çekirdek deposu: in-memory ring buffer → (ops.) disk → canlı yayın.
 ///
 /// Tüm mutasyon tek bir serial kuyrukta yapılır → kayıt sırası deterministiktir ve
 /// veri yarışı yoktur. `@unchecked Sendable` bu serial-kuyruk sözleşmesine dayanır.
@@ -8,7 +8,6 @@ final class LogStore: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "com.olaf.store", qos: .utility)
     private let capacity: Int
-    private let redactor: any Redactor
     private let persistence: FilePersistence?
     private let exportFormatter: any LogFormatter
     private let osLogMirror: OSLogMirror?
@@ -31,14 +30,12 @@ final class LogStore: @unchecked Sendable {
 
     init(
         capacity: Int,
-        redactor: any Redactor,
         persistence: FilePersistence?,
         exportFormatter: any LogFormatter,
         osLogMirror: OSLogMirror?,
         sessionID: String
     ) {
         self.capacity = capacity
-        self.redactor = redactor
         self.persistence = persistence
         self.exportFormatter = exportFormatter
         self.osLogMirror = osLogMirror
@@ -48,7 +45,7 @@ final class LogStore: @unchecked Sendable {
 
     // MARK: - Yazma
 
-    /// Ham (redakte edilmemiş) veriyi alır; redaksiyon kuyruk içinde yapılır.
+    /// Çağrı yerinden gelen veriyi alıp serial kuyrukta tampona/diske yazar.
     func ingest(
         date: Date,
         level: LogLevel,
@@ -65,8 +62,8 @@ final class LogStore: @unchecked Sendable {
                 date: date,
                 level: level,
                 category: category,
-                message: redactor.redact(rawMessage),
-                metadata: redactor.redact(metadata: rawMetadata),
+                message: rawMessage,
+                metadata: rawMetadata,
                 file: file,
                 line: line,
                 function: function,
@@ -98,7 +95,7 @@ final class LogStore: @unchecked Sendable {
     }
 
     /// `snapshot()`'ın bloke etmeyen sürümü: çağıran (ör. ana thread) `.utility` kuyruğu yoğun
-    /// redaksiyon burst'ü işlerken `queue.sync` ile beklemesin diye.
+    /// yazma burst'ü işlerken `queue.sync` ile beklemesin diye.
     func snapshotAsync() async -> [LogEntry] {
         await withCheckedContinuation { continuation in
             queue.async { [self] in
@@ -149,6 +146,18 @@ final class LogStore: @unchecked Sendable {
         await withCheckedContinuation { continuation in
             queue.async { [self] in
                 continuation.resume(returning: persistence?.consolidatedTextURL(using: exportFormatter))
+            }
+        }
+    }
+
+    /// Verilen kayıtları (ör. viewer'da o an **filtreli** görünen liste) paylaşılabilir .log
+    /// dosyasına yazar. Disk persistance'tan bağımsız — yalnız geçirilen kayıtları dışa aktarır.
+    /// Metin oluşturma + dosya I/O serial kuyrukta yapılır → çağıran bloke olmaz.
+    func exportFileURL(entries: [LogEntry]) async -> URL? {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                let text = entries.map { exportFormatter.string(from: $0) }.joined(separator: "\n")
+                continuation.resume(returning: LogExportFile.write(text))
             }
         }
     }

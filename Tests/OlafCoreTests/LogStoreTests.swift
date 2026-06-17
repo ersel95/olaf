@@ -3,10 +3,9 @@ import XCTest
 
 final class LogStoreTests: XCTestCase {
 
-    private func makeStore(capacity: Int, redactor: any Redactor = NoopRedactor()) -> LogStore {
+    private func makeStore(capacity: Int) -> LogStore {
         LogStore(
             capacity: capacity,
-            redactor: redactor,
             persistence: nil,
             exportFormatter: PlainTextFormatter(),
             osLogMirror: nil,
@@ -59,11 +58,12 @@ final class LogStoreTests: XCTestCase {
         XCTAssertEqual(async.map(\.message), ["1", "2", "3"])
     }
 
-    func testRedactionAppliedBeforeStorage() {
-        let store = makeStore(capacity: 10, redactor: BankingRedactor())
+    func testRawDataStoredUnchanged() {
+        // Maskeleme/filtreleme yok: hassas görünümlü veri bile ham haliyle saklanır.
+        let store = makeStore(capacity: 10)
         ingest(store, "PAN=4508034012345678")
         let stored = store.snapshot().first?.message ?? ""
-        XCTAssertFalse(stored.contains("4508034012345678"))
+        XCTAssertEqual(stored, "PAN=4508034012345678")
     }
 
     func testClearEmptiesBuffer() {
@@ -72,6 +72,23 @@ final class LogStoreTests: XCTestCase {
         store.clear()
         // clear async; snapshot serial kuyrukta sıraya girer → temizlik tamamlanmış olur.
         XCTAssertTrue(store.snapshot().isEmpty)
+    }
+
+    func testExportWritesOnlyGivenEntries() async throws {
+        // Filtreli export: viewer'da görünen alt küme geçilir → dosya yalnız onları içermeli.
+        let store = makeStore(capacity: 10)
+        for i in 1...5 { ingest(store, "msg-\(i)") }
+        let subset = Array(store.snapshot().prefix(2))   // "msg-1", "msg-2"
+
+        let url = await store.exportFileURL(entries: subset)
+        let exported = try XCTUnwrap(url)
+        let text = try String(contentsOf: exported, encoding: .utf8)
+
+        XCTAssertTrue(text.contains("msg-1"))
+        XCTAssertTrue(text.contains("msg-2"))
+        XCTAssertFalse(text.contains("msg-3"))
+        XCTAssertFalse(text.contains("msg-5"))
+        try? FileManager.default.removeItem(at: exported)
     }
 
     func testStreamReceivesNewEntries() async {

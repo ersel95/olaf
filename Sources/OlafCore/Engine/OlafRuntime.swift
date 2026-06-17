@@ -60,7 +60,6 @@ final class OlafRuntime: @unchecked Sendable {
 
         _store = LogStore(
             capacity: configuration.inMemoryCapacity,
-            redactor: configuration.effectiveRedactor,
             persistence: persistence,
             exportFormatter: configuration.exportFormatter,
             osLogMirror: mirror,

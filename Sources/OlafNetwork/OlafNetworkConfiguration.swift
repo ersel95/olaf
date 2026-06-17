@@ -4,11 +4,11 @@ import OlafCore
 /// Olaf network capture yapılandırması.
 public struct OlafNetworkConfiguration: Sendable {
 
-    /// İstek/yanıt gövdelerini de logla. **Varsayılan açık.** (Gövdeler yine BankingRedactor'dan
-    /// geçer; yine de keyfi JSON'daki her PII garanti yakalanamaz — gerekirse `false` yapın.)
+    /// İstek/yanıt gövdelerini de logla. **Varsayılan açık.** (Gövdeler ham olarak saklanır;
+    /// gerekmiyorsa `false` yapın.)
     public var capturesBodies: Bool
 
-    /// İstek/yanıt header'larını da logla. **Varsayılan açık** (hassas header'lar redaksiyondan geçer).
+    /// İstek/yanıt header'larını da logla. **Varsayılan açık** (header'lar ham olarak saklanır).
     public var capturesHeaders: Bool
 
     /// Gövde loglanırken kesilecek maksimum karakter sayısı.

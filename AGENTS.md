@@ -73,7 +73,7 @@ Dosya `@_exported import OlafCore` içerdiğinden çağrı yerleri `import OlafC
 ```swift
 OlafNetwork.startAutomaticCapture()   // URLSessionConfiguration swizzle + global; SSL kırmaz
 ```
-İstek/yanıtlar `.network` kategorisinde redaksiyonla Olaf'a düşer. Gövde + header **default açık**;
+İstek/yanıtlar `.network` kategorisinde ham (maskelemesiz) Olaf'a düşer. Gövde + header **default açık**;
 kısmak için `startAutomaticCapture(OlafNetworkConfiguration(capturesBodies: false))`.
 Kendi session'ına manuel/deterministik enjekte için (adım 4) `configureNetworkCapture(_:)` / `install(into:chainingTo:)`.
 

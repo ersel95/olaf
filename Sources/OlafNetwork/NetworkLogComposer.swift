@@ -1,7 +1,7 @@
 import Foundation
 import OlafCore
 
-/// Bir network olayının ham (redakte edilmemiş) verisi. Redaksiyon `Olaf.log` içinde uygulanır.
+/// Bir network olayının ham verisi (maskeleme/filtreleme yapılmaz, olduğu gibi loglanır).
 struct NetworkLogEvent {
     var method: String
     var url: String
@@ -47,12 +47,10 @@ enum NetworkLogComposer {
         ]
         if let status = event.statusCode { metadata["status"] = String(status) }
         if let error = event.error { metadata["error"] = error }
-        // Gövdeler ayrı `requestBody`/`responseBody` anahtarlarıyla → BankingRedactor JSON ise
-        // derin key-bazlı (token/balance/iban/pan/cvv…) recursive maskelemeden geçirir;
-        // JSON değilse value-pattern (kart/IBAN/email) redaksiyonu uygulanır.
+        // Gövdeler ayrı `requestBody`/`responseBody` anahtarlarıyla ham olarak saklanır.
         if let body = event.requestBody { metadata["requestBody"] = body }
         if let body = event.responseBody { metadata["responseBody"] = body }
-        // Header'lar ayrı anahtarlarla → BankingRedactor key-bazlı maskeleme (Authorization/Cookie/token) çalışır.
+        // Header'lar ayrı anahtarlarla ham olarak saklanır.
         for (key, value) in event.requestHeaders ?? [:] { metadata["reqH.\(key)"] = value }
         for (key, value) in event.responseHeaders ?? [:] { metadata["respH.\(key)"] = value }
         return metadata

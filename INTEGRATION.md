@@ -50,7 +50,7 @@ public final class OlafManager {
 
     public func initialize() {
         #if !PROD
-        Olaf.start(.bankingDefault)
+        Olaf.start(.default)
         #if canImport(OlafNetwork)
         OlafNetwork.startAutomaticCapture()
         #endif
@@ -73,7 +73,7 @@ Shake jesti Olaf'a aittir; cihaz sallanınca viewer açılır.
 
 ## 4. Network loglarını Olaf'ta listelemek — `OlafNetwork`
 
-İstek/yanıtları `.network` kategorisinde, **BankingRedactor'dan geçirerek** (PAN/IBAN/token maskeli) loglar.
+İstek/yanıtları `.network` kategorisinde **ham** (maskelemesiz) loglar.
 
 ### ÖNERİLEN: tek satır otomatik capture (networking koduna dokunmadan)
 `startAutomaticCapture()`, `URLSessionConfiguration`'ı swizzle ederek tüm session'lara (Alamofire dahil)
@@ -102,10 +102,10 @@ OlafManager.shared.configureNetworkCapture(configuration)
 Bunu kullanıyorsanız `startAutomaticCapture`'a gerek kalmaz. Başka bir capture aracının URLProtocol'ünü
 aynı trafiğe zincirlemek için `OlafNetwork.install(into:chainingTo:)` kullanılabilir.
 
-> **Güvenlik:** Gövde/header default açıktır → tüm trafik loglanır. BankingRedactor JSON gövdelerini derin,
-> key-bazlı (token/balance/iban/pan/cvv…) maskeler ve kart/IBAN/email örüntülerini değerlerde gizler; yine de
-> keyfi/serbest formatlı JSON'daki her PII'nin maskeleneceği garanti edilemez. Capture katmanı TLS doğrulamasını
-> ASLA gevşetmez (cert pinning baypaslanmaz). Gövde loglama yine de **yalnız non-prod debug** içindir → PROD'da çalışmamalı.
+> **Güvenlik:** Gövde/header default açıktır → tüm trafik **ham** loglanır (maskeleme/filtreleme yapılmaz;
+> token/PAN/IBAN/Authorization dahil her şey olduğu gibi saklanır). Capture katmanı TLS doğrulamasını
+> ASLA gevşetmez (cert pinning baypaslanmaz). Hassas veri sızıntısını önlemek host'un sorumluluğundadır →
+> capture **yalnız non-prod debug** içindir, PROD'da çalışmamalı.
 
 ## 5. Uygulamada loglama — her zaman `OlafManager` üzerinden
 
@@ -149,7 +149,7 @@ remote config / screenshot detector / upload kodu çalışmaz. Üç gate:
 sağlamak (§6.3). İlgili blok:
 ```swift
 #if !PROD
-Olaf.start(.bankingDefault)
+Olaf.start(.default)
 #if canImport(OlafNetwork)
 OlafNetwork.startAutomaticCapture()
 #endif

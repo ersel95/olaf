@@ -90,7 +90,6 @@ final class OlafURLProtocol: URLProtocol {
             event.responseHeaders = (http?.allHeaderFields as? [String: String])
         }
 
-        // Redaksiyon Olaf.log içinde (BankingRedactor) otomatik uygulanır.
         Olaf.log(
             NetworkLogComposer.level(statusCode: event.statusCode, error: event.error),
             NetworkLogComposer.message(for: event),
@@ -101,7 +100,7 @@ final class OlafURLProtocol: URLProtocol {
 
     private func bodyString(from data: Data?, limit: Int) -> String? {
         guard let data, !data.isEmpty, limit > 0 else { return nil }
-        // JSON ise yakalama anında (redaksiyondan ÖNCE) pretty-print ederek sakla → viewer'da girintili görünür.
+        // JSON ise yakalama anında pretty-print ederek sakla → viewer'da girintili görünür.
         if let object = try? JSONSerialization.jsonObject(with: data),
            let pretty = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]),
            let text = String(data: pretty, encoding: .utf8) {

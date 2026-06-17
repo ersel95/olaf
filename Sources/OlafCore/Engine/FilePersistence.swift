@@ -104,31 +104,8 @@ final class FilePersistence: @unchecked Sendable {
     /// Diskteki tüm kayıtları, verilen formatter ile **insan-okur düz metin** bir dosyaya
     /// dönüştürür ve paylaşılabilir URL döndürür.
     func consolidatedTextURL(using formatter: any LogFormatter) -> URL? {
-        // Önceki export'ları temizle → tmp'de süresiz birikmesinler (hassas log içerebilir).
-        purgeOldExports()
-
-        let entries = loadEntries()
-        let text = entries.map { formatter.string(from: $0) }.joined(separator: "\n")
-
-        let exportURL = fileManager.temporaryDirectory
-            .appendingPathComponent("olaf-export-\(Int(Date().timeIntervalSince1970)).log")
-        do {
-            try text.write(to: exportURL, atomically: true, encoding: .utf8)
-            return exportURL
-        } catch {
-            return nil
-        }
-    }
-
-    private static let exportPrefix = "olaf-export-"
-
-    /// tmp'deki eski `olaf-export-*.log` dosyalarını siler (yeni export'tan önce çağrılır).
-    private func purgeOldExports() {
-        let tmp = fileManager.temporaryDirectory
-        let contents = (try? fileManager.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil)) ?? []
-        for url in contents where url.lastPathComponent.hasPrefix(Self.exportPrefix) && url.pathExtension == "log" {
-            try? fileManager.removeItem(at: url)
-        }
+        let text = loadEntries().map { formatter.string(from: $0) }.joined(separator: "\n")
+        return LogExportFile.write(text, fileManager: fileManager)
     }
 
     // MARK: - Dahili

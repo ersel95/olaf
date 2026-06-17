@@ -1,41 +1,33 @@
 import Foundation
 
-/// `GET /config?appKey=` yanıtı (server-side kill-switch + redaksiyon toggle).
+/// `GET /config?appKey=` yanıtı (server-side kill-switch).
 public struct OlafRemoteConfig: Codable, Sendable {
 
     /// Server-side kill-switch. `false` → cihaz raporu yine sıkıştırıp **göndermez**
     /// (ikinci savunma katmanı; local `enabled` ile birlikte iki gate).
     public let captureEnabled: Bool
 
-    /// Panel'den gelen redaksiyon sinyali. Bug-reporter upload'ları **her zaman** redakte edilir;
-    /// bu bayrak yalnız DAHA kısıtlayıcı yönde anlamlıdır (server redaksiyonu zorlayabilir,
-    /// asla kapatamaz/gevşetemez). `OlafBugReportService.remoteRedactionEnabled` ile okunur.
-    public let redactionEnabled: Bool
-
     /// Screenshot için izin verilen üst sınır (byte).
     public let maxScreenshotBytes: Int
 
-    public init(captureEnabled: Bool, redactionEnabled: Bool, maxScreenshotBytes: Int) {
+    public init(captureEnabled: Bool, maxScreenshotBytes: Int) {
         self.captureEnabled = captureEnabled
-        self.redactionEnabled = redactionEnabled
         self.maxScreenshotBytes = maxScreenshotBytes
     }
 
     private enum CodingKeys: String, CodingKey {
-        case captureEnabled, redactionEnabled, maxScreenshotBytes
+        case captureEnabled, maxScreenshotBytes
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         captureEnabled = try c.decodeIfPresent(Bool.self, forKey: .captureEnabled) ?? false
-        redactionEnabled = try c.decodeIfPresent(Bool.self, forKey: .redactionEnabled) ?? false
         maxScreenshotBytes = try c.decodeIfPresent(Int.self, forKey: .maxScreenshotBytes) ?? (4 * 1_048_576)
     }
 
     /// Henüz config çekilmediğinde / hata durumunda kullanılan güvenli varsayılan: **kapalı**.
     public static let disabled = OlafRemoteConfig(
         captureEnabled: false,
-        redactionEnabled: false,
         maxScreenshotBytes: 4 * 1_048_576
     )
 }

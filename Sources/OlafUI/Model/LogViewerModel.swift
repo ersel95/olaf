@@ -221,8 +221,12 @@ public final class LogViewerModel: ObservableObject {
         incoming.removeAll()
     }
 
+    /// O an **ekranda görünen** (kapsam + seviye/kategori/arama filtreleri uygulanmış) kayıtları
+    /// paylaşılabilir bir dosyaya yazar. Hiçbir filtre seçili değilse bu, tüm görünür listeyle
+    /// eşittir. Kronolojik (eski → yeni) yazılır; `filteredEntries` en-yeni-üstte sıralı.
     public func exportFileURL() async -> URL? {
-        await Olaf.exportFileURL()
+        let visible = Array(filteredEntries.reversed())
+        return await Olaf.exportFileURL(entries: visible)
     }
 
     /// Kayıtlı dış araçlar (geçiş butonları).

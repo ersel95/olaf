@@ -1,7 +1,7 @@
 import Foundation
 
-/// Tek bir log kaydı. `message` ve `metadata` redaksiyondan **geçmiş** haliyle saklanır;
-/// ham PII hiçbir zaman bu yapıya ulaşmaz (bkz. `Redactor`).
+/// Tek bir log kaydı. `message` ve `metadata` çağrı yerinden geldiği **ham** haliyle saklanır
+/// (maskeleme/filtreleme yapılmaz — tüm veri olduğu gibi tutulur).
 public struct LogEntry: Identifiable, Sendable, Codable, Hashable {
     public let id: UUID
     public let date: Date

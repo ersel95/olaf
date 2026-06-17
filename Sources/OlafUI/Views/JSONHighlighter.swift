@@ -2,7 +2,7 @@
 import SwiftUI
 
 /// JSON metnini regex tabanlı renklendirip `AttributedString` döndürür (key/string/sayı/literal).
-/// Katı parse yapmaz → redaksiyon/truncation ile bozulmuş JSON'u da renklendirir.
+/// Katı parse yapmaz → truncation ile bozulmuş JSON'u da renklendirir.
 enum JSONHighlighter {
 
     /// Pattern'ler statik literal → regex'ler bir kez derlenir (her detay render'ında yeniden

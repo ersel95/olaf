@@ -40,7 +40,7 @@ public final class OlafManager {
         // ADAPT: prod'da kapalı tutun. Önerilen: derleme sınırı (capture kodu prod binary'sine girmez).
         // Alternatif: runtime feature flag (capture kodu binary'de kalır, çalışma-zamanı kapalı).
         #if !PROD
-        Olaf.start(.bankingDefault)
+        Olaf.start(.default)
 
         #if canImport(OlafNetwork)
         // Tüm session'lara otomatik enjekte (host networking koduna dokunmadan, SSL kırmadan).

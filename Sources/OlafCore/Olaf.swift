@@ -3,7 +3,7 @@ import Foundation
 /// Olaf'un genel (public) cephesi. Tek satır kurulum + ergonomik log API'si.
 ///
 /// ```swift
-/// Olaf.start(.bankingDefault)
+/// Olaf.start(.default)
 /// Olaf.info("Login başarılı", category: .auth, metadata: ["method": "biometric"])
 /// Olaf.error("Transfer reddedildi", category: .payment, metadata: ["code": code])
 /// ```
@@ -149,7 +149,7 @@ public enum Olaf {
         runtime.store?.snapshot() ?? []
     }
 
-    /// `snapshot()`'ın bloke etmeyen sürümü. Çekirdek kuyruk yoğun redaksiyon burst'ü işlerken
+    /// `snapshot()`'ın bloke etmeyen sürümü. Çekirdek kuyruk yoğun yazma burst'ü işlerken
     /// ana thread'i `queue.sync` ile bekletmemek için viewer bunu kullanır.
     public static func snapshotAsync() async -> [LogEntry] {
         guard let store = runtime.store else { return [] }
@@ -177,5 +177,12 @@ public enum Olaf {
     public static func exportFileURL() async -> URL? {
         guard let store = runtime.store else { return nil }
         return await store.exportFileURL()
+    }
+
+    /// Verilen kayıtları paylaşılabilir bir dosyaya yazar (asenkron, bloke etmez). Viewer, o an
+    /// **filtreli** görünen listeyi paylaşmak için bunu kullanır; kayıt seçimi çağırana aittir.
+    public static func exportFileURL(entries: [LogEntry]) async -> URL? {
+        guard let store = runtime.store else { return nil }
+        return await store.exportFileURL(entries: entries)
     }
 }

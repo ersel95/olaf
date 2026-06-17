@@ -23,7 +23,7 @@ enum Formatting {
         return (try? JSONSerialization.jsonObject(with: data)) != nil
     }
 
-    /// JSON gibi GÖRÜNÜYOR mu? (redaksiyon/truncation geçerli JSON'u bozmuş olabilir; renklendirme
+    /// JSON gibi GÖRÜNÜYOR mu? (truncation geçerli JSON'u bozmuş olabilir; renklendirme
     /// için katı parse yerine `{`/`[` ile başlama kontrolü yeterli.)
     static func looksLikeJSON(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)

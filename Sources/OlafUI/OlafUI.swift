@@ -6,7 +6,7 @@ import OlafUpload
 /// OlafUI'ın genel cephesi: shake → viewer kurulumu, dış araç kaydı, sunum.
 ///
 /// ```swift
-/// Olaf.start(.bankingDefault)
+/// Olaf.start(.default)
 /// OlafUI.install()       // viewer (shake) kurulumu
 /// ```
 ///

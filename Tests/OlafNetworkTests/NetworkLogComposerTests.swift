@@ -73,21 +73,15 @@ final class NetworkLogComposerTests: XCTestCase {
         XCTAssertEqual(config.category, .network)
     }
 
-    func testComposerBodyMetadataIsDeepRedactedByBankingRedactor() {
-        // C-2: composer requestBody/responseBody'yi ayrı anahtar olarak koyar; BankingRedactor
-        // bunları JSON ise derin key-bazlı maskeler.
+    func testComposerStoresBodiesRawAsSeparateKeys() {
+        // composer requestBody/responseBody'yi ayrı anahtar olarak ham (maskelemesiz) saklar.
         var e = event(status: 200)
         e.requestBody = #"{"accessToken":"abc123","amount":50}"#
         e.responseBody = #"{"balance":99999,"iban":"AZ21NABZ00000000137010001944"}"#
         let metadata = NetworkLogComposer.metadata(for: e)
 
-        let redacted = BankingRedactor().redact(metadata: metadata)
-        let req = redacted["requestBody"]!
-        let resp = redacted["responseBody"]!
-        XCTAssertFalse(req.contains("abc123"))
-        XCTAssertTrue(req.contains("50"))                       // hassas olmayan korunur
-        XCTAssertFalse(resp.contains("99999"))
-        XCTAssertFalse(resp.contains("AZ21NABZ00000000137010001944"))
+        XCTAssertEqual(metadata["requestBody"], #"{"accessToken":"abc123","amount":50}"#)
+        XCTAssertEqual(metadata["responseBody"], #"{"balance":99999,"iban":"AZ21NABZ00000000137010001944"}"#)
     }
 
     func testMetadataIncludesHeadersAsSeparateKeys() {
@@ -95,7 +89,7 @@ final class NetworkLogComposerTests: XCTestCase {
         e.requestHeaders = ["Authorization": "Bearer x", "Accept": "application/json"]
         e.responseHeaders = ["Set-Cookie": "sid=123"]
         let metadata = NetworkLogComposer.metadata(for: e)
-        XCTAssertEqual(metadata["reqH.Authorization"], "Bearer x") // composer maskelemez; Olaf.log içinde redakte edilir
+        XCTAssertEqual(metadata["reqH.Authorization"], "Bearer x") // ham olarak saklanır
         XCTAssertEqual(metadata["reqH.Accept"], "application/json")
         XCTAssertEqual(metadata["respH.Set-Cookie"], "sid=123")
     }

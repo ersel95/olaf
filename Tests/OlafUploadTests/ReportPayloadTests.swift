@@ -86,7 +86,6 @@ final class ReportPayloadTests: XCTestCase {
         let data = "{}".data(using: .utf8)!
         let config = try JSONDecoder().decode(OlafRemoteConfig.self, from: data)
         XCTAssertFalse(config.captureEnabled)
-        XCTAssertFalse(config.redactionEnabled)
         XCTAssertGreaterThan(config.maxScreenshotBytes, 0)
     }
 }
