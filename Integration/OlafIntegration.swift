@@ -45,7 +45,7 @@ public final class OlafManager {
         #if canImport(OlafNetwork)
         // Tüm session'lara otomatik enjekte (host networking koduna dokunmadan, SSL kırmadan).
         // Not: Kendi özel Alamofire/URLSession config'inizi kuruyorsanız bunun yerine configureNetworkCapture'ı kullanın.
-        OlafNetwork.startAutomaticCapture()
+        OlafNetwork.startAutomaticCapture(Self.networkConfiguration)
         #endif
 
         Task { @MainActor in
@@ -72,6 +72,20 @@ public final class OlafManager {
         #endif
     }
 
+    // MARK: - Network capture konfigürasyonu
+
+    /// Ortak network-capture ayarı (hem `startAutomaticCapture` hem `configureNetworkCapture` kullanır).
+    ///
+    /// ADAPT: `allowsArbitraryServerTrustForCapture` — iç/UAT gateway'iniz **özel kurumsal CA** ile imzalı
+    /// bir sertifika sunuyorsa açın. Capture proxy'si host'un trust delegate'ini PAYLAŞMADIĞI için default
+    /// doğrulama TLS `-9807` / NSURLError `-1202` ("sertifika geçersiz") verir. Bu bayrak yalnız **capture
+    /// proxy'sinin** server-trust'ını gevşetir (uygulamanızın kendi trafiğinin doğrulaması değişmez, SSL
+    /// kırılmaz). Kod zaten `#if !PROD` altında derlenir → prod binary'sine girmez. Sistem CA'sıyla imzalı
+    /// public sertifikalarda gerekmez; `false` bırakın.
+    private static let networkConfiguration = OlafNetworkConfiguration(
+        allowsArbitraryServerTrustForCapture: false
+    )
+
     // MARK: - Bug-reporter konfig kaynakları (HOST sağlar — repoya commit edilmez)
     // ADAPT: Bu değerleri Info.plist'e xcconfig'ten enjekte edip burada okuyun. Hard-code ETMEYİN.
 
@@ -96,7 +110,7 @@ public final class OlafManager {
     public func configureNetworkCapture(_ configuration: URLSessionConfiguration) {
         #if !PROD
         #if canImport(OlafNetwork)
-        OlafNetwork.install(into: configuration)
+        OlafNetwork.install(into: configuration, with: Self.networkConfiguration)
         #endif
         #endif
     }
