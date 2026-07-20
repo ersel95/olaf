@@ -98,6 +98,11 @@ public enum OlafNetwork {
         box.mocks.append(mock)
     }
 
+    /// Tek bir mock'u kaldırır (viewer'daki mock listesi kullanır).
+    public static func removeMock(id: UUID) {
+        box.mocks.removeAll { $0.id == id }
+    }
+
     /// Tüm mock'ları kaldırır (istekler yeniden gerçek backend'e gider).
     public static func removeAllMocks() {
         box.mocks = []

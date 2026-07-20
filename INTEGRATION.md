@@ -226,6 +226,9 @@ OlafNetwork.removeAllMocks()   // gerçek backend'e dönüş
   eşleşirse **ilk eklenen** kazanır. Capture URL filtreleri mock'ları etkilemez.
 - Mock'lanan istekler listede `[mock]` işaretiyle loglanır; detayda "Kaynak: Mock" görünür.
   `delaySeconds` süresince "Aktif istekler" barında beklerler (yavaş ağ simülasyonu).
+- **Cihaz üzerinde, kod yazmadan**: viewer'da bir network kaydının detayı → **"Mock'a çevir"** —
+  yakalanan yanıt editörde açılır (status/gövde/gecikme/taşıma hatası düzenlenir), kaydedilince
+  aktifleşir. Aktif mock'lar **⋯ → Mock'lar** ekranından görüntülenir/silinir.
 - Diğer her şey gibi **yalnız non-prod** (`#if !PROD`) içindir.
 
 ---

@@ -78,6 +78,31 @@ final class MockingTests: XCTestCase {
         }
     }
 
+    // MARK: - Viewer akışı yardımcıları
+
+    func testSuggestedMockPatternIsHostPlusPathWithoutQuery() {
+        let entry = LogEntry(
+            date: Date(), level: .info, category: .network, message: "m",
+            metadata: ["method": "GET", "url": "https://api.example.com/v1/pay?id=7&x=1"],
+            file: "F.swift", line: 1, function: "f()", thread: "main"
+        )
+        XCTAssertEqual(NetworkLogInfo(entry: entry)?.suggestedMockPattern, "api.example.com/v1/pay")
+    }
+
+    func testRemoveMockByID() {
+        let first = OlafMockResponse(urlContains: "/a", json: "{}")
+        let second = OlafMockResponse(urlContains: "/b", json: "{}")
+        OlafNetwork.addMock(first)
+        OlafNetwork.addMock(second)
+        XCTAssertEqual(OlafNetwork.activeMocks.count, 2)
+
+        OlafNetwork.removeMock(id: first.id)
+        XCTAssertEqual(OlafNetwork.activeMocks.map(\.urlContains), ["/b"])
+
+        OlafNetwork.removeMock(id: first.id)   // bilinmeyen id no-op
+        XCTAssertEqual(OlafNetwork.activeMocks.count, 1)
+    }
+
     // MARK: - Loglama işareti
 
     func testComposerMarksMockedEvents() {

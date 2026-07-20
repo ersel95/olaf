@@ -8,6 +8,7 @@ struct LogDetailView: View {
     let entry: LogEntry
 
     @State private var didCopy = false
+    @State private var isMockEditorPresented = false
 
     private var network: NetworkLogInfo? { NetworkLogInfo(entry: entry) }
 
@@ -24,6 +25,11 @@ struct LogDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { shareMenu }
+        }
+        .sheet(isPresented: $isMockEditorPresented) {
+            if let network {
+                MockEditorView(info: network)
+            }
         }
         .copyToast($didCopy)
     }
@@ -154,6 +160,13 @@ struct LogDetailView: View {
             } label: {
                 rowLabel("cURL", systemImage: "terminal")
             }
+            Button {
+                isMockEditorPresented = true
+            } label: {
+                rowLabel("Mock'a çevir", systemImage: "arrow.triangle.2.circlepath")
+            }
+        } footer: {
+            Text("Mock'a çevir: bu yanıtı düzenleyip kaydedin; eşleşen sonraki istekler ağa çıkmadan sizin yanıtınızı alır.")
         }
 
         if info.hasTimings {

@@ -9,6 +9,7 @@ public struct OlafViewerView: View {
 
     @State private var isFilterPresented = false
     @State private var isStatsPresented = false
+    @State private var isMocksPresented = false
     /// Çoklu seçim modu (yalnız Oturum kapsamında).
     @State private var isSelecting = false
     @State private var selectedIDs = Set<UUID>()
@@ -38,6 +39,9 @@ public struct OlafViewerView: View {
             }
             .sheet(isPresented: $isStatsPresented) {
                 NetworkStatsView(entries: model.filteredEntries)
+            }
+            .sheet(isPresented: $isMocksPresented) {
+                MockListView()
             }
         }
         .onAppear { model.start() }
@@ -250,6 +254,7 @@ public struct OlafViewerView: View {
                     Divider()
                     shareMenu
                     Button { isStatsPresented = true } label: { Label("İstatistikler", systemImage: "chart.bar") }
+                    Button { isMocksPresented = true } label: { Label("Mock'lar", systemImage: "arrow.triangle.2.circlepath") }
                     Divider()
                     Button { importOSLog() } label: { Label("OSLog'u içe aktar (1 saat)", systemImage: "square.and.arrow.down") }
                     Button(role: .destructive) { model.clear() } label: { Label("Temizle", systemImage: "trash") }

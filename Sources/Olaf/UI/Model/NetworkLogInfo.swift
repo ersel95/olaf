@@ -80,6 +80,13 @@ struct NetworkLogInfo {
         return comps.host ?? ""
     }
 
+    /// Mock editörünün önerdiği eşleşme kalıbı: host + path (query'siz) — aynı endpoint'in
+    /// tüm çağrılarını yakalayacak kadar genel, başka endpoint'lere taşmayacak kadar özgül.
+    var suggestedMockPattern: String {
+        guard let url, let comps = URLComponents(string: url) else { return url ?? "" }
+        return (comps.host ?? "") + (comps.path.isEmpty ? "/" : comps.path)
+    }
+
     var isFailure: Bool {
         if error != nil { return true }
         if let code = statusCode { return code >= 400 }

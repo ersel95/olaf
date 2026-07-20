@@ -18,7 +18,10 @@ import Foundation
 /// Eşleşme: URL (lowercase) `urlContains` parçasını içeriyorsa ve `method` uyuyorsa
 /// (nil = tüm metotlar). Birden çok mock eşleşirse **ilk eklenen** kazanır.
 /// Capture filtreleri (`includedURLs`/`excludedURLs`) mock'ları etkilemez.
-public struct OlafMockResponse: Sendable {
+public struct OlafMockResponse: Sendable, Identifiable {
+
+    /// Kayıt kimliği (viewer'daki mock listesinden tekil silme için).
+    public let id: UUID
 
     /// URL'in içermesi gereken parça (karşılaştırma lowercase yapılır).
     public var urlContains: String
@@ -41,6 +44,7 @@ public struct OlafMockResponse: Sendable {
         delaySeconds: TimeInterval = 0,
         transportError: URLError.Code? = nil
     ) {
+        self.id = UUID()
         self.urlContains = urlContains.lowercased()
         self.method = method?.uppercased()
         self.statusCode = statusCode

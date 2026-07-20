@@ -3,6 +3,14 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
 (0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
 
+## [0.43.0] — 2026-07-20
+### Eklendi
+- **Viewer'dan mock'a çevirme**: network kaydının detayında "Mock'a çevir" — yakalanan yanıt
+  düzenlenebilir editörde açılır (URL kalıbı, metot kısıtı, status/gövde, gecikme, taşıma
+  hatası seçimi) ve kaydedilince cihaz üzerinde, kod yazmadan mock aktifleşir.
+- **Mock listesi** (⋯ → Mock'lar): aktif mock'ları görüntüleme, kaydırarak tekil silme,
+  "Tümünü kaldır". `OlafMockResponse` artık `Identifiable`; `OlafNetwork.removeMock(id:)`.
+
 ## [0.42.0] — 2026-07-20
 ### Eklendi
 - **Response mocking**: `OlafNetwork.addMock(OlafMockResponse(...))` — eşleşen istekler ağa
