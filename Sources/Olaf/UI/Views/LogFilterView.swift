@@ -56,6 +56,21 @@ struct LogFilterView: View {
                     Text("Eşiğin altındaki seviyeler hiç toplanmaz (yukarıdaki görüntüleme filtrelerinden bağımsızdır; uygulama yeniden başlayınca config değerine döner).")
                 }
 
+                Section {
+                    ForEach(NetworkContentKind.allCases, id: \.self) { kind in
+                        Toggle(isOn: Binding(
+                            get: { model.selectedContentKinds.isEmpty || model.selectedContentKinds.contains(kind) },
+                            set: { _ in model.toggleContentKind(kind) }
+                        )) {
+                            Text(kind.title).font(.callout)
+                        }
+                    }
+                } header: {
+                    Text("İçerik türü (network)")
+                } footer: {
+                    Text("Seçim yapıldığında yalnız bu türlerdeki network yanıtları listelenir (network dışı kayıtlar gizlenir).")
+                }
+
                 let categories = model.availableCategories
                 if !categories.isEmpty {
                     Section("Kategoriler") {

@@ -128,6 +128,18 @@ final class OlafURLProtocol: URLProtocol {
         // callback gelmez → alanlar sabittir, kopyalamak güvenlidir.
         let nsError = error as NSError?
         let cancelled = nsError.map { $0.domain == NSURLErrorDomain && $0.code == NSURLErrorCancelled } ?? false
+
+        // Görsel önizleme: image/* yanıtlar sınır altındaysa base64 saklanır (detayda gösterilir).
+        var imageBase64: String?
+        let responseContentType = (capturedResponse as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Content-Type")?.lowercased()
+        let imageLimit = OlafNetwork.current.maxImageBodyBytes
+        if capturesBodies,
+           let responseContentType, responseContentType.hasPrefix("image/"),
+           !responseData.isEmpty, responseData.count <= imageLimit {
+            imageBase64 = responseData.base64EncodedString()
+        }
+
         let completion = CaptureCompletion(
             method: request.httpMethod ?? "GET",
             url: request.url?.absoluteString ?? "-",
@@ -141,7 +153,8 @@ final class OlafURLProtocol: URLProtocol {
             responseBody: responseData,
             requestHeaders: request.allHTTPHeaderFields,
             responseHeaders: (capturedResponse as? HTTPURLResponse)?.allHeaderFields as? [String: String],
-            timing: Self.timing(from: capturedMetrics)
+            timing: Self.timing(from: capturedMetrics),
+            responseImageBase64: imageBase64
         )
         OlafProxySession.logQueue.async {
             Self.log(completion)
@@ -165,6 +178,7 @@ final class OlafURLProtocol: URLProtocol {
         let requestHeaders: [String: String]?
         let responseHeaders: [String: String]?
         let timing: NetworkTimingMetrics?
+        let responseImageBase64: String?
     }
 
     /// Task metriklerinden zamanlama kırılımı çıkarır. Redirect'li isteklerde SON transaction
@@ -199,7 +213,8 @@ final class OlafURLProtocol: URLProtocol {
             requestBody: nil,
             responseBody: nil,
             cancelled: completion.cancelled,
-            timing: completion.timing
+            timing: completion.timing,
+            responseImageBase64: completion.responseImageBase64
         )
 
         if config.capturesBodies {

@@ -18,6 +18,9 @@ struct NetworkLogEvent {
     var cancelled: Bool = false
     /// `URLSessionTaskMetrics`'ten çıkarılan zamanlama kırılımı (toplanamadıysa `nil`).
     var timing: NetworkTimingMetrics?
+    /// `image/*` yanıt gövdesi (base64) — yalnız `maxImageBodyBytes` sınırının altındaki
+    /// görsellerde dolar; viewer detayında önizleme olarak gösterilir.
+    var responseImageBase64: String?
 }
 
 /// Bir isteğin faz-faz zamanlama kırılımı ("API mi yavaş, ağ mı?" sorusunun cevabı).
@@ -71,6 +74,7 @@ enum NetworkLogComposer {
         // Gövdeler ayrı `requestBody`/`responseBody` anahtarlarıyla ham olarak saklanır.
         if let body = event.requestBody { metadata["requestBody"] = body }
         if let body = event.responseBody { metadata["responseBody"] = body }
+        if let image = event.responseImageBase64 { metadata["responseImageBase64"] = image }
         // Header'lar ayrı anahtarlarla ham olarak saklanır.
         for (key, value) in event.requestHeaders ?? [:] { metadata["reqH.\(key)"] = value }
         for (key, value) in event.responseHeaders ?? [:] { metadata["respH.\(key)"] = value }

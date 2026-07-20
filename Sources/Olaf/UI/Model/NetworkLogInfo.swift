@@ -14,6 +14,8 @@ struct NetworkLogInfo {
     let cancelled: Bool
     let requestBody: String?
     let responseBody: String?
+    /// `image/*` yanıt gövdesi (sınır altındaysa yakalanır) — detayda önizleme için.
+    let responseImageData: Data?
     let requestHeaders: [(key: String, value: String)]
     let responseHeaders: [(key: String, value: String)]
 
@@ -44,6 +46,7 @@ struct NetworkLogInfo {
         cancelled = m["cancelled"] == "true"
         requestBody = m["requestBody"]
         responseBody = m["responseBody"]
+        responseImageData = m["responseImageBase64"].flatMap { Data(base64Encoded: $0) }
         requestHeaders = m
             .filter { $0.key.hasPrefix("reqH.") }
             .map { (String($0.key.dropFirst(5)), $0.value) }

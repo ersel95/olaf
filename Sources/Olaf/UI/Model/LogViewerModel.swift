@@ -24,6 +24,9 @@ public final class LogViewerModel: ObservableObject {
     /// Gösterilecek seviyeler (çoklu seçim). Boş = hepsi.
     @Published public var enabledLevels: Set<LogLevel> = Set(LogLevel.allCases)
     @Published public var selectedCategories: Set<LogCategory> = []
+    /// Network içerik türü filtresi (boş = kapalı). Seçiliyken **yalnız** bu türlerdeki
+    /// network kayıtları gösterilir (network olmayan kayıtlar gizlenir).
+    @Published public var selectedContentKinds: Set<NetworkContentKind> = []
 
     /// `true` iken yeni loglar canlı eklenir; `false` (duraklat) iken liste dondurulur.
     @Published public var isFollowing: Bool = true
@@ -81,9 +84,13 @@ public final class LogViewerModel: ObservableObject {
             .assign(to: &$effectiveQuery)
 
         // Girdilerden türetilen değerler: yalnız girdi değişiminde hesaplanır (render başına değil).
-        Publishers.CombineLatest4($entries, $effectiveQuery, $enabledLevels, $selectedCategories)
-            .map { entries, query, levels, categories in
-                Self.filter(entries: entries, query: query, levels: levels, categories: categories)
+        let categorySelection = Publishers.CombineLatest($selectedCategories, $selectedContentKinds)
+        Publishers.CombineLatest4($entries, $effectiveQuery, $enabledLevels, categorySelection)
+            .map { entries, query, levels, selection in
+                Self.filter(
+                    entries: entries, query: query, levels: levels,
+                    categories: selection.0, contentKinds: selection.1
+                )
             }
             .assign(to: &$filteredEntries)
 
@@ -215,16 +222,22 @@ public final class LogViewerModel: ObservableObject {
         public let entries: [LogEntry]  // en yeni üstte
     }
 
-    /// Seviye/kategori/arama filtresi — en yeni en üstte.
+    /// Seviye/kategori/içerik-türü/arama filtresi — en yeni en üstte.
     nonisolated static func filter(
         entries: [LogEntry],
         query: String,   // zaten trim+lowercase (debounce pipeline'ından)
         levels: Set<LogLevel>,
-        categories: Set<LogCategory>
+        categories: Set<LogCategory>,
+        contentKinds: Set<NetworkContentKind> = []
     ) -> [LogEntry] {
         entries.reversed().filter { entry in
             if !levels.isEmpty, !levels.contains(entry.level) { return false }
             if !categories.isEmpty, !categories.contains(entry.category) { return false }
+            if !contentKinds.isEmpty {
+                guard let kind = NetworkContentKind.of(entry), contentKinds.contains(kind) else {
+                    return false
+                }
+            }
             guard !query.isEmpty else { return true }
             if entry.message.lowercased().contains(query) { return true }
             if entry.category.rawValue.lowercased().contains(query) { return true }
@@ -281,14 +294,25 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
+    public func toggleContentKind(_ kind: NetworkContentKind) {
+        if selectedContentKinds.contains(kind) {
+            selectedContentKinds.remove(kind)
+        } else {
+            selectedContentKinds.insert(kind)
+        }
+    }
+
     /// Varsayılan dışı bir filtre uygulanmış mı? (funnel rozetinde gösterilir)
     public var isFiltering: Bool {
-        enabledLevels.count != LogLevel.allCases.count || !selectedCategories.isEmpty
+        enabledLevels.count != LogLevel.allCases.count
+            || !selectedCategories.isEmpty
+            || !selectedContentKinds.isEmpty
     }
 
     public func resetFilters() {
         enabledLevels = Set(LogLevel.allCases)
         selectedCategories.removeAll()
+        selectedContentKinds.removeAll()
     }
 
     public func clear() {

@@ -3,6 +3,15 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
 (0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
 
+## [0.40.0] — 2026-07-20
+### Eklendi
+- **İçerik türü filtresi** (filtre ekranı → "İçerik türü"): network yanıtları
+  JSON/XML/HTML/Görsel/Metin/Diğer sınıflarına göre süzülebilir (seçiliyken yalnız o türler
+  listelenir).
+- **Görsel önizleme**: `image/*` yanıt gövdeleri `maxImageBodyBytes` (varsayılan 256 KB)
+  sınırının altındaysa yakalanır ve detay ekranında önizlenir
+  (`OlafNetworkConfiguration.maxImageBodyBytes`, `0` = kapalı).
+
 ## [0.39.0] — 2026-07-20
 ### Eklendi
 - **Decode hatası yakalama**: `OlafDecoding.decode(_:from:url:)` (JSONDecoder sarmalayıcısı,

@@ -1,5 +1,6 @@
 #if canImport(UIKit)
 import SwiftUI
+import UIKit
 
 /// Tek kaydın detayı: renkli status başlığı + gruplu List + alt ekranlara
 /// navigation (header'lar, gövde, cURL, metrikler). `.network` dışı kayıtlar seviye + mesaj + metadata.
@@ -129,6 +130,20 @@ struct LogDetailView: View {
                 } label: {
                     rowLabel("Gövdeyi görüntüle", systemImage: "doc.plaintext")
                 }
+            }
+
+            // image/* yanıtlar (sınır altındaysa) doğrudan önizlenir.
+            if let imageData = info.responseImageData, let image = UIImage(data: imageData) {
+                HStack {
+                    Spacer()
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    Spacer()
+                }
+                .padding(.vertical, 4)
             }
         }
 

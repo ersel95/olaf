@@ -13,6 +13,11 @@ public struct OlafNetworkConfiguration: Sendable {
     /// Gövde loglanırken kesilecek maksimum karakter sayısı.
     public var maxBodyLength: Int
 
+    /// `image/*` yanıt gövdelerinde **önizleme** için saklanacak üst sınır (byte). Bu boyuta kadar
+    /// olan görseller base64 olarak kayda eklenir ve detay ekranında gösterilir; büyükler yalnız
+    /// boyut bilgisiyle geçer (RAM/disk şişmesin). `0` → görsel önizleme kapalı.
+    public var maxImageBodyBytes: Int
+
     /// Network kayıtlarının düşeceği kategori.
     public var category: LogCategory
 
@@ -36,6 +41,7 @@ public struct OlafNetworkConfiguration: Sendable {
         capturesBodies: Bool = true,
         capturesHeaders: Bool = true,
         maxBodyLength: Int = 8000,
+        maxImageBodyBytes: Int = 262_144,   // 256 KB
         category: LogCategory = .network,
         includedURLs: [String] = [],
         excludedURLs: [String] = [],
@@ -44,6 +50,7 @@ public struct OlafNetworkConfiguration: Sendable {
         self.capturesBodies = capturesBodies
         self.capturesHeaders = capturesHeaders
         self.maxBodyLength = max(0, maxBodyLength)
+        self.maxImageBodyBytes = max(0, maxImageBodyBytes)
         self.category = category
         self.includedURLs = includedURLs.map { $0.lowercased() }
         self.excludedURLs = excludedURLs.map { $0.lowercased() }
