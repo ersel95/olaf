@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: macOS test + iOS build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: macOS build & test
+        run: swift test
+
+      # Viewer içeriği UIKit gate'li olduğundan iOS derlemesi ayrıca doğrulanır
+      # (CLAUDE.md kuralı: her değişiklikte macOS test + iOS build yeşil olmalı).
+      - name: iOS build
+        run: |
+          xcodebuild -scheme Olaf \
+            -destination 'generic/platform=iOS' \
+            build CODE_SIGNING_ALLOWED=NO
