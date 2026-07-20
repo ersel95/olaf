@@ -3,6 +3,12 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
 (0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
 
+## [0.36.0] — 2026-07-20
+### Eklendi
+- **HAR export**: görünen network kayıtları HAR 1.2 belgesi olarak paylaşılabilir
+  (Charles/Proxyman/Chrome DevTools doğrudan açar) — ⋯ → Paylaş → "HAR (network)".
+  Zamanlama fazları (dns/connect/ssl/wait/receive) HAR timings'e eşlenir.
+
 ## [0.35.0] — 2026-07-20
 ### Eklendi
 - **Geçmişte sayfalama**: `Olaf.loadPersistedPage(before:minimumEntries:)` — geçmiş artık tek

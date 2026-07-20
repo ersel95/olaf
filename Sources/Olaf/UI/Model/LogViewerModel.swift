@@ -312,6 +312,15 @@ public final class LogViewerModel: ObservableObject {
         return await Olaf.exportNDJSONFileURL(entries: visible)
     }
 
+    /// Görünen **network** kayıtlarını HAR 1.2 dosyasına yazar (Charles/Proxyman/DevTools açar).
+    public func exportHARFileURL() async -> URL? {
+        let visible = Array(filteredEntries.reversed())
+        return await Task.detached(priority: .utility) {
+            guard let text = HARExporter.harDocument(from: visible) else { return nil }
+            return LogExportFile.write(text, fileExtension: "har")
+        }.value
+    }
+
     /// Kayıtlı dış araçlar (geçiş butonları).
     public var externalTools: [any ExternalToolBridge] {
         ExternalToolRegistry.shared.all

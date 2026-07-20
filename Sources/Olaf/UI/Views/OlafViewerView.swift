@@ -168,8 +168,7 @@ public struct OlafViewerView: View {
             Menu {
                 followToggle
                 Divider()
-                Button { share(ndjson: false) } label: { Label("Paylaş (.log)", systemImage: "square.and.arrow.up") }
-                Button { share(ndjson: true) } label: { Label("Paylaş (NDJSON)", systemImage: "curlybraces.square") }
+                shareMenu
                 Divider()
                 Button { importOSLog() } label: { Label("OSLog'u içe aktar (1 saat)", systemImage: "square.and.arrow.down") }
                 Button(role: .destructive) { model.clear() } label: { Label("Temizle", systemImage: "trash") }
@@ -213,6 +212,33 @@ public struct OlafViewerView: View {
         }
     }
 
+    /// Paylaşım biçimleri alt menüsü (görünen — filtreli — kayıtlar üzerinden).
+    private var shareMenu: some View {
+        Menu {
+            Button { share(.log) } label: { Label(".log (düz metin)", systemImage: "doc.text") }
+            Button { share(.ndjson) } label: { Label("NDJSON (ham)", systemImage: "curlybraces.square") }
+            Button { share(.har) } label: { Label("HAR (network)", systemImage: "network") }
+        } label: {
+            Label("Paylaş", systemImage: "square.and.arrow.up")
+        }
+    }
+
+    private enum ExportKind { case log, ndjson, har }
+
+    private func share(_ kind: ExportKind) {
+        Task {
+            let url: URL?
+            switch kind {
+            case .log: url = await model.exportFileURL()
+            case .ndjson: url = await model.exportNDJSONFileURL()
+            case .har: url = await model.exportHARFileURL()
+            }
+            if let url {
+                presentShareSheet([url])
+            }
+        }
+    }
+
     /// Son 1 saatin OSLog kayıtlarını (diğer SDK'ların os_log çıktıları dahil) içe aktarır.
     private func importOSLog() {
         Task {
@@ -221,13 +247,5 @@ public struct OlafViewerView: View {
         }
     }
 
-    private func share(ndjson: Bool) {
-        Task {
-            let url = ndjson ? await model.exportNDJSONFileURL() : await model.exportFileURL()
-            if let url {
-                presentShareSheet([url])
-            }
-        }
-    }
 }
 #endif
