@@ -4,7 +4,9 @@
 
 # Olaf
 
-**Uygulama loglarını** cihazda görüntüleyip paylaşmayı sağlayan, generic ve taşınabilir bir Swift logging + in-app log viewer kütüphanesi.
+[![CI](https://github.com/ersel95/olaf/actions/workflows/ci.yml/badge.svg)](https://github.com/ersel95/olaf/actions/workflows/ci.yml)
+
+**Uygulama loglarını** cihazda görüntüleyip paylaşmayı sağlayan, generic ve taşınabilir bir Swift logging + in-app log viewer kütüphanesi. Değişiklikler için [CHANGELOG](CHANGELOG.md).
 
 > **Amaç:** TestFlight'a özelliği açık gönderdiğiniz kullanıcıların loglarını cihazda görüntüleyip paylaşabilmek. Cihaz sallandığında loglar düz metin olarak açılır.
 >
@@ -25,7 +27,7 @@
 ## Kurulum (SPM)
 
 ```swift
-.package(url: "https://github.com/ersel95/olaf.git", from: "0.30.0")
+.package(url: "https://github.com/ersel95/olaf.git", from: "0.34.0")
 ```
 Tek ürün: `Olaf` — motor (`Olaf` facade) + network capture (`OlafNetwork`) + viewer (`OlafUI`) birlikte gelir.
 

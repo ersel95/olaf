@@ -17,7 +17,10 @@ let package = Package(
         .target(
             name: "Olaf",
             resources: [
-                .process("UI/Resources")
+                .process("UI/Resources"),
+                // App Store gönderimlerinde SDK privacy manifest'i (veri toplanmaz; yalnız
+                // rotation için dosya-tarihi okuma beyanı).
+                .copy("PrivacyInfo.xcprivacy")
             ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
