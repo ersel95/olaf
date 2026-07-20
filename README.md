@@ -27,7 +27,7 @@
 ## Kurulum (SPM)
 
 ```swift
-.package(url: "https://github.com/ersel95/olaf.git", from: "0.41.0")
+.package(url: "https://github.com/ersel95/olaf.git", from: "0.42.0")
 ```
 Tek ürün: `Olaf` — motor (`Olaf` facade) + network capture (`OlafNetwork`) + viewer (`OlafUI`) birlikte gelir.
 
@@ -106,6 +106,7 @@ dahil) maskelenmeden saklanır. `includedURLs`/`excludedURLs` ile **baseURL filt
 - **Paylaşım biçimleri**: .log (düz metin) · NDJSON (ham) · **HAR 1.2** (Charles/Proxyman/DevTools) · **Postman Collection v2.1**; tek kayıt için Basit/Tam log + cURL.
 - **İstatistikler** (⋯ menüsü): hata oranı, ortalama/medyan/p95 süre, metot/durum dağılımı, en yavaş istekler, host'lar.
 - **Decode hatası yakalama**: `OlafDecoding.decode(_:from:url:)` hatalı alanın tam yolunu (`user.accounts[0].iban`) ham gövdeyle birlikte loglar.
+- **Response mocking**: `OlafNetwork.addMock(...)` — eşleşen istekler ağa çıkmadan sizin yanıtınızı alır (edge-case/5xx/yavaş ağ/timeout simülasyonu); kayıtlar `[mock]` işaretli.
 - **Pin + çoklu seçim**: kayıt sabitleme (üstte ayrı bölüm) ve çoklu seçimle toplu paylaşım; içerik türü filtresi (JSON/XML/HTML/Görsel/Metin).
 - **Aktif istekler**: devam eden (henüz yanıt almamış) istekler viewer'ın üstünde geçen süresiyle canlı görünür — asılı kalan çağrıyı anında yakalarsınız.
 - **Zamanlama kırılımı**: her istekte DNS / TCP / TLS / TTFB süreleri, protokol (h2/h3) ve bağlantının yeniden kullanılıp kullanılmadığı detay ekranındaki "Zamanlama" bölümünde ("API mi yavaş, ağ mı?").

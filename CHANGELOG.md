@@ -3,6 +3,14 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
 (0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
 
+## [0.42.0] — 2026-07-20
+### Eklendi
+- **Response mocking**: `OlafNetwork.addMock(OlafMockResponse(...))` — eşleşen istekler ağa
+  çıkmadan tanımlı yanıtı alır (status/header/gövde, `delaySeconds` ile yavaş ağ,
+  `.failure(...)` ile taşıma hatası simülasyonu). İlk eklenen mock kazanır; capture URL
+  filtreleri mock'ları etkilemez. Kayıtlar `[mock]` işaretiyle loglanır, detayda
+  "Kaynak: Mock" görünür.
+
 ## [0.41.0] — 2026-07-20
 ### Eklendi
 - **Sabitleme (pin)**: satıra basılı tutup "Sabitle" — sabitler oturum listesinin üstünde,

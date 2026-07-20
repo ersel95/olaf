@@ -12,6 +12,8 @@ struct NetworkLogInfo {
     let error: String?
     /// İstek tamamlanmadan iptal edildi (hata değil; `.info` seviyesinde loglanır).
     let cancelled: Bool
+    /// Yanıt mock'tan üretildi (ağa çıkılmadı).
+    let mocked: Bool
     let requestBody: String?
     let responseBody: String?
     /// `image/*` yanıt gövdesi (sınır altındaysa yakalanır) — detayda önizleme için.
@@ -44,6 +46,7 @@ struct NetworkLogInfo {
         responseBytes = m["respBytes"].flatMap(Int.init)
         error = m["error"]
         cancelled = m["cancelled"] == "true"
+        mocked = m["mocked"] == "true"
         requestBody = m["requestBody"]
         responseBody = m["responseBody"]
         responseImageData = m["responseImageBase64"].flatMap { Data(base64Encoded: $0) }

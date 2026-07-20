@@ -80,6 +80,7 @@ struct LogDetailView: View {
             kv("URL", info.url ?? "-", mono: true)
             if let status = info.statusCode { kv("Durum", String(status)) }
             if info.cancelled { kv("Durum", "İptal edildi") }
+            if info.mocked { kv("Kaynak", "Mock (ağa çıkılmadı)") }
             if let ms = info.durationMs { kv("Süre", "\(ms) ms") }
             if let b = info.requestBytes { kv("İstek boyutu", Formatting.byteCount(b)) }
             if let b = info.responseBytes { kv("Yanıt boyutu", Formatting.byteCount(b)) }

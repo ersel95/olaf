@@ -89,6 +89,32 @@ public enum OlafNetwork {
         PendingRequestRegistry.shared.snapshot
     }
 
+    // MARK: - Response mocking
+
+    /// Bir mock kaydeder. Eşleşen istekler **ağa çıkmadan** bu yanıtı alır (capture aktif olmalı —
+    /// `startAutomaticCapture`/`install`). Birden çok mock eşleşirse ilk eklenen kazanır.
+    /// Yalnız non-prod debug içindir (Olaf'ın geri kalanı gibi `#if !PROD` altında kalmalı).
+    public static func addMock(_ mock: OlafMockResponse) {
+        box.mocks.append(mock)
+    }
+
+    /// Tüm mock'ları kaldırır (istekler yeniden gerçek backend'e gider).
+    public static func removeAllMocks() {
+        box.mocks = []
+    }
+
+    /// Kayıtlı mock'lar (ekleme sırasıyla).
+    public static var activeMocks: [OlafMockResponse] {
+        box.mocks
+    }
+
+    /// Verilen isteğe uyan ilk mock (dahili — `OlafURLProtocol` kullanır).
+    static func mock(for request: URLRequest) -> OlafMockResponse? {
+        let mocks = box.mocks
+        guard !mocks.isEmpty else { return nil }
+        return mocks.first { $0.matches(request) }
+    }
+
     // Dahili erişim (URLProtocol config'i okur).
     static var current: OlafNetworkConfiguration { box.value }
 
@@ -96,6 +122,7 @@ public enum OlafNetwork {
         private let lock = NSLock()
         private var _value = OlafNetworkConfiguration.default
         private var _chained: [AnyClass] = []
+        private var _mocks: [OlafMockResponse] = []
 
         var value: OlafNetworkConfiguration {
             get { lock.lock(); defer { lock.unlock() }; return _value }
@@ -104,6 +131,10 @@ public enum OlafNetwork {
         var chained: [AnyClass] {
             get { lock.lock(); defer { lock.unlock() }; return _chained }
             set { lock.lock(); _chained = newValue; lock.unlock() }
+        }
+        var mocks: [OlafMockResponse] {
+            get { lock.lock(); defer { lock.unlock() }; return _mocks }
+            set { lock.lock(); _mocks = newValue; lock.unlock() }
         }
     }
 }

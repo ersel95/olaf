@@ -21,6 +21,8 @@ struct NetworkLogEvent {
     /// `image/*` yanıt gövdesi (base64) — yalnız `maxImageBodyBytes` sınırının altındaki
     /// görsellerde dolar; viewer detayında önizleme olarak gösterilir.
     var responseImageBase64: String?
+    /// Yanıt mock'tan üretildi (ağa çıkılmadı — bkz. `OlafMockResponse`).
+    var mocked: Bool = false
 }
 
 /// Bir isteğin faz-faz zamanlama kırılımı ("API mi yavaş, ağ mı?" sorusunun cevabı).
@@ -56,6 +58,7 @@ enum NetworkLogComposer {
         if let status = event.statusCode { parts.append("→ \(status)") }
         if event.cancelled { parts.append("→ iptal") }
         if event.error != nil { parts.append("→ ✗") }
+        if event.mocked { parts.append("[mock]") }
         parts.append("(\(event.durationMs)ms)")
         return parts.joined(separator: " ")
     }
@@ -71,6 +74,7 @@ enum NetworkLogComposer {
         if let status = event.statusCode { metadata["status"] = String(status) }
         if let error = event.error { metadata["error"] = error }
         if event.cancelled { metadata["cancelled"] = "true" }
+        if event.mocked { metadata["mocked"] = "true" }
         // Gövdeler ayrı `requestBody`/`responseBody` anahtarlarıyla ham olarak saklanır.
         if let body = event.requestBody { metadata["requestBody"] = body }
         if let body = event.responseBody { metadata["responseBody"] = body }

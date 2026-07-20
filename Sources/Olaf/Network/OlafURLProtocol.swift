@@ -39,6 +39,8 @@ final class OlafURLProtocol: URLProtocol {
         if URLProtocol.property(forKey: handledKey, in: request) != nil { return false }
         guard let scheme = request.url?.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else { return false }
+        // Mock'lanan istekler, capture filtreleri dışında kalsa bile yakalanır (mock önceliklidir).
+        if OlafNetwork.mock(for: request) != nil { return true }
         // baseURL allow/deny filtresi: filtre dışı istekler yakalanmaz (olduğu gibi geçer).
         return OlafNetwork.current.shouldCapture(request.url)
     }
@@ -75,6 +77,13 @@ final class OlafURLProtocol: URLProtocol {
             method: request.httpMethod ?? "GET",
             url: request.url?.absoluteString ?? "-"
         )
+
+        // Mock eşleşiyorsa ağa hiç çıkma: yanıt (gecikmeli) buradan üretilir.
+        if let mock = OlafNetwork.mock(for: request) {
+            startMockDelivery(mock)
+            return
+        }
+
         proxyTask = OlafProxySession.shared.startTask(with: mutable as URLRequest, handler: self)
     }
 
@@ -84,6 +93,79 @@ final class OlafURLProtocol: URLProtocol {
         // üretir → `.info` seviyesinde "iptal" olarak loglanır (handler orada düşürülür).
         proxyTask?.cancel()
         proxyTask = nil
+        // Henüz teslim edilmemiş mock varsa iptal et ve bekleyen kaydını düşür.
+        if let item = mockWorkItem {
+            item.cancel()
+            mockWorkItem = nil
+            if let pendingID {
+                PendingRequestRegistry.shared.unregister(pendingID)
+            }
+        }
+    }
+
+    // MARK: - Mock teslimatı
+
+    private var mockWorkItem: DispatchWorkItem?
+
+    private func startMockDelivery(_ mock: OlafMockResponse) {
+        let item = DispatchWorkItem { [weak self] in
+            self?.deliverMock(mock)
+        }
+        mockWorkItem = item
+        DispatchQueue.global(qos: .userInitiated)
+            .asyncAfter(deadline: .now() + mock.delaySeconds, execute: item)
+    }
+
+    private func deliverMock(_ mock: OlafMockResponse) {
+        mockWorkItem = nil
+        if let pendingID {
+            PendingRequestRegistry.shared.unregister(pendingID)
+        }
+
+        let cancelled = isStopped
+        var transportErrorDescription: String?
+
+        if let errorCode = mock.transportError {
+            transportErrorDescription = URLError(errorCode).localizedDescription
+            if !cancelled {
+                client?.urlProtocol(self, didFailWithError: URLError(errorCode))
+            }
+        } else if !cancelled {
+            guard let url = request.url,
+                  let response = HTTPURLResponse(
+                      url: url, statusCode: mock.statusCode,
+                      httpVersion: "HTTP/1.1", headerFields: mock.headers
+                  ) else {
+                client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+                return
+            }
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            if !mock.body.isEmpty {
+                client?.urlProtocol(self, didLoad: mock.body)
+            }
+            client?.urlProtocolDidFinishLoading(self)
+        }
+
+        let completion = CaptureCompletion(
+            method: request.httpMethod ?? "GET",
+            url: request.url?.absoluteString ?? "-",
+            statusCode: mock.transportError == nil ? mock.statusCode : nil,
+            durationMs: Int(Date().timeIntervalSince(startDate) * 1000),
+            requestBytes: capturedRequestBody?.count ?? request.httpBody?.count ?? 0,
+            responseBytes: mock.body.count,
+            errorDescription: cancelled ? nil : transportErrorDescription,
+            cancelled: cancelled,
+            requestBody: capturedRequestBody ?? request.httpBody,
+            responseBody: mock.body,
+            requestHeaders: request.allHTTPHeaderFields,
+            responseHeaders: mock.headers,
+            timing: nil,
+            responseImageBase64: nil,
+            mocked: true
+        )
+        OlafProxySession.logQueue.async {
+            Self.log(completion)
+        }
     }
 
     // MARK: - Proxy callback'leri (OlafProxySession delegate kuyruğundan yönlendirilir)
@@ -154,7 +236,8 @@ final class OlafURLProtocol: URLProtocol {
             requestHeaders: request.allHTTPHeaderFields,
             responseHeaders: (capturedResponse as? HTTPURLResponse)?.allHeaderFields as? [String: String],
             timing: Self.timing(from: capturedMetrics),
-            responseImageBase64: imageBase64
+            responseImageBase64: imageBase64,
+            mocked: false
         )
         OlafProxySession.logQueue.async {
             Self.log(completion)
@@ -179,6 +262,7 @@ final class OlafURLProtocol: URLProtocol {
         let responseHeaders: [String: String]?
         let timing: NetworkTimingMetrics?
         let responseImageBase64: String?
+        let mocked: Bool
     }
 
     /// Task metriklerinden zamanlama kırılımı çıkarır. Redirect'li isteklerde SON transaction
@@ -214,7 +298,8 @@ final class OlafURLProtocol: URLProtocol {
             responseBody: nil,
             cancelled: completion.cancelled,
             timing: completion.timing,
-            responseImageBase64: completion.responseImageBase64
+            responseImageBase64: completion.responseImageBase64,
+            mocked: completion.mocked
         )
 
         if config.capturesBodies {
