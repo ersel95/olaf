@@ -3,6 +3,12 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
 (0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
 
+## [0.37.0] — 2026-07-20
+### Eklendi
+- **İstatistik ekranı** (⋯ → İstatistikler): görünen network kayıtları için hata oranı,
+  ortalama/medyan/p95 süre, toplam boyutlar, durum sınıfı ve metot dağılımı (bar'lı),
+  en yavaş 5 istek ve en çok istek alan host'lar.
+
 ## [0.36.0] — 2026-07-20
 ### Eklendi
 - **HAR export**: görünen network kayıtları HAR 1.2 belgesi olarak paylaşılabilir

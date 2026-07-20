@@ -8,6 +8,7 @@ public struct OlafViewerView: View {
     private let onClose: () -> Void
 
     @State private var isFilterPresented = false
+    @State private var isStatsPresented = false
 
     public init(onClose: @escaping () -> Void = {}) {
         self.onClose = onClose
@@ -31,6 +32,9 @@ public struct OlafViewerView: View {
             .safeAreaInset(edge: .bottom) { externalToolBar }
             .sheet(isPresented: $isFilterPresented) {
                 LogFilterView(model: model)
+            }
+            .sheet(isPresented: $isStatsPresented) {
+                NetworkStatsView(entries: model.filteredEntries)
             }
         }
         .onAppear { model.start() }
@@ -169,6 +173,7 @@ public struct OlafViewerView: View {
                 followToggle
                 Divider()
                 shareMenu
+                Button { isStatsPresented = true } label: { Label("İstatistikler", systemImage: "chart.bar") }
                 Divider()
                 Button { importOSLog() } label: { Label("OSLog'u içe aktar (1 saat)", systemImage: "square.and.arrow.down") }
                 Button(role: .destructive) { model.clear() } label: { Label("Temizle", systemImage: "trash") }
