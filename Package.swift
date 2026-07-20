@@ -5,70 +5,27 @@ let package = Package(
     name: "Olaf",
     platforms: [
         .iOS(.v17),
-        .macOS(.v14) // Core, UIKit'siz olduğu için macOS'ta da test edilebilir
+        .macOS(.v14) // Motor UIKit'siz olduğu için macOS'ta da derlenir/test edilir
     ],
     products: [
-        // Çekirdek motor (UIKit/SwiftUI'sız, her platformda).
-        .library(name: "OlafCore", targets: ["OlafCore"]),
-        // In-app viewer (shake → liste/detay, filtre, paylaşım). iOS hedefli; içerik `#if canImport(UIKit)` gate'li.
-        .library(name: "OlafUI", targets: ["OlafUI"]),
-        // Opsiyonel network capture (URLProtocol). İstek/yanıtları .network kategorisinde,
-        // BankingRedactor'dan geçerek Olaf'a loglar. UIKit'siz, her platformda.
-        .library(name: "OlafNetwork", targets: ["OlafNetwork"]),
-        // Opsiyonel bug-reporter upload katmanı (screenshot → banner → multipart upload).
-        // OPT-IN, varsayılan KAPALI. OlafCore'a bağımlı; recursion önleme için OlafNetwork'e zayıf bağlı.
-        .library(name: "OlafUpload", targets: ["OlafUpload"])
+        // Tek ürün: motor (ring buffer, NDJSON persistans, OSLog köprüsü) + network capture
+        // (URLProtocol) + in-app viewer (shake → liste/detay). Viewer içeriği
+        // `#if canImport(UIKit)` gate'li olduğundan her platformda derlenir.
+        .library(name: "Olaf", targets: ["Olaf"])
     ],
     targets: [
         .target(
-            name: "OlafCore",
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency")
-            ]
-        ),
-        .target(
-            name: "OlafUI",
-            dependencies: ["OlafCore", "OlafUpload"],
+            name: "Olaf",
             resources: [
-                .process("Resources")
+                .process("UI/Resources")
             ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]
         ),
-        .target(
-            name: "OlafNetwork",
-            dependencies: ["OlafCore"],
-            swiftSettings: [
-                // Tutarlılık: URLProtocol (mutable state) en riskli yer; strict checking burada da açık.
-                .enableExperimentalFeature("StrictConcurrency")
-            ]
-        ),
-        .target(
-            name: "OlafUpload",
-            dependencies: ["OlafCore", "OlafNetwork"],
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency")
-            ]
-        ),
         .testTarget(
-            name: "OlafCoreTests",
-            dependencies: ["OlafCore"],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
-        ),
-        .testTarget(
-            name: "OlafUITests",
-            dependencies: ["OlafUI"],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
-        ),
-        .testTarget(
-            name: "OlafNetworkTests",
-            dependencies: ["OlafNetwork"],
-            swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
-        ),
-        .testTarget(
-            name: "OlafUploadTests",
-            dependencies: ["OlafUpload"],
+            name: "OlafTests",
+            dependencies: ["Olaf"],
             swiftSettings: [.enableExperimentalFeature("StrictConcurrency")]
         )
     ]

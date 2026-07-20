@@ -2,7 +2,7 @@
 
 Olaf'u uygulamaya bağlamak için rehber.
 
-> **Tasarım ilkesi:** Çekirdek (OlafCore/UI) hiçbir dış araca bağlı değildir. Dış tanılama araçları
+> **Tasarım ilkesi:** Olaf hiçbir dış araca bağlı değildir. Dış tanılama araçları
 > (örn. başka bir network logger) jenerik `ExternalToolBridge` ile host tarafında eklenebilir.
 > Hızlı yol: tek-dosya template [`Integration/OlafIntegration.swift`](Integration/OlafIntegration.swift)
 > ve makine-takipli [`AGENTS.md`](AGENTS.md).
@@ -16,21 +16,16 @@ Olaf'u uygulamaya bağlamak için rehber.
 ## 1. Paketi ekle
 
 Xcode → Add Packages → `https://github.com/ersel95/olaf` → ana app target'ına ("Choose Package Products"):
-- `OlafCore` (motor) + `OlafUI` (viewer) — zorunlu
-- `OlafNetwork` — network loglarını Olaf'ta görmek için (§4)
-- `OlafUpload` — **bug-reporter** (screenshot → banner → upload) için (§6). OPT-IN, varsayılan kapalı.
+- `Olaf` — **tek ürün**: motor + network capture + in-app viewer birlikte gelir.
 
-(App extension'lara yalnız `OlafCore`.)
-
-> **Kapsam matrisi — hangi özellik hangi ürün/flag ile gelir:**
+> **Kapsam matrisi — hangi özellik hangi çağrı ile açılır:**
 >
-> | Özellik | Ürün(ler) | Açma koşulu |
-> |---|---|---|
-> | Log API (trace…critical) | `OlafCore` | `Olaf.start(...)` |
-> | Shake → log viewer | `OlafCore` + `OlafUI` | `OlafUI.install()` |
-> | Network capture | + `OlafNetwork` | `OlafNetwork.startAutomaticCapture()` |
-> | Navigation breadcrumb | `OlafCore` | `Olaf.trackScreen(...)` (§7) |
-> | **Bug-reporter** (screenshot→banner→upload) | + `OlafUpload` | `OlafUpload.configure(enabled: true, apiKey:…)` (§6) — **opt-in** |
+> | Özellik | Açma koşulu |
+> |---|---|
+> | Log API (trace…critical) | `Olaf.start(...)` |
+> | Shake → log viewer | `OlafUI.install()` |
+> | Network capture | `OlafNetwork.startAutomaticCapture()` |
+> | Navigation breadcrumb | `Olaf.trackScreen(...)` (§6) |
 
 ## 2. Entegrasyon dosyasını kopyala
 
@@ -38,11 +33,7 @@ Xcode → Add Packages → `https://github.com/ersel95/olaf` → ana app target'
 kopyalayın. İçinde `OlafManager` (başlatma + loglama) hazırdır. `// ADAPT:` satırlarını uyarlayın.
 
 ```swift
-@_exported import OlafCore
-import OlafUI
-#if canImport(OlafNetwork)
-import OlafNetwork
-#endif
+@_exported import Olaf
 
 public final class OlafManager {
     public static let shared = OlafManager()
@@ -51,9 +42,7 @@ public final class OlafManager {
     public func initialize() {
         #if !PROD
         Olaf.start(.default)
-        #if canImport(OlafNetwork)
         OlafNetwork.startAutomaticCapture()
-        #endif
         Task { @MainActor in
             OlafUI.install()
         }
@@ -124,88 +113,21 @@ public extension LogCategory {
     static let transfers: LogCategory = "transfers"
 }
 ```
-Dosya `@_exported import OlafCore` içerir → çağrı yerleri `import OlafCore` yazmadan kullanabilir.
+Dosya `@_exported import Olaf` içerir → çağrı yerleri `import Olaf` yazmadan kullanabilir.
 
 ---
 
-## 6. Bug-reporter — screenshot → banner → upload (`OlafUpload`)
-
-> **Akış:** Tester ekran görüntüsü alır → app'in altından **Olaf ikonu + balon** ("Bir sorun mu tespit
-> edildi? Paylaşmak ister misin?") çıkar → **Evet** → 2 alanlı rapor sheet'i (+ ilk seferde isim) →
-> ikisi de dolunca **Gönder** aktif → upload → başarıda sheet kapanır + "Gönderildi" toast'ı.
-> Hata olursa rapor diske kuyruklanır ve daha sonra otomatik gönderilir (offline retry + backoff).
-
-### 6.1 ÜÇ savunma katmanı (varsayılan KAPALI)
-Bug-reporter **opt-in**'dir. `OlafUpload.configure(enabled: true, apiKey:…)` çağrılmadıkça **hiçbir**
-remote config / screenshot detector / upload kodu çalışmaz. Üç gate:
-1. **Local opt-in** `enabled` (build-time, varsayılan `false`).
-2. **`#if !PROD`** derleme sınırı (en kritik kural — canlıya asla çıkmaz).
-3. **Server-side `captureEnabled`** (`GET /config` ile uzaktan kill-switch).
-
-`enabled == false` iken **sıfır ağ aktivitesi**: remote config bile çağrılmaz. `apiKey` boşsa no-op + dev uyarısı.
-
-### 6.2 Başlatma (opt-in configure)
-`OlafManager.initialize()` template'i (§2) bunu zaten içerir; tek yapılacak değerleri **host tarafından**
-sağlamak (§6.3). İlgili blok:
-```swift
-#if !PROD
-Olaf.start(.default)
-#if canImport(OlafNetwork)
-OlafNetwork.startAutomaticCapture()
-#endif
-Task { @MainActor in OlafUI.install() }   // bug-reporter detector hook'unu da kaydeder (kurmaz)
-
-#if canImport(OlafUpload)
-if let baseURL = Self.olafUploadBaseURL {       // değer yoksa hiç configure edilmez
-    OlafUpload.configure(
-        enabled: Self.bugReporterEnabled,        // default false — opt-in
-        apiKey: Self.olafApiKey,                 // host (xcconfig) — TEK secret; backend app'i bundan tanır
-        baseURL: baseURL,                        // sabit origin (host'ta hard-code edilebilir)
-        environment: Self.olafEnvironment
-    )
-}
-#endif
-#endif
-```
-> **Sıra bağımsız:** `OlafUI.install()` yalnız bir kurulum *hook'u* kaydeder; gerçek screenshot
-> detector / banner ancak `OlafUpload.configure(enabled: true)` başarılı olunca kurulur. İkisinin
-> çağrı sırası önemli değildir.
-
-### 6.3 Konfig değerleri — HOST sağlar (public repo)
-Olaf SDK **tamamen public**'tir → hiçbir gerçek URL / şirket adı / sır SDK koduna **veya** bu repoya girmez.
-**Tek SECRET `apiKey`'dir** (backend app'i ondan tanır — ayrı appKey/slug yok). `baseURL` gizli değildir,
-sabit bir origin'dir → host'ta sabit verilebilir. Önerilen yol: apiKey **xcconfig → Info.plist**.
-
-1. Host repo'da (Olaf'ta değil) apiKey'i `Secrets.xcconfig`'e — **`.gitignore`'a ekleyin** (yalnız non-prod):
-   ```
-   OLAF_BUG_REPORTER_ENABLED = true
-   OLAF_API_KEY = <API_KEY>            # TEK secret
-   OLAF_ENVIRONMENT = test
-   ```
-2. `Info.plist`'e `OLAF_API_KEY`'i `$(OLAF_API_KEY)` referansıyla ekleyin.
-3. `baseURL`'i host kodunda sabit verin (gizli değil) ya da yine xcconfig'ten okuyun.
-
-> CI/Fastlane kullanıyorsanız apiKey'i ortam değişkeninden enjekte edin. `<API_KEY>` **örnektir**;
-> gerçek değeri yalnız host CI/secrets'ta tutun.
-
-### 6.4 Recursion önleme (otomatik)
-`OlafUpload.configure`, upload + config endpoint'lerini (host + `/reports` + `/config`) otomatik olarak
-`OlafNetwork.configuration.excludedURLs`'e ekler → upload trafiği capture edilmez (sonsuz döngü olmaz).
-Ayrıca uploader **kendi `URLSession`'ını** kullanır (capture protokolü enjekte edilmemiş) → çift güvence.
-
----
-
-## 7. Navigation breadcrumb (ekran geçişleri)
+## 6. Navigation breadcrumb (ekran geçişleri)
 
 `Olaf.trackScreen(_:kind:)` ekran geçişlerini `.navigation` kategorisinde loglar. SDK herhangi bir
 navigasyon kütüphanesine **bağımlı değildir** (Coordinator'a import etmez); host kendi navigasyon
 hook'undan çağırır.
 
-### 7.1 Coordinator kullanan projeler (önerilen)
+### 6.1 Coordinator kullanan projeler (önerilen)
 Host app'e küçük bir adapter ekleyin (Olaf'a değil — host target'a):
 ```swift
 import CoordinatorCore   // host'un kendi navigasyon paketi
-import OlafCore
+import Olaf
 
 final class OlafNavigationObserver: CoordinatorActivityObserver {
     func coordinator(willPresentScreen id: String, kind: String) {
@@ -228,7 +150,7 @@ dispatcher.addActivityObserver(OlafNavigationObserver())
 > `Olaf.trackScreen(..., kind: "push")` çağırın, ya da `BaseCoordinator` stack `didSet`'ine tek
 > `notify(kind:"push")` satırı ekleyin (host kararı).
 
-### 7.2 Coordinator kullanmayan projeler (alternatif)
+### 6.2 Coordinator kullanmayan projeler (alternatif)
 Ekran göründüğünde manuel çağırın:
 ```swift
 .onAppear { Olaf.trackScreen("DashboardView", kind: "push") }
@@ -236,35 +158,16 @@ Ekran göründüğünde manuel çağırın:
 
 ---
 
-## 8. Doğrulama & sorun giderme
+## 7. Doğrulama
 
-### 8.1 Doğrulama adımları
-1. `#if !PROD` aktif bir config'te (Debug/UAT) build alın; `OLAF_BUG_REPORTER_ENABLED = true` + 
-   `OLAF_API_KEY`/`OLAF_API_BASE_URL` sağlanmış olsun.
+1. `#if !PROD` aktif bir config'te (Debug/UAT) build alın.
 2. Uygulamayı çalıştırın, birkaç ekranda gezinin (network/log birikir).
-3. **Ekran görüntüsü alın** (cihaz/simülatör: ⌘S simülatörde Save Screen).
-   - **Görmelisin:** app'in altından Olaf ikonu + balon ("Bir sorun mu tespit edildi?…") yukarı kayar.
-4. **Evet**'e basın → rapor sheet'i açılır. İlk kullanımda **isim** alanı görünür.
-5. "Ne yaşadın?" + "Ne olmalıydı?" (ve gerekiyorsa isim) doldurun → **Gönder** aktifleşir.
-6. **Gönder** → kısa loading → başarıda sheet kapanır + "Gönderildi" toast'ı.
-   - **Görmelisin:** panelde (olaf-api'ye bağlı) yeni rapor; `entries` tüm kategorileri içerir, screenshot ekli.
-
-### 8.2 Sorun giderme
-- **Banner çıkmıyor**:
-  - `OlafUpload.configure(enabled: true, …)` çağrıldı mı? `OlafUpload.isConfigured` `true` mu?
-  - `apiKey` dolu mu? (boşsa no-op + dev log uyarısı.)
-  - Server-side `captureEnabled` `false` olabilir → `GET /config` yanıtını kontrol edin
-    (kill-switch). Banner yalnız `captureEnabled == true` iken gösterilir.
-  - `#if !PROD` aktif mi? PROD config'te tüm akış derlenmez.
-- **Screenshot siyah/eksik**: secure (gizli) alanlar `drawHierarchy` ile render'da siyah çıkabilir — bilinen, kabul edilen sınır.
-- **Upload başarısız**: rapor **otomatik kuyruğa** alınır (`Caches/Olaf/uploads/`), exponential backoff ile
-  yeniden denenir; sheet'te inline hata + "tekrar Gönder" gösterilir. Foreground'a dönüşte
-  `OlafUpload.flushPendingUploads()` çağırarak bekleyenleri zorlayabilirsiniz.
-- **Upload kendini logluyor (recursion)**: olmamalı — `configure` upload/config URL'lerini otomatik
-  `excludedURLs`'e ekler. Yine de görürseniz `OlafNetwork.configuration.excludedURLs`'i kontrol edin.
+3. **Cihazı sallayın** → viewer açılır; app + network logları tek listede görünmelidir.
+4. Bir network satırına girin → status banner, header'lar, pretty-JSON gövde ve paylaşım
+   (Basit/Tam log + cURL) çalışmalıdır.
 
 > **Sürüm uyumu:** iOS 17+. **Dış bağımlılık yok.** UIKit kodları `#if canImport(UIKit)` gate'lidir
-> (Core/Upload non-UI mantığı macOS'ta da derlenir/test edilir).
+> (non-UI mantık macOS'ta da derlenir/test edilir).
 
 ---
 

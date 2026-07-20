@@ -4,20 +4,13 @@
 //  Host uygulamaya (örn. Core/Utils/) kopyalayın; `// ADAPT:` yerlerini projeye uyarlayın.
 //
 //  • Olaf'u tek noktadan başlatır,
-//  • (opsiyonel) OlafNetwork ile ağ trafiğini yakalar,
+//  • network trafiğini yakalar (OlafNetwork),
 //  • shake → viewer kurar.
 //
-//  Ürün seçimi: OlafCore + OlafUI zorunlu; ağ yakalama için OlafNetwork.
+//  Tek ürün: `Olaf` (motor + network capture + viewer birlikte gelir).
 
 import Foundation
-@_exported import OlafCore
-import OlafUI
-#if canImport(OlafNetwork)
-import OlafNetwork
-#endif
-#if canImport(OlafUpload)
-import OlafUpload
-#endif
+@_exported import Olaf
 
 // MARK: - App'e özel log kategorileri
 
@@ -42,33 +35,13 @@ public final class OlafManager {
         #if !PROD
         Olaf.start(.default)
 
-        #if canImport(OlafNetwork)
         // Tüm session'lara otomatik enjekte (host networking koduna dokunmadan, SSL kırmadan).
         // Not: Kendi özel Alamofire/URLSession config'inizi kuruyorsanız bunun yerine configureNetworkCapture'ı kullanın.
         OlafNetwork.startAutomaticCapture(Self.networkConfiguration)
-        #endif
 
         Task { @MainActor in
             OlafUI.install()
         }
-
-        // OPT-IN bug-reporter (screenshot → banner → upload). VARSAYILAN KAPALI.
-        // `enabled: false` iken hiçbir remote config / detector / tracker / upload kodu çalışmaz
-        // (shake → log görüntüleme bundan bağımsız, etkilenmez).
-        //
-        // Açmak için: `enabled: true` + `apiKey`'i HOST tarafından (xcconfig/secrets) sağlayın —
-        // repo'ya ASLA commit etmeyin. apiKey TEK gizli değerdir; backend app'i ondan tanır
-        // (appKey/slug taşınmaz). baseURL gizli değildir, sabittir → host'ta sabit verilebilir.
-        #if canImport(OlafUpload)
-        if let baseURL = Self.olafUploadBaseURL {
-            OlafUpload.configure(
-                enabled: Self.bugReporterEnabled,      // ADAPT: build-time flag (default false önerilir)
-                apiKey: Self.olafApiKey,               // ADAPT: xcconfig/secrets'tan (TEK secret)
-                baseURL: baseURL,                      // ADAPT: sabit origin (host'ta hard-code edilebilir)
-                environment: Self.olafEnvironment      // ADAPT: "test"/"uat" vb.
-            )
-        }
-        #endif
         #endif
     }
 
@@ -86,32 +59,11 @@ public final class OlafManager {
         allowsArbitraryServerTrustForCapture: false
     )
 
-    // MARK: - Bug-reporter konfig kaynakları (HOST sağlar — repoya commit edilmez)
-    // ADAPT: Bu değerleri Info.plist'e xcconfig'ten enjekte edip burada okuyun. Hard-code ETMEYİN.
-
-    /// Bug-reporter açık mı? Default `false` (opt-in). xcconfig/build flag'inden besleyin.
-    private static var bugReporterEnabled: Bool {
-        (Bundle.main.object(forInfoDictionaryKey: "OLAF_BUG_REPORTER_ENABLED") as? String)?.lowercased() == "true"
-    }
-    private static var olafApiKey: String {
-        Bundle.main.object(forInfoDictionaryKey: "OLAF_API_KEY") as? String ?? ""
-    }
-    private static var olafEnvironment: String {
-        Bundle.main.object(forInfoDictionaryKey: "OLAF_ENVIRONMENT") as? String ?? "staging"
-    }
-    private static var olafUploadBaseURL: URL? {
-        guard let raw = Bundle.main.object(forInfoDictionaryKey: "OLAF_API_BASE_URL") as? String,
-              !raw.isEmpty else { return nil }
-        return URL(string: raw)
-    }
-
     /// (Opsiyonel) Host kendi `URLSessionConfiguration`'ını kuruyorsa: otomatik swizzle yerine bu config'e
     /// Olaf'u en öne enjekte eder. Bunu kullanıyorsanız initialize içindeki startAutomaticCapture'a gerek yoktur.
     public func configureNetworkCapture(_ configuration: URLSessionConfiguration) {
         #if !PROD
-        #if canImport(OlafNetwork)
         OlafNetwork.install(into: configuration, with: Self.networkConfiguration)
-        #endif
         #endif
     }
 

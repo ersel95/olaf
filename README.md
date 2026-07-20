@@ -27,9 +27,9 @@ Tasarım/fizibilite detayları için ana projedeki `OLAF_REPORT.md`'ye bakın.
 ## Kurulum (SPM)
 
 ```swift
-.package(url: "https://github.com/ersel95/olaf.git", from: "0.19.0")
+.package(url: "https://github.com/ersel95/olaf.git", from: "0.29.0")
 ```
-Ürünler: `OlafCore` (motor) · `OlafUI` (viewer) · `OlafNetwork` (opsiyonel network capture).
+Tek ürün: `Olaf` — motor (`Olaf` facade) + network capture (`OlafNetwork`) + viewer (`OlafUI`) birlikte gelir.
 
 > Uygulamada doğrudan `Olaf.x(...)` çağırmak yerine tek entegrasyon noktası olan `OlafManager`
 > üzerinden loglamanız önerilir — bkz. [`INTEGRATION.md`](INTEGRATION.md).
@@ -37,7 +37,7 @@ Tasarım/fizibilite detayları için ana projedeki `OLAF_REPORT.md`'ye bakın.
 ## Kullanım
 
 ```swift
-import OlafCore
+import Olaf
 
 // Uygulama başlangıcında (bir kez):
 Olaf.start(.default)   // diske yazar, OSLog'a yansıtır
@@ -88,7 +88,6 @@ OlafUI.register(SomeToolBridge())
 **Tek satır, networking koduna dokunmadan** (URLSessionConfiguration swizzle + global; SSL kırmaz):
 
 ```swift
-import OlafNetwork
 OlafNetwork.startAutomaticCapture()   // gövde+header default açık
 
 // Hangi baseURL'lerin yakalanacağını init'te filtrele:
