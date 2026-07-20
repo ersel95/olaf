@@ -142,6 +142,8 @@ public struct OlafViewerView: View {
                 Divider()
                 Button { share(ndjson: false) } label: { Label("Paylaş (.log)", systemImage: "square.and.arrow.up") }
                 Button { share(ndjson: true) } label: { Label("Paylaş (NDJSON)", systemImage: "curlybraces.square") }
+                Divider()
+                Button { importOSLog() } label: { Label("OSLog'u içe aktar (1 saat)", systemImage: "square.and.arrow.down") }
                 Button(role: .destructive) { model.clear() } label: { Label("Temizle", systemImage: "trash") }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -180,6 +182,14 @@ public struct OlafViewerView: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
             .background(.bar)
+        }
+    }
+
+    /// Son 1 saatin OSLog kayıtlarını (diğer SDK'ların os_log çıktıları dahil) içe aktarır.
+    private func importOSLog() {
+        Task {
+            _ = try? await Olaf.importOSLogEntries(since: Date().addingTimeInterval(-3600))
+            model.reload()
         }
     }
 

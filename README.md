@@ -20,7 +20,7 @@
 | **3 — Araç köprüleri** | Jenerik `ExternalToolBridge` + `presentExternal`; host kendi dış tanılama aracını viewer'a buton olarak ekleyebilir, shake sahipliği devri (app tarafı: `INTEGRATION.md` / `AGENTS.md`) | ✅ |
 | **N — Network capture (OlafNetwork)** | Opsiyonel URLProtocol; istek/yanıt `.network` kategorisinde, ham → app+network tek listede | ✅ |
 | **5 — UX & paylaşım** | Detay görünümü (status banner, pretty-JSON gövde), paylaşım (Basit/Tam log + cURL), kopyalama toast, start öncesi log tamponlama, oturum bazlı geçmiş | ✅ |
-| 4 — Köprüler | OSLogStore importer, swift-log backend | ⏳ |
+| **4 — Köprüler** | OSLogStore importer (`Olaf.importOSLogEntries` + viewer menüsü), swift-log backend (`Integration/OlafLogHandler.swift` template) | ✅ |
 
 ## Kurulum (SPM)
 

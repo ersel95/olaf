@@ -10,7 +10,8 @@ import Foundation
 public enum Olaf {
 
     /// Süreç boyunca tek örnek. `start(_:)` çağrılana dek pasiftir.
-    private static let runtime = OlafRuntime()
+    /// (internal: OSLog importer gibi modül-içi uzantılar store'a buradan erişir.)
+    static let runtime = OlafRuntime()
 
     // MARK: - Kurulum
 

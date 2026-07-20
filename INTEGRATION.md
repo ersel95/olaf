@@ -176,6 +176,30 @@ Ekran göründüğünde manuel çağırın:
 
 ---
 
+## 8. Köprüler (opsiyonel)
+
+### 8.1 swift-log backend'i — `OlafLogHandler` (template)
+Host swift-log kullanıyorsa [`Integration/OlafLogHandler.swift`](Integration/OlafLogHandler.swift)
+dosyasını app'e kopyalayın (Olaf sıfır bağımlılık taşıdığından swift-log'a paket bağımlılığı yoktur;
+swift-log host projede olmalıdır). Sonra uygulama başlangıcında, `Olaf.start` SONRASI bir kez:
+```swift
+LoggingSystem.bootstrap { label in OlafLogHandler(label: label) }
+```
+Uygulamadaki ve bağımlılıklardaki tüm `Logging.Logger` çağrıları Olaf'a akar; Logger `label`'ı
+Olaf kategorisi olur, metadata korunur.
+
+### 8.2 OSLog içe aktarma
+Olaf'ı bilmeyen SDK'ların `os_log`/`Logger` çıktılarını da tek listede görmek için:
+```swift
+try await Olaf.importOSLogEntries(since: Date().addingTimeInterval(-3600))
+```
+Viewer menüsünde de var: **⋯ → "OSLog'u içe aktar (1 saat)"**. Olaf'ın kendi OSLog aynası çift
+kayıt üretmesin diye ana bundle id'si (default ayna subsystem'i) otomatik hariç tutulur; aynaya
+özel `subsystem` verdiyseniz `excludingSubsystems:` ile geçirin. Not: kayıtlar özgün zaman
+damgasını taşır ama listede içe aktarma anının üstünde grup hâlinde görünür.
+
+---
+
 ## Dış bir tanılama aracı eklemek
 Jenerik geçiş `ExternalToolBridge` ile yapılır:
 ```swift
