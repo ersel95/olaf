@@ -41,6 +41,21 @@ struct LogFilterView: View {
                     }
                 }
 
+                Section {
+                    Picker("Eşik", selection: Binding(
+                        get: { Olaf.minimumLevel },
+                        set: { Olaf.minimumLevel = $0 }
+                    )) {
+                        ForEach(LogLevel.allCases, id: \.self) { level in
+                            Text(level.name).tag(level)
+                        }
+                    }
+                } header: {
+                    Text("Toplama eşiği")
+                } footer: {
+                    Text("Eşiğin altındaki seviyeler hiç toplanmaz (yukarıdaki görüntüleme filtrelerinden bağımsızdır; uygulama yeniden başlayınca config değerine döner).")
+                }
+
                 let categories = model.availableCategories
                 if !categories.isEmpty {
                     Section("Kategoriler") {

@@ -161,4 +161,22 @@ final class LogStore: @unchecked Sendable {
             }
         }
     }
+
+    /// Verilen kayıtları **ham NDJSON** (satır başına bir JSON `LogEntry`) dosyasına yazar.
+    /// Disk formatıyla birebir aynı şema → jq/backend analizi/başka araçlara kayıpsız beslenebilir.
+    func exportNDJSONFileURL(entries: [LogEntry]) async -> URL? {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
+                encoder.outputFormatting = [.withoutEscapingSlashes]
+                let text = entries
+                    .compactMap { entry in
+                        (try? encoder.encode(entry)).flatMap { String(data: $0, encoding: .utf8) }
+                    }
+                    .joined(separator: "\n")
+                continuation.resume(returning: LogExportFile.write(text, fileExtension: "ndjson"))
+            }
+        }
+    }
 }

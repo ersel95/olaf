@@ -140,7 +140,8 @@ public struct OlafViewerView: View {
             Menu {
                 followToggle
                 Divider()
-                Button { share() } label: { Label("Paylaş", systemImage: "square.and.arrow.up") }
+                Button { share(ndjson: false) } label: { Label("Paylaş (.log)", systemImage: "square.and.arrow.up") }
+                Button { share(ndjson: true) } label: { Label("Paylaş (NDJSON)", systemImage: "curlybraces.square") }
                 Button(role: .destructive) { model.clear() } label: { Label("Temizle", systemImage: "trash") }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -182,9 +183,10 @@ public struct OlafViewerView: View {
         }
     }
 
-    private func share() {
+    private func share(ndjson: Bool) {
         Task {
-            if let url = await model.exportFileURL() {
+            let url = ndjson ? await model.exportNDJSONFileURL() : await model.exportFileURL()
+            if let url {
                 presentShareSheet([url])
             }
         }

@@ -42,6 +42,21 @@ public final class LogViewerModel: ObservableObject {
     /// Geçmiş (disk) yüklenirken `true`.
     @Published public private(set) var isLoading: Bool = false
 
+    // MARK: - Türetilmiş (memoize edilmiş) durum
+    //
+    // Bunlar eskiden computed property idi → her SwiftUI render'ında tüm liste yeniden
+    // taranıyordu (büyük Geçmiş'te takılma). Artık yalnız girdiler değişince bir kez
+    // hesaplanır ve @Published olarak yayınlanır.
+
+    /// Filtre uygulanmış, en yeni en üstte sıralı kayıtlar.
+    @Published public private(set) var filteredEntries: [LogEntry] = []
+
+    /// Geçmişteki kayıtların oturum grupları — **mevcut oturum hariç** (o "Oturum" sekmesinde).
+    @Published public private(set) var sessionGroups: [LogSession] = []
+
+    /// Mevcut kayıtlarda görülen kategoriler (filtre çubuğu için).
+    @Published public private(set) var availableCategories: [LogCategory] = []
+
     public init() {
         // Arama debounce: searchText → (trim+lowercase) → 200ms sessizlik → effectiveQuery.
         $searchText
@@ -49,6 +64,22 @@ public final class LogViewerModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .assign(to: &$effectiveQuery)
+
+        // Girdilerden türetilen değerler: yalnız girdi değişiminde hesaplanır (render başına değil).
+        Publishers.CombineLatest4($entries, $effectiveQuery, $enabledLevels, $selectedCategories)
+            .map { entries, query, levels, categories in
+                Self.filter(entries: entries, query: query, levels: levels, categories: categories)
+            }
+            .assign(to: &$filteredEntries)
+
+        $filteredEntries
+            .map { Self.groupSessions($0, excluding: Olaf.currentSessionID) }
+            .assign(to: &$sessionGroups)
+
+        $entries
+            .map { Self.categories(in: $0) }
+            .removeDuplicates()
+            .assign(to: &$availableCategories)
     }
 
     deinit { streamTask?.cancel() }
@@ -133,27 +164,25 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
-    // MARK: - Türetilmiş
+    // MARK: - Türetme mantığı (saf fonksiyonlar → test edilebilir)
 
-    /// Mevcut kayıtlarda görülen kategoriler (filtre çubuğu için).
-    public var availableCategories: [LogCategory] {
-        var seen = Set<LogCategory>()
-        var ordered: [LogCategory] = []
-        for entry in entries where !seen.contains(entry.category) {
-            seen.insert(entry.category)
-            ordered.append(entry.category)
-        }
-        return ordered.sorted { $0.rawValue < $1.rawValue }
+    /// Bir uygulama oturumunun gruplanmış logları.
+    public struct LogSession: Identifiable, Sendable {
+        public let id: String        // sessionID
+        public let startDate: Date   // oturumdaki en erken kayıt
+        public let entries: [LogEntry]  // en yeni üstte
     }
 
-    /// Filtre uygulanmış, en yeni en üstte sıralı kayıtlar.
-    public var filteredEntries: [LogEntry] {
-        let query = effectiveQuery   // debounce edilmiş, zaten trim+lowercase
-        return entries.reversed().filter { entry in
-            if !enabledLevels.isEmpty, !enabledLevels.contains(entry.level) { return false }
-            if !selectedCategories.isEmpty, !selectedCategories.contains(entry.category) {
-                return false
-            }
+    /// Seviye/kategori/arama filtresi — en yeni en üstte.
+    nonisolated static func filter(
+        entries: [LogEntry],
+        query: String,   // zaten trim+lowercase (debounce pipeline'ından)
+        levels: Set<LogLevel>,
+        categories: Set<LogCategory>
+    ) -> [LogEntry] {
+        entries.reversed().filter { entry in
+            if !levels.isEmpty, !levels.contains(entry.level) { return false }
+            if !categories.isEmpty, !categories.contains(entry.category) { return false }
             guard !query.isEmpty else { return true }
             if entry.message.lowercased().contains(query) { return true }
             if entry.category.rawValue.lowercased().contains(query) { return true }
@@ -163,22 +192,12 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
-    // MARK: - Oturum gruplama (geçmiş için)
-
-    /// Bir uygulama oturumunun gruplanmış logları.
-    public struct LogSession: Identifiable {
-        public let id: String        // sessionID
-        public let startDate: Date   // oturumdaki en erken kayıt
-        public let entries: [LogEntry]  // en yeni üstte
-    }
-
-    /// Geçmişteki kayıtları oturuma göre gruplar — **mevcut oturum hariç** (o "Oturum" sekmesinde).
+    /// Kayıtları oturuma göre gruplar; `excluding` (mevcut oturum) atlanır.
     /// Oturumlar en yeniden eskiye sıralanır; içleri en yeni üstte.
-    public var sessionGroups: [LogSession] {
-        let current = Olaf.currentSessionID
+    nonisolated static func groupSessions(_ entries: [LogEntry], excluding current: String) -> [LogSession] {
         var grouped: [String: [LogEntry]] = [:]
         var order: [String] = []
-        for entry in filteredEntries where entry.sessionID != current {
+        for entry in entries where entry.sessionID != current {
             if grouped[entry.sessionID] == nil { order.append(entry.sessionID) }
             grouped[entry.sessionID, default: []].append(entry)
         }
@@ -189,6 +208,17 @@ public final class LogViewerModel: ObservableObject {
                 return LogSession(id: id, startDate: start, entries: items)
             }
             .sorted { $0.startDate > $1.startDate }
+    }
+
+    /// Kayıtlarda görülen kategoriler (ada göre sıralı, tekrarsız).
+    nonisolated static func categories(in entries: [LogEntry]) -> [LogCategory] {
+        var seen = Set<LogCategory>()
+        var ordered: [LogCategory] = []
+        for entry in entries where !seen.contains(entry.category) {
+            seen.insert(entry.category)
+            ordered.append(entry.category)
+        }
+        return ordered.sorted { $0.rawValue < $1.rawValue }
     }
 
     // MARK: - Aksiyonlar
@@ -232,6 +262,12 @@ public final class LogViewerModel: ObservableObject {
     public func exportFileURL() async -> URL? {
         let visible = Array(filteredEntries.reversed())
         return await Olaf.exportFileURL(entries: visible)
+    }
+
+    /// Görünen kayıtları **ham NDJSON** olarak dışa aktarır (jq/backend analizi için).
+    public func exportNDJSONFileURL() async -> URL? {
+        let visible = Array(filteredEntries.reversed())
+        return await Olaf.exportNDJSONFileURL(entries: visible)
     }
 
     /// Kayıtlı dış araçlar (geçiş butonları).

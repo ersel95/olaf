@@ -109,6 +109,13 @@ final class OlafRuntime: @unchecked Sendable {
         set { lock.lock(); _enabled = newValue; lock.unlock() }
     }
 
+    /// Toplama eşiği. `start` config'inden gelir; runtime'da değiştirilebilir
+    /// (örn. viewer'daki "Toplama eşiği" ayarı). Kalıcı değildir — süreç ömrüyle sınırlıdır.
+    var minimumLevel: LogLevel {
+        get { lock.lock(); defer { lock.unlock() }; return _minimumLevel }
+        set { lock.lock(); _minimumLevel = newValue; lock.unlock() }
+    }
+
     /// Bir log çağrısının hedefini belirler (mesaj yalnız `.drop` değilse compute edilir).
     func target(for level: LogLevel) -> LogTarget {
         lock.lock(); defer { lock.unlock() }

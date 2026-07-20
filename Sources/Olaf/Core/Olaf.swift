@@ -28,6 +28,14 @@ public enum Olaf {
     /// Olaf başlatıldı mı?
     public static var isStarted: Bool { runtime.isStarted }
 
+    /// Toplama eşiği: bu seviyenin altındaki loglar hiç işlenmez (mesaj compute bile edilmez).
+    /// `start` config'inden gelir; çalışma anında değiştirilebilir (örn. gürültüyü kısmak için
+    /// "yalnız warning+ topla"). Kalıcı değildir — süreç ömrüyle sınırlıdır.
+    public static var minimumLevel: LogLevel {
+        get { runtime.minimumLevel }
+        set { runtime.minimumLevel = newValue }
+    }
+
     /// Mevcut uygulama oturumunun kimliği (her `start()` yeni üretir). Geçmişte oturum gruplama için.
     public static var currentSessionID: String { runtime.currentSessionID }
 
@@ -184,5 +192,12 @@ public enum Olaf {
     public static func exportFileURL(entries: [LogEntry]) async -> URL? {
         guard let store = runtime.store else { return nil }
         return await store.exportFileURL(entries: entries)
+    }
+
+    /// Verilen kayıtları **ham NDJSON** (.ndjson — satır başına bir JSON `LogEntry`) dosyasına
+    /// yazar. Disk formatıyla aynı şema: jq/backend analizi/başka araçlara kayıpsız beslenebilir.
+    public static func exportNDJSONFileURL(entries: [LogEntry]) async -> URL? {
+        guard let store = runtime.store else { return nil }
+        return await store.exportNDJSONFileURL(entries: entries)
     }
 }
