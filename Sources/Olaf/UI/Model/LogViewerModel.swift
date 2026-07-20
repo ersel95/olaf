@@ -321,6 +321,16 @@ public final class LogViewerModel: ObservableObject {
         }.value
     }
 
+    /// Görünen **network** kayıtlarını Postman Collection v2.1 dosyasına yazar
+    /// (aynı method+URL bir kez; Postman → Import ile yeniden çalıştırılabilir).
+    public func exportPostmanFileURL() async -> URL? {
+        let visible = Array(filteredEntries.reversed())
+        return await Task.detached(priority: .utility) {
+            guard let text = PostmanExporter.collection(from: visible) else { return nil }
+            return LogExportFile.write(text, fileExtension: "postman_collection.json")
+        }.value
+    }
+
     /// Kayıtlı dış araçlar (geçiş butonları).
     public var externalTools: [any ExternalToolBridge] {
         ExternalToolRegistry.shared.all

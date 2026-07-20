@@ -223,12 +223,13 @@ public struct OlafViewerView: View {
             Button { share(.log) } label: { Label(".log (düz metin)", systemImage: "doc.text") }
             Button { share(.ndjson) } label: { Label("NDJSON (ham)", systemImage: "curlybraces.square") }
             Button { share(.har) } label: { Label("HAR (network)", systemImage: "network") }
+            Button { share(.postman) } label: { Label("Postman Collection", systemImage: "paperplane") }
         } label: {
             Label("Paylaş", systemImage: "square.and.arrow.up")
         }
     }
 
-    private enum ExportKind { case log, ndjson, har }
+    private enum ExportKind { case log, ndjson, har, postman }
 
     private func share(_ kind: ExportKind) {
         Task {
@@ -237,6 +238,7 @@ public struct OlafViewerView: View {
             case .log: url = await model.exportFileURL()
             case .ndjson: url = await model.exportNDJSONFileURL()
             case .har: url = await model.exportHARFileURL()
+            case .postman: url = await model.exportPostmanFileURL()
             }
             if let url {
                 presentShareSheet([url])

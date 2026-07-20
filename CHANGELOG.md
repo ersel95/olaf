@@ -3,6 +3,12 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
 (0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
 
+## [0.38.0] — 2026-07-20
+### Eklendi
+- **Postman Collection export** (⋯ → Paylaş → "Postman Collection"): görünen network
+  istekleri Collection v2.1 olarak dışa aktarılır (aynı method+URL bir kez); Postman'e
+  Import ile alınıp yeniden çalıştırılabilir.
+
 ## [0.37.0] — 2026-07-20
 ### Eklendi
 - **İstatistik ekranı** (⋯ → İstatistikler): görünen network kayıtları için hata oranı,
