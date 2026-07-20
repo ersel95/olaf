@@ -3,6 +3,13 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
 (0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
 
+## [0.41.0] — 2026-07-20
+### Eklendi
+- **Sabitleme (pin)**: satıra basılı tutup "Sabitle" — sabitler oturum listesinin üstünde,
+  filtrelerden bağımsız ayrı bölümde görünür (oturum içi; kalıcı değildir).
+- **Çoklu seçim paylaşımı** (⋯ → Seç): oturum listesinde birden çok kayıt işaretlenip tek
+  `.log` dosyası olarak paylaşılabilir.
+
 ## [0.40.0] — 2026-07-20
 ### Eklendi
 - **İçerik türü filtresi** (filtre ekranı → "İçerik türü"): network yanıtları

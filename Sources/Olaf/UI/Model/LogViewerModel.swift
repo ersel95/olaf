@@ -31,6 +31,10 @@ public final class LogViewerModel: ObservableObject {
     /// `true` iken yeni loglar canlı eklenir; `false` (duraklat) iken liste dondurulur.
     @Published public var isFollowing: Bool = true
 
+    /// Sabitlenen kayıt kimlikleri (oturum içi; kalıcı değildir). Sabitler, listenin üstünde
+    /// ayrı bölümde **filtrelerden bağımsız** gösterilir.
+    @Published public var pinnedIDs: Set<UUID> = []
+
     private var pendingWhilePaused: [LogEntry] = []
     private var streamTask: Task<Void, Never>?
 
@@ -294,6 +298,31 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
+    public func togglePin(_ entry: LogEntry) {
+        if pinnedIDs.contains(entry.id) {
+            pinnedIDs.remove(entry.id)
+        } else {
+            pinnedIDs.insert(entry.id)
+        }
+    }
+
+    /// Sabitlenmiş kayıtlar (en yeni üstte) — filtrelerden bağımsız, yüklü kayıtlar içinden.
+    public var pinnedEntries: [LogEntry] {
+        Self.pinned(in: entries, ids: pinnedIDs)
+    }
+
+    nonisolated static func pinned(in entries: [LogEntry], ids: Set<UUID>) -> [LogEntry] {
+        guard !ids.isEmpty else { return [] }
+        return entries.reversed().filter { ids.contains($0.id) }
+    }
+
+    /// Seçilen kayıtları (çoklu seçim) okunur `.log` dosyasına yazar — kronolojik sırayla.
+    public func exportFileURL(for ids: Set<UUID>) async -> URL? {
+        let chosen = Array(filteredEntries.filter { ids.contains($0.id) }.reversed())
+        guard !chosen.isEmpty else { return nil }
+        return await Olaf.exportFileURL(entries: chosen)
+    }
+
     public func toggleContentKind(_ kind: NetworkContentKind) {
         if selectedContentKinds.contains(kind) {
             selectedContentKinds.remove(kind)
@@ -320,6 +349,7 @@ public final class LogViewerModel: ObservableObject {
         entries.removeAll()
         pendingWhilePaused.removeAll()
         incoming.removeAll()
+        pinnedIDs.removeAll()
     }
 
     /// O an **ekranda görünen** (kapsam + seviye/kategori/arama filtreleri uygulanmış) kayıtları

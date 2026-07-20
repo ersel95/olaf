@@ -9,6 +9,9 @@ public struct OlafViewerView: View {
 
     @State private var isFilterPresented = false
     @State private var isStatsPresented = false
+    /// Çoklu seçim modu (yalnız Oturum kapsamında).
+    @State private var isSelecting = false
+    @State private var selectedIDs = Set<UUID>()
 
     public init(onClose: @escaping () -> Void = {}) {
         self.onClose = onClose
@@ -67,19 +70,83 @@ public struct OlafViewerView: View {
         }
     }
 
-    /// Mevcut oturum — düz liste (en yeni üstte).
+    /// Mevcut oturum — sabitler üstte, düz liste (en yeni üstte), çoklu seçim destekli.
     @ViewBuilder
     private var sessionList: some View {
         let entries = model.filteredEntries
-        if entries.isEmpty {
+        if entries.isEmpty && model.pinnedEntries.isEmpty {
             ContentUnavailableView("Kayıt yok", systemImage: "doc.text.magnifyingglass", description: Text("Filtreyle eşleşen log bulunamadı."))
                 .frame(maxHeight: .infinity)
         } else {
-            List(entries) { entry in
-                NavigationLink(value: entry) { LogRowView(entry: entry) }
+            List(selection: $selectedIDs) {
+                if !model.pinnedEntries.isEmpty && !isSelecting {
+                    pinnedSection
+                }
+                Section {
+                    ForEach(entries) { entry in
+                        NavigationLink(value: entry) { LogRowView(entry: entry) }
+                            .contextMenu { pinButton(entry) }
+                    }
+                }
             }
             .listStyle(.plain)
+            .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
             .navigationDestination(for: LogEntry.self) { LogDetailView(entry: $0) }
+            .safeAreaInset(edge: .bottom) {
+                if isSelecting { selectionBar }
+            }
+        }
+    }
+
+    /// Sabitlenen kayıtlar — filtrelerden bağımsız, listenin üstünde.
+    private var pinnedSection: some View {
+        Section {
+            ForEach(model.pinnedEntries) { entry in
+                NavigationLink(value: entry) { LogRowView(entry: entry) }
+                    .contextMenu { pinButton(entry) }
+            }
+        } header: {
+            Label("Sabitlenenler", systemImage: "pin.fill")
+                .font(.caption)
+        }
+    }
+
+    private func pinButton(_ entry: LogEntry) -> some View {
+        let isPinned = model.pinnedIDs.contains(entry.id)
+        return Button {
+            model.togglePin(entry)
+        } label: {
+            Label(isPinned ? "Sabitlemeyi kaldır" : "Sabitle",
+                  systemImage: isPinned ? "pin.slash" : "pin")
+        }
+    }
+
+    /// Çoklu seçim modunda alttaki paylaşım barı.
+    private var selectionBar: some View {
+        HStack {
+            Text("\(selectedIDs.count) kayıt seçildi")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button {
+                shareSelected()
+            } label: {
+                Label("Paylaş", systemImage: "square.and.arrow.up")
+                    .font(.callout.weight(.semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(selectedIDs.isEmpty)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
+
+    private func shareSelected() {
+        Task {
+            if let url = await model.exportFileURL(for: selectedIDs) {
+                presentShareSheet([url])
+            }
         }
     }
 
@@ -169,16 +236,26 @@ public struct OlafViewerView: View {
             .accessibilityLabel("Filtreler")
         }
         ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-                followToggle
-                Divider()
-                shareMenu
-                Button { isStatsPresented = true } label: { Label("İstatistikler", systemImage: "chart.bar") }
-                Divider()
-                Button { importOSLog() } label: { Label("OSLog'u içe aktar (1 saat)", systemImage: "square.and.arrow.down") }
-                Button(role: .destructive) { model.clear() } label: { Label("Temizle", systemImage: "trash") }
-            } label: {
-                Image(systemName: "ellipsis.circle")
+            if isSelecting {
+                Button("Bitti") {
+                    isSelecting = false
+                    selectedIDs.removeAll()
+                }
+            } else {
+                Menu {
+                    followToggle
+                    if model.scope == .session {
+                        Button { isSelecting = true } label: { Label("Seç", systemImage: "checkmark.circle") }
+                    }
+                    Divider()
+                    shareMenu
+                    Button { isStatsPresented = true } label: { Label("İstatistikler", systemImage: "chart.bar") }
+                    Divider()
+                    Button { importOSLog() } label: { Label("OSLog'u içe aktar (1 saat)", systemImage: "square.and.arrow.down") }
+                    Button(role: .destructive) { model.clear() } label: { Label("Temizle", systemImage: "trash") }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
             }
         }
     }
