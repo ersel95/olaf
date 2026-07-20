@@ -1,7 +1,7 @@
 import Foundation
 
-/// `.network` kaydından cURL temsili üretir. Header değerleri redakte edilmiş haliyle gelir
-/// (örn. `Authorization: ***`), bu yüzden çıktı paylaşıma güvenlidir.
+/// `.network` kaydından cURL temsili üretir. Header/gövde değerleri **ham**dır (maskeleme yok);
+/// `Authorization`/`Cookie` dahil sırlar çıktıya aynen girer — paylaşmadan önce gözden geçirin.
 enum CurlBuilder {
     static func curl(from info: NetworkLogInfo) -> String {
         var lines = ["curl -X \(info.method ?? "GET") \(quote(info.url ?? ""))"]

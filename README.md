@@ -10,8 +10,6 @@
 >
 > **Tamamen local:** Backend yoktur. Loglar cihazda NDJSON olarak saklanır (oturumlar arası geçmiş), viewer'dan okunur düz metin `.log` olarak paylaşılır. Hiçbir veri ağ üzerinden gönderilmez.
 
-Tasarım/fizibilite detayları için ana projedeki `OLAF_REPORT.md`'ye bakın.
-
 ## Durum
 
 | Faz | Kapsam | Durum |
@@ -27,7 +25,7 @@ Tasarım/fizibilite detayları için ana projedeki `OLAF_REPORT.md`'ye bakın.
 ## Kurulum (SPM)
 
 ```swift
-.package(url: "https://github.com/ersel95/olaf.git", from: "0.29.0")
+.package(url: "https://github.com/ersel95/olaf.git", from: "0.30.0")
 ```
 Tek ürün: `Olaf` — motor (`Olaf` facade) + network capture (`OlafNetwork`) + viewer (`OlafUI`) birlikte gelir.
 
@@ -134,4 +132,4 @@ swift test
 
 ## Lisans
 
-TBD.
+MIT — bkz. [LICENSE](LICENSE).

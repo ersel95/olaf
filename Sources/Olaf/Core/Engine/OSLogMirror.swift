@@ -1,7 +1,7 @@
 import Foundation
 import os
 
-/// Redakte edilmiş kayıtları `os.Logger`'a yansıtır → Console.app ve sistem log akışında görünür.
+/// Kayıtları `os.Logger`'a yansıtır → Console.app ve sistem log akışında görünür.
 /// Yalnız `LogStore`'un serial kuyruğundan çağrılır.
 final class OSLogMirror: @unchecked Sendable {
 
@@ -14,7 +14,8 @@ final class OSLogMirror: @unchecked Sendable {
 
     func log(_ entry: LogEntry) {
         let logger = logger(for: entry.category.rawValue)
-        // Mesaj zaten redakte; yine de `.public` ile veriyoruz çünkü hassas veri kalmadı.
+        // `.public`: mesaj HAM'dır ve Console.app'te açık görünür — Olaf yalnız non-prod'da
+        // çalıştırılmalıdır (hassas veri sorumluluğu host'ta; bkz. CLAUDE.md/README kuralları).
         logger.log(level: entry.level.osLogType, "\(entry.message, privacy: .public)")
     }
 

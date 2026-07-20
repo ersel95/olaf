@@ -13,12 +13,16 @@ struct NetworkLogEvent {
     var responseBody: String?
     var requestHeaders: [String: String]?
     var responseHeaders: [String: String]?
+    /// İstek tamamlanmadan iptal edildi (`NSURLErrorCancelled` — örn. ekran kapandı, prefetch
+    /// vazgeçildi). Gerçek bir hata değildir; `.info` seviyesinde loglanır, `error` alanı boş kalır.
+    var cancelled: Bool = false
 }
 
 /// Network olayını seviye + mesaj + metadata'ya dönüştürür. Saf fonksiyonlar → test edilebilir.
 enum NetworkLogComposer {
 
-    static func level(statusCode: Int?, error: String?) -> LogLevel {
+    static func level(statusCode: Int?, error: String?, cancelled: Bool = false) -> LogLevel {
+        if cancelled { return .info }
         if error != nil { return .error }
         guard let status = statusCode else { return .info }
         switch status {
@@ -31,6 +35,7 @@ enum NetworkLogComposer {
     static func message(for event: NetworkLogEvent) -> String {
         var parts = ["\(event.method)", event.url]
         if let status = event.statusCode { parts.append("→ \(status)") }
+        if event.cancelled { parts.append("→ iptal") }
         if event.error != nil { parts.append("→ ✗") }
         parts.append("(\(event.durationMs)ms)")
         return parts.joined(separator: " ")
@@ -46,6 +51,7 @@ enum NetworkLogComposer {
         ]
         if let status = event.statusCode { metadata["status"] = String(status) }
         if let error = event.error { metadata["error"] = error }
+        if event.cancelled { metadata["cancelled"] = "true" }
         // Gövdeler ayrı `requestBody`/`responseBody` anahtarlarıyla ham olarak saklanır.
         if let body = event.requestBody { metadata["requestBody"] = body }
         if let body = event.responseBody { metadata["responseBody"] = body }

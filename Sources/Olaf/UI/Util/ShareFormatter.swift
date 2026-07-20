@@ -1,7 +1,8 @@
 import Foundation
 
 /// Paylaşım metinlerini üretir (Basit/Tam log formatları). Saf fonksiyonlar → test edilebilir.
-/// İçerik zaten redakte edilmiş `LogEntry`/`NetworkLogInfo`'dan üretilir → paylaşıma güvenli.
+/// İçerik `LogEntry`/`NetworkLogInfo`'dan **ham** alınır (maskeleme yok) → hassas veri içerebilir;
+/// paylaşım sorumluluğu kullanıcıdadır.
 enum ShareFormatter {
 
     // MARK: - Network

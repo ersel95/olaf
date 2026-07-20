@@ -10,6 +10,8 @@ struct NetworkLogInfo {
     let requestBytes: Int?
     let responseBytes: Int?
     let error: String?
+    /// İstek tamamlanmadan iptal edildi (hata değil; `.info` seviyesinde loglanır).
+    let cancelled: Bool
     let requestBody: String?
     let responseBody: String?
     let requestHeaders: [(key: String, value: String)]
@@ -25,6 +27,7 @@ struct NetworkLogInfo {
         requestBytes = m["reqBytes"].flatMap(Int.init)
         responseBytes = m["respBytes"].flatMap(Int.init)
         error = m["error"]
+        cancelled = m["cancelled"] == "true"
         requestBody = m["requestBody"]
         responseBody = m["responseBody"]
         requestHeaders = m

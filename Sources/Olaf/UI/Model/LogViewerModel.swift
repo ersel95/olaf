@@ -109,6 +109,12 @@ public final class LogViewerModel: ObservableObject {
             guard let self else { return }
             self.flushScheduled = false
             guard !self.incoming.isEmpty else { return }
+            // Geçmiş kapsamında canlı kayıtlar listeye karıştırılmaz (mevcut oturum orada zaten
+            // gösterilmez); Oturum'a dönüşte reload() güncel snapshot'ı alır — kayıp olmaz.
+            if self.scope == .history {
+                self.incoming.removeAll(keepingCapacity: true)
+                return
+            }
             // Duraklatılmışsa kayıtlar "devam et"e dek beklesin (pause semantiği korunur).
             if self.isFollowing {
                 self.entries.append(contentsOf: self.incoming)
