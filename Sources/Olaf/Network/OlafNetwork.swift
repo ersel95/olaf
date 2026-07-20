@@ -1,7 +1,7 @@
 import Foundation
 
 /// Olaf network capture cephesi. Uygulamanın network isteklerini yakalayıp `.network`
-/// kategorisinde (redakte edilerek) Olaf'a loglar.
+/// kategorisinde **ham** (maskelemesiz) Olaf'a loglar.
 ///
 /// ```swift
 /// // Tüm istekleri yakalamak için (Alamofire/URLSession custom config):
@@ -62,7 +62,8 @@ public enum OlafNetwork {
     /// `URLSessionConfiguration.default/.ephemeral` swizzle edilerek tüm session'lara (Alamofire dahil)
     /// otomatik enjekte edilir + shared session için global kayıt yapılır.
     ///
-    /// SSL: proxy session sunucu trust'ını kabul eder (iç/pinned sertifikalar kırılmaz). **Non-prod debug** için.
+    /// SSL: proxy session **varsayılan sistem doğrulaması** kullanır (pinning/OS trust baypaslanmaz);
+    /// özel kurumsal CA'lar için `allowsArbitraryServerTrustForCapture` (yalnız non-prod). **Non-prod debug** için.
     ///
     /// ```swift
     /// // OlafManager.initialize() içinde tek satır — BaseService'e dokunmaya gerek yok:

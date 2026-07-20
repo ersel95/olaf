@@ -1,12 +1,12 @@
 import Foundation
 
-/// İstek/yanıtları yakalayıp Olaf'a loglayan `URLProtocol`. Gerçek isteği kendi (yakalanmayan)
-/// session'ı üzerinden yürütür ve sonucu istemciye iletir.
+/// İstek/yanıtları yakalayıp Olaf'a loglayan `URLProtocol`. Gerçek isteği, tüm yakalamaların
+/// paylaştığı (yakalanmayan) proxy session (`OlafProxySession`) üzerinden yürütür ve sonucu
+/// istemciye iletir.
 final class OlafURLProtocol: URLProtocol {
 
     private static let handledKey = "com.olaf.network.handled"
 
-    private var proxySession: URLSession?
     private var proxyTask: URLSessionDataTask?
     /// Yalnız gövde yakalama açıkken (`capturesBodies`) doldurulur; kapalıyken büyük indirmeleri
     /// gereksiz yere RAM'de tutmamak için boş kalır (sayım `responseByteCount`'tan gelir).
@@ -18,6 +18,15 @@ final class OlafURLProtocol: URLProtocol {
     /// `request.httpBody` çoğu zaman `nil`'dir; gövde `startLoading`'de buraya yakalanır.
     private var capturedRequestBody: Data?
     private var startDate = Date()
+
+    /// `stopLoading` sonrası istemciye çağrı yapılmaz (URL loading sistemi protokolü bıraktı).
+    /// `stopLoading` istemci kuyruğundan, proxy callback'leri delegate kuyruğundan gelir → kilit.
+    private let stateLock = NSLock()
+    private var _stopped = false
+    private var isStopped: Bool {
+        get { stateLock.lock(); defer { stateLock.unlock() }; return _stopped }
+        set { stateLock.lock(); _stopped = newValue; stateLock.unlock() }
+    }
 
     // MARK: - URLProtocol
 
@@ -58,65 +67,124 @@ final class OlafURLProtocol: URLProtocol {
             }
         }
 
-        // Proxy session: capture'a özel, izole (shared cookie/cache havuzunu kullanmasın).
-        let config = URLSessionConfiguration.ephemeral
-        // Zincirlenen protokoller (başka capture araçları) proxy session'da yakalasın diye eklenir.
-        // OlafURLProtocol bu listeye girmez (sonsuz döngüyü handledKey + dışlama önler).
-        let selfID = ObjectIdentifier(OlafURLProtocol.self)
-        let chained = OlafNetwork.chainedProtocolClasses.filter { ObjectIdentifier($0) != selfID }
-        if !chained.isEmpty {
-            config.protocolClasses = chained + (config.protocolClasses ?? [])
-        }
-        let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
-        self.proxySession = session
-        self.proxyTask = session.dataTask(with: mutable as URLRequest)
-        self.proxyTask?.resume()
+        proxyTask = OlafProxySession.shared.startTask(with: mutable as URLRequest, handler: self)
     }
 
     override func stopLoading() {
+        isStopped = true
+        // Tamamlanmış task'ta cancel no-op'tur; yarıda kesilen task `didCompleteWithError(cancelled)`
+        // üretir → `.info` seviyesinde "iptal" olarak loglanır (handler orada düşürülür).
         proxyTask?.cancel()
-        proxySession?.invalidateAndCancel()
-        proxySession = nil
+        proxyTask = nil
+    }
+
+    // MARK: - Proxy callback'leri (OlafProxySession delegate kuyruğundan yönlendirilir)
+
+    func proxyDidReceive(_ response: URLResponse) {
+        capturedResponse = response
+        guard !isStopped else { return }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    }
+
+    func proxyDidReceive(_ data: Data) {
+        responseByteCount += data.count
+        // Gövde yakalama kapalıysa veriyi biriktirme (yalnız byte say) → büyük indirmelerde RAM tasarrufu.
+        if capturesBodies { responseData.append(data) }
+        guard !isStopped else { return }
+        client?.urlProtocol(self, didLoad: data)
+    }
+
+    func proxyWasRedirected(to newRequest: URLRequest, response: HTTPURLResponse) {
+        guard !isStopped else { return }
+        client?.urlProtocol(self, wasRedirectedTo: newRequest, redirectResponse: response)
+    }
+
+    func proxyDidComplete(error: Error?) {
+        if !isStopped {
+            if let error {
+                client?.urlProtocol(self, didFailWithError: error)
+            } else {
+                client?.urlProtocolDidFinishLoading(self)
+            }
+        }
+
+        // Ağır kısım (JSON pretty-print + loglama) paylaşılan delegate kuyruğunu bekletmesin diye
+        // Sendable bir anlık görüntüyle ayrı kuyruğa taşınır. Bu noktadan sonra task için başka
+        // callback gelmez → alanlar sabittir, kopyalamak güvenlidir.
+        let nsError = error as NSError?
+        let cancelled = nsError.map { $0.domain == NSURLErrorDomain && $0.code == NSURLErrorCancelled } ?? false
+        let completion = CaptureCompletion(
+            method: request.httpMethod ?? "GET",
+            url: request.url?.absoluteString ?? "-",
+            statusCode: (capturedResponse as? HTTPURLResponse)?.statusCode,
+            durationMs: Int(Date().timeIntervalSince(startDate) * 1000),
+            requestBytes: capturedRequestBody?.count ?? request.httpBody?.count ?? 0,
+            responseBytes: responseByteCount,
+            errorDescription: cancelled ? nil : nsError?.localizedDescription,
+            cancelled: cancelled,
+            requestBody: capturedRequestBody ?? request.httpBody,
+            responseBody: responseData,
+            requestHeaders: request.allHTTPHeaderFields,
+            responseHeaders: (capturedResponse as? HTTPURLResponse)?.allHeaderFields as? [String: String]
+        )
+        OlafProxySession.logQueue.async {
+            Self.log(completion)
+        }
     }
 
     // MARK: - Loglama
 
-    private func logCompletion(error: Error?) {
+    /// Tamamlanan bir yakalamanın Sendable anlık görüntüsü (log kuyruğuna taşınır).
+    private struct CaptureCompletion: Sendable {
+        let method: String
+        let url: String
+        let statusCode: Int?
+        let durationMs: Int
+        let requestBytes: Int
+        let responseBytes: Int
+        let errorDescription: String?
+        let cancelled: Bool
+        let requestBody: Data?
+        let responseBody: Data?
+        let requestHeaders: [String: String]?
+        let responseHeaders: [String: String]?
+    }
+
+    private static func log(_ completion: CaptureCompletion) {
         let config = OlafNetwork.current
-        let http = capturedResponse as? HTTPURLResponse
-        let durationMs = Int(Date().timeIntervalSince(startDate) * 1000)
 
         var event = NetworkLogEvent(
-            method: request.httpMethod ?? "GET",
-            url: request.url?.absoluteString ?? "-",
-            statusCode: http?.statusCode,
-            durationMs: durationMs,
-            requestBytes: capturedRequestBody?.count ?? request.httpBody?.count ?? 0,
-            responseBytes: responseByteCount,
-            error: error.map { ($0 as NSError).localizedDescription },
+            method: completion.method,
+            url: completion.url,
+            statusCode: completion.statusCode,
+            durationMs: completion.durationMs,
+            requestBytes: completion.requestBytes,
+            responseBytes: completion.responseBytes,
+            error: completion.errorDescription,
             requestBody: nil,
-            responseBody: nil
+            responseBody: nil,
+            cancelled: completion.cancelled
         )
 
         if config.capturesBodies {
-            event.requestBody = bodyString(from: capturedRequestBody ?? request.httpBody, limit: config.maxBodyLength)
-            event.responseBody = bodyString(from: responseData, limit: config.maxBodyLength)
+            event.requestBody = bodyString(from: completion.requestBody, limit: config.maxBodyLength)
+            event.responseBody = bodyString(from: completion.responseBody, limit: config.maxBodyLength)
         }
 
         if config.capturesHeaders {
-            event.requestHeaders = request.allHTTPHeaderFields
-            event.responseHeaders = (http?.allHeaderFields as? [String: String])
+            event.requestHeaders = completion.requestHeaders
+            event.responseHeaders = completion.responseHeaders
         }
 
         Olaf.log(
-            NetworkLogComposer.level(statusCode: event.statusCode, error: event.error),
+            NetworkLogComposer.level(statusCode: event.statusCode, error: event.error, cancelled: event.cancelled),
             NetworkLogComposer.message(for: event),
             category: config.category,
             metadata: NetworkLogComposer.metadata(for: event)
         )
     }
 
-    private func bodyString(from data: Data?, limit: Int) -> String? {
+    private static func bodyString(from data: Data?, limit: Int) -> String? {
         guard let data, !data.isEmpty, limit > 0 else { return nil }
         // JSON ise yakalama anında pretty-print ederek sakla → viewer'da girintili görünür.
         if let object = try? JSONSerialization.jsonObject(with: data),
@@ -145,9 +213,88 @@ final class OlafURLProtocol: URLProtocol {
     }
 }
 
-// MARK: - URLSessionDataDelegate (yakalama + istemciye iletim)
+// MARK: - Paylaşılan proxy session
 
-extension OlafURLProtocol: URLSessionDataDelegate {
+/// Tüm yakalamaların paylaştığı TEK proxy session + task → protokol yönlendiricisi.
+///
+/// Neden tek session? İstek başına session kurmak her yakalanan isteğe yeni TCP+TLS handshake
+/// ödetir ve HTTP/2 bağlantı havuzunu kullanılamaz kılar. Tek session bağlantıları yeniden kullanır.
+///
+/// Config `.default` tabanlıdır → paylaşılan `HTTPCookieStorage` korunur (ephemeral'da çerezler
+/// isteklere eklenmez ve `Set-Cookie` saklanmazdı → cookie tabanlı oturumlar capture altında
+/// bozulurdu). Cache kapalıdır: yanıt saklama politikası istemci tarafında kalır.
+final class OlafProxySession: NSObject, @unchecked Sendable {
+
+    static let shared = OlafProxySession()
+
+    /// Ağır log hazırlığı (JSON pretty-print) için ayrı kuyruk — delegate kuyruğunu bekletmez.
+    static let logQueue = DispatchQueue(label: "com.olaf.network.log", qos: .utility)
+
+    private let lock = NSLock()
+    private var handlers: [ObjectIdentifier: OlafURLProtocol] = [:]
+    private var session: URLSession?
+    /// Session'ın kurulduğu andaki `chainedProtocolClasses` imzası; değişirse session yeniden kurulur.
+    private var builtChainSignature: [ObjectIdentifier] = []
+
+    private override init() { super.init() }
+
+    // MARK: - Task yaşam döngüsü
+
+    /// Proxy task'ı oluşturup başlatır ve handler'ı task'a bağlar. Handler, task tamamlanana
+    /// (`didCompleteWithError`) dek güçlü tutulur; orada düşürülür.
+    func startTask(with request: URLRequest, handler: OlafURLProtocol) -> URLSessionDataTask {
+        lock.lock()
+        let session = currentSessionLocked()
+        lock.unlock()
+        let task = session.dataTask(with: request)
+        lock.lock()
+        handlers[ObjectIdentifier(task)] = handler
+        lock.unlock()
+        task.resume()
+        return task
+    }
+
+    /// Aktif session'ı döndürür; zincir değiştiyse (veya ilk kullanımsa) yeniden kurar.
+    /// Eski session `finishTasksAndInvalidate` ile in-flight task'larını bitirip kapanır
+    /// (callback'ler task kimliğiyle yönlendirildiğinden eski task'lar etkilenmez).
+    private func currentSessionLocked() -> URLSession {
+        let signature = OlafNetwork.chainedProtocolClasses.map(ObjectIdentifier.init)
+        if let session, signature == builtChainSignature { return session }
+        session?.finishTasksAndInvalidate()
+        let fresh = URLSession(configuration: Self.makeConfiguration(), delegate: self, delegateQueue: nil)
+        session = fresh
+        builtChainSignature = signature
+        return fresh
+    }
+
+    private static func makeConfiguration() -> URLSessionConfiguration {
+        let config = URLSessionConfiguration.default
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.urlCache = nil
+        let selfID = ObjectIdentifier(OlafURLProtocol.self)
+        // Swizzle, `.default` config'e Olaf'ı enjekte etmiş olabilir → proxy'den çıkar (handledKey
+        // zaten döngüyü keser ama gereksiz canInit turu da olmasın). Zincirlenen protokoller
+        // (başka capture araçları) proxy trafiğini de görsün diye başa eklenir.
+        let chained = OlafNetwork.chainedProtocolClasses.filter { ObjectIdentifier($0) != selfID }
+        let existing = (config.protocolClasses ?? []).filter { ObjectIdentifier($0) != selfID }
+        config.protocolClasses = chained + existing
+        return config
+    }
+
+    private func handler(for task: URLSessionTask) -> OlafURLProtocol? {
+        lock.lock(); defer { lock.unlock() }
+        return handlers[ObjectIdentifier(task)]
+    }
+
+    private func removeHandler(for task: URLSessionTask) -> OlafURLProtocol? {
+        lock.lock(); defer { lock.unlock() }
+        return handlers.removeValue(forKey: ObjectIdentifier(task))
+    }
+}
+
+// MARK: - URLSessionDataDelegate (task → handler yönlendirme)
+
+extension OlafProxySession: URLSessionDataDelegate {
 
     func urlSession(
         _ session: URLSession,
@@ -155,21 +302,28 @@ extension OlafURLProtocol: URLSessionDataDelegate {
         didReceive response: URLResponse,
         completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
     ) {
-        capturedResponse = response
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        handler(for: dataTask)?.proxyDidReceive(response)
         completionHandler(.allow)
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        responseByteCount += data.count
-        // Gövde yakalama kapalıysa veriyi biriktirme (yalnız byte say) → büyük indirmelerde RAM tasarrufu.
-        if capturesBodies { responseData.append(data) }
-        client?.urlProtocol(self, didLoad: data)
+        handler(for: dataTask)?.proxyDidReceive(data)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        handler(for: task)?.proxyWasRedirected(to: request, response: response)
+        completionHandler(request)
     }
 
     /// Sunucu trust challenge'ı. **Varsayılan**: sistem doğrulaması (`.performDefaultHandling`) →
     /// proxy session host'un cert pinning'ini/OS trust zincirini ezmez; geçersiz/pinlenmemiş sertifika
-    /// reddedilir (eski `URLCredential(trust:)` baypası kaldırıldı).
+    /// reddedilir.
     ///
     /// **Opt-in (yalnız non-prod)**: `allowsArbitraryServerTrustForCapture == true` ise server-trust
     /// challenge'ında sunucunun sunduğu trust koşulsuz kabul edilir. Host kendi özel CA'sına / iç test
@@ -189,25 +343,7 @@ extension OlafURLProtocol: URLSessionDataDelegate {
         completionHandler(.performDefaultHandling, nil)
     }
 
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        willPerformHTTPRedirection response: HTTPURLResponse,
-        newRequest request: URLRequest,
-        completionHandler: @escaping (URLRequest?) -> Void
-    ) {
-        client?.urlProtocol(self, wasRedirectedTo: request, redirectResponse: response)
-        completionHandler(request)
-    }
-
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let error {
-            client?.urlProtocol(self, didFailWithError: error)
-        } else {
-            client?.urlProtocolDidFinishLoading(self)
-        }
-        logCompletion(error: error)
-        proxySession?.finishTasksAndInvalidate()
-        proxySession = nil
+        removeHandler(for: task)?.proxyDidComplete(error: error)
     }
 }

@@ -15,7 +15,7 @@ SPM tek ürün sunar: `Olaf`. Host tek ürünü ekler, tek `import Olaf` yeter. 
   `#if canImport(UIKit)` gate'li. Jenerik `ExternalToolBridge` + `OlafUI.register(_:)` ile host kendi
   dış tanılama aracını viewer'a buton olarak ekleyebilir (paket hiçbir dış araca bağlı değildir).
 - **`Sources/Olaf/Network`** — URLProtocol network capture; `.network` kategorisinde, ham (maskelemesiz).
-  - `startAutomaticCapture(config)` — URLSessionConfiguration swizzle ile tüm session'lara otomatik enjekte (host'un networking koduna dokunmadan); proxy session sunucu trust'ını kabul eder (SSL kırmaz).
+  - `startAutomaticCapture(config)` — URLSessionConfiguration swizzle ile tüm session'lara otomatik enjekte (host'un networking koduna dokunmadan). Yakalanan istekler TEK paylaşılan proxy session'dan (`OlafProxySession`) geçer: bağlantı havuzu/TLS yeniden kullanılır, paylaşılan `HTTPCookieStorage` korunur. Trust default sistem doğrulamasıdır (`allowsArbitraryServerTrustForCapture` yalnız opt-in).
   - `OlafNetworkConfiguration`: `capturesBodies/capturesHeaders` (default açık), `includedURLs`/`excludedURLs` (baseURL allow/deny filtresi — `canInit`'te uygulanır, exclude önceliklidir), `maxBodyLength`, `category`.
   - JSON gövdeler **yakalama anında** pretty-print edilip saklanır; viewer'da `JSONHighlighter` ile syntax renklendirme.
 
@@ -32,8 +32,9 @@ Her değişiklikte macOS test + iOS build yeşil olmalı.
 - **Paket hiçbir dış araca bağlı DEĞİLDİR.** Dış tanılama aracı geçişi yalnız jenerik `ExternalToolBridge`
   + `OlafUI.register(_:)` ile host tarafında eklenir; gerekirse `OlafNetwork.install(chainingTo:)` ile
   başka bir capture aracının URLProtocol'ü paylaşılan session'a zincirlenebilir.
-- **Network capture yalnız non-prod debug.** Proxy session sunucu trust'ını kabul eder (SSL kırmamak için);
-  gövde/header default loglanır → PROD'da çalıştırılmamalı (host runtime flag + `#if !PROD` ile gate'ler).
+- **Network capture yalnız non-prod debug.** Proxy varsayılan olarak sistem trust doğrulaması kullanır
+  (pinning/OS trust baypaslanmaz); özel CA'lar için `allowsArbitraryServerTrustForCapture` opt-in'dir.
+  Gövde/header default loglanır → PROD'da çalıştırılmamalı (host runtime flag + `#if !PROD` ile gate'ler).
 - **call-site bilgisi** (file/line/function) log fonksiyonlarında **doğrudan** `#fileID/#line/#function` default'u
   olmalı — tek struct'a sarmak (LogSource) call-site yakalamayı bozar.
 - Public repo: banka/şirket adı veya iç sınıf adı **eklenmez** (jenerik tut).
