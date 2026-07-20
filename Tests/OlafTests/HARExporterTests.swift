@@ -43,7 +43,7 @@ final class HARExporterTests: XCTestCase {
         let log = try XCTUnwrap(root["log"] as? [String: Any])
         XCTAssertEqual(log["version"] as? String, "1.2")
 
-        // Network olmayan kayıt atlanır.
+        // Non-network entries are skipped.
         let entries = try XCTUnwrap(log["entries"] as? [[String: Any]])
         XCTAssertEqual(entries.count, 1)
 

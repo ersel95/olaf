@@ -1,7 +1,7 @@
 import XCTest
 @testable import Olaf
 
-/// Geçmişte sayfalama — dosya-sınırlı imleçle en yeniden geriye okuma.
+/// History pagination — reading newest to oldest with a file-bounded cursor.
 final class HistoryPaginationTests: XCTestCase {
 
     private var directory: URL!
@@ -22,7 +22,7 @@ final class HistoryPaginationTests: XCTestCase {
         )
     }
 
-    /// Küçük maxFileSize ile çok dosyalı bir geçmiş kurar (her yazım ~payload boyutunda).
+    /// Builds a multi-file history using a small maxFileSize (each write is ~payload-sized).
     private func makeRotatedHistory(entryCount: Int, perFileBytes: Int = 2000) throws -> FilePersistence {
         let persistence = try XCTUnwrap(FilePersistence(
             directory: directory, maxFileSize: perFileBytes, maxFileCount: 100
@@ -38,10 +38,10 @@ final class HistoryPaginationTests: XCTestCase {
 
         let page = persistence.loadEntriesPage(before: nil, minimumEntries: 3)
         XCTAssertFalse(page.entries.isEmpty)
-        XCTAssertNotNil(page.nextCursor)                       // gerisi duruyor
-        // İlk sayfa EN YENİ kaydı içermeli.
+        XCTAssertNotNil(page.nextCursor)                       // the rest remains
+        // The first page should contain the NEWEST entry.
         XCTAssertTrue(page.entries.contains { $0.message.hasSuffix("#12") })
-        // Sayfa içi sıra eskiden yeniye olmalı.
+        // Order within the page should be oldest to newest.
         let numbers = page.entries.compactMap { Int($0.message.split(separator: "#").last ?? "") }
         XCTAssertEqual(numbers, numbers.sorted())
     }
@@ -55,20 +55,20 @@ final class HistoryPaginationTests: XCTestCase {
         var pages = 0
         repeat {
             let page = persistence.loadEntriesPage(before: cursor, minimumEntries: 4)
-            collected.insert(contentsOf: page.entries, at: 0)   // viewer'ın yaptığı gibi başa ekle
+            collected.insert(contentsOf: page.entries, at: 0)   // prepend, the way the viewer does
             cursor = page.nextCursor
             pages += 1
-            XCTAssertLessThan(pages, 100, "imleç ilerlemiyor (sonsuz döngü)")
+            XCTAssertLessThan(pages, 100, "cursor isn't advancing (infinite loop)")
         } while cursor != nil
 
-        XCTAssertGreaterThan(pages, 1, "test çok dosyalı sayfalama üretmeliydi")
-        // Tüm kayıtlar, tam sırayla, tekrarsız: birleştirilmiş sayfalar == tek seferde okuma.
+        XCTAssertGreaterThan(pages, 1, "test should have produced multi-file pagination")
+        // All entries, in exact order, without duplicates: merged pages == a single read.
         XCTAssertEqual(collected.map(\.id), all.map(\.id))
     }
 
     func testMinimumEntriesSpansMultipleFiles() throws {
         let persistence = try makeRotatedHistory(entryCount: 12)
-        // Tek dosyada ~2-3 kayıt var; 8 istemek birden çok dosya tüketmeli.
+        // A single file holds ~2-3 entries; requesting 8 should consume multiple files.
         let page = persistence.loadEntriesPage(before: nil, minimumEntries: 8)
         XCTAssertGreaterThanOrEqual(page.entries.count, 8)
     }
@@ -78,11 +78,11 @@ final class HistoryPaginationTests: XCTestCase {
         let first = persistence.loadEntriesPage(before: nil, minimumEntries: 3)
         let cursor = try XCTUnwrap(first.nextCursor)
 
-        // İmlecin gösterdiği dosya silinmiş olsun (prune senaryosu).
+        // Simulate the cursor's file having been deleted (prune scenario).
         try FileManager.default.removeItem(at: directory.appendingPathComponent(cursor))
 
         let second = persistence.loadEntriesPage(before: cursor, minimumEntries: 3)
-        // Düşüş: daha eski dosyalardan devam eder ve ilk sayfayla kesişmez.
+        // Fallback: continues from older files and doesn't overlap with the first page.
         let firstIDs = Set(first.entries.map(\.id))
         XCTAssertFalse(second.entries.isEmpty)
         XCTAssertTrue(firstIDs.isDisjoint(with: second.entries.map(\.id)))

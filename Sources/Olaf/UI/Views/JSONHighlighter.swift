@@ -1,12 +1,12 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// JSON metnini regex tabanlı renklendirip `AttributedString` döndürür (key/string/sayı/literal).
-/// Katı parse yapmaz → truncation ile bozulmuş JSON'u da renklendirir.
+/// Highlights JSON text via regex and returns an `AttributedString` (key/string/number/literal).
+/// Does not strict-parse → also highlights JSON broken by truncation.
 enum JSONHighlighter {
 
-    /// Pattern'ler statik literal → regex'ler bir kez derlenir (her detay render'ında yeniden
-    /// derleme yok). `NSRegularExpression` thread-safe. `try!` güvenli: derleme-zamanı sabitleri.
+    /// Patterns are static literals → regexes are compiled once (no recompilation on every
+    /// detail render). `NSRegularExpression` is thread-safe. `try!` is safe: compile-time constants.
     private enum Regexes {
         static let string = try! NSRegularExpression(pattern: #""(?:\\.|[^"\\])*""#)
         static let key = try! NSRegularExpression(pattern: #""(?:\\.|[^"\\])*"(?=\s*:)"#)
@@ -18,11 +18,11 @@ enum JSONHighlighter {
         var result = AttributedString(text)
         result.foregroundColor = .primary
 
-        // Sıra önemli: önce tüm string'ler, sonra key'ler (string'in üstüne yazar).
-        colorize(Regexes.string, .green, in: &result, source: text)   // string değerler
-        colorize(Regexes.key, .purple, in: &result, source: text)     // key'ler
-        colorize(Regexes.number, .teal, in: &result, source: text)    // sayılar
-        colorize(Regexes.literal, .orange, in: &result, source: text) // literal
+        // Order matters: color all strings first, then keys (overwrites over the string color).
+        colorize(Regexes.string, .green, in: &result, source: text)   // string values
+        colorize(Regexes.key, .purple, in: &result, source: text)     // keys
+        colorize(Regexes.number, .teal, in: &result, source: text)    // numbers
+        colorize(Regexes.literal, .orange, in: &result, source: text) // literals
 
         return result
     }

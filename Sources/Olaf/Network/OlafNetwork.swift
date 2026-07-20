@@ -1,39 +1,39 @@
 import Foundation
 
-/// Olaf network capture cephesi. Uygulamanın network isteklerini yakalayıp `.network`
-/// kategorisinde **ham** (maskelemesiz) Olaf'a loglar.
+/// Olaf network capture facade. Captures the app's network requests and logs them to Olaf
+/// **raw** (unredacted) under the `.network` category.
 ///
 /// ```swift
-/// // Tüm istekleri yakalamak için (Alamofire/URLSession custom config):
+/// // To capture all requests (Alamofire/URLSession custom config):
 /// OlafNetwork.install(into: sessionConfiguration)
 ///
-/// // Başka bir capture aracıyla BİRLİKTE çalışmak için zincirle:
+/// // To work TOGETHER with another capture tool, chain it:
 /// OlafNetwork.install(into: sessionConfiguration, chainingTo: [OtherCaptureProtocol.self])
 /// ```
 public enum OlafNetwork {
 
     private static let box = ConfigBox()
 
-    /// Aktif yapılandırma. `Olaf.start` öncesi/sonrası ayarlanabilir.
+    /// Active configuration. Can be set before/after `Olaf.start`.
     public static var configuration: OlafNetworkConfiguration {
         get { box.value }
         set { box.value = newValue }
     }
 
-    /// Olaf isteği yeniden başlatırken kendi (yakalanmayan) proxy session'ına eklenecek
-    /// ek `URLProtocol` sınıfları. Başka capture araçlarının da yakalaması için kullanılır.
+    /// Additional `URLProtocol` classes to add to Olaf's own (uncaptured) proxy session when it
+    /// restarts a request. Used so other capture tools can also capture the traffic.
     public static var chainedProtocolClasses: [AnyClass] {
         get { box.chained }
         set { box.chained = newValue }
     }
 
-    /// Yakalama protokolünü verilen `URLSessionConfiguration`'a enjekte eder ve yakalama
-    /// parametrelerini **init'te** ayarlar.
+    /// Injects the capture protocol into the given `URLSessionConfiguration` and sets the capture
+    /// parameters **at init**.
     /// - Parameters:
-    ///   - configuration: Protokolün başa ekleneceği session config.
-    ///   - networkConfiguration: Yakalama filtreleri (gövde/header default açık).
-    ///   - chainingTo: Olaf yakaladıktan sonra isteğin geçmesi gereken ek `URLProtocol`'ler
-    ///     — böylece başka bir capture aracı da aynı trafiği yakalar.
+    ///   - configuration: The session config the protocol will be prepended to.
+    ///   - networkConfiguration: Capture filters (body/header capture on by default).
+    ///   - chainingTo: Additional `URLProtocol`s the request should pass through after Olaf
+    ///     captures it — so another capture tool also sees the same traffic.
     public static func install(
         into configuration: URLSessionConfiguration,
         with networkConfiguration: OlafNetworkConfiguration = .default,
@@ -41,14 +41,14 @@ public enum OlafNetwork {
     ) {
         self.configuration = networkConfiguration
         self.chainedProtocolClasses = chainedClasses
-        // Var olan kopyaları ele, garantili en öne ekle (URLProtocol "ilk eşleşen kazanır").
+        // Remove any existing copies, then guarantee we're prepended first (URLProtocol: "first match wins").
         let id = ObjectIdentifier(OlafURLProtocol.self)
         var classes = (configuration.protocolClasses ?? []).filter { ObjectIdentifier($0) != id }
         classes.insert(OlafURLProtocol.self, at: 0)
         configuration.protocolClasses = classes
     }
 
-    /// `URLSession.shared` ve global istekler için protokolü kaydeder ve yakalama parametrelerini init'te ayarlar.
+    /// Registers the protocol for `URLSession.shared` and global requests, and sets the capture parameters at init.
     public static func installGlobally(
         _ networkConfiguration: OlafNetworkConfiguration = .default,
         chainingTo chainedClasses: [AnyClass] = []
@@ -58,15 +58,15 @@ public enum OlafNetwork {
         URLProtocol.registerClass(OlafURLProtocol.self)
     }
 
-    /// **En kolay kurulum — host networking koduna DOKUNMADAN.**
-    /// `URLSessionConfiguration.default/.ephemeral` swizzle edilerek tüm session'lara (Alamofire dahil)
-    /// otomatik enjekte edilir + shared session için global kayıt yapılır.
+    /// **Easiest setup — WITHOUT touching the host's networking code.**
+    /// Swizzles `URLSessionConfiguration.default/.ephemeral` so it's automatically injected into
+    /// every session (including Alamofire) + registers globally for the shared session.
     ///
-    /// SSL: proxy session **varsayılan sistem doğrulaması** kullanır (pinning/OS trust baypaslanmaz);
-    /// özel kurumsal CA'lar için `allowsArbitraryServerTrustForCapture` (yalnız non-prod). **Non-prod debug** için.
+    /// SSL: the proxy session uses **default system validation** (pinning/OS trust is not bypassed);
+    /// for custom enterprise CAs use `allowsArbitraryServerTrustForCapture` (non-prod only). For **non-prod debug** use only.
     ///
     /// ```swift
-    /// // OlafManager.initialize() içinde tek satır — BaseService'e dokunmaya gerek yok:
+    /// // One line inside OlafManager.initialize() — no need to touch BaseService:
     /// OlafNetwork.startAutomaticCapture()
     /// ```
     public static func startAutomaticCapture(_ networkConfiguration: OlafNetworkConfiguration = .default) {
@@ -75,52 +75,52 @@ public enum OlafNetwork {
         URLProtocol.registerClass(OlafURLProtocol.self)
     }
 
-    /// Global kaydı kaldırır.
+    /// Removes the global registration.
     public static func uninstallGlobally() {
         URLProtocol.unregisterClass(OlafURLProtocol.self)
     }
 
-    /// Manuel enjeksiyon için protokol sınıfı.
+    /// Protocol class for manual injection.
     public static var protocolClass: AnyClass { OlafURLProtocol.self }
 
-    /// Şu an devam eden (henüz tamamlanmamış) yakalamalar — en eski üstte.
-    /// Viewer "Aktif istekler" bölümü bunu periyodik okur; asılı kalan istekler burada görünür.
+    /// Currently in-flight (not yet completed) captures — oldest first.
+    /// The viewer's "Active requests" section polls this periodically; stuck requests show up here.
     public static var pendingRequests: [PendingNetworkRequest] {
         PendingRequestRegistry.shared.snapshot
     }
 
     // MARK: - Response mocking
 
-    /// Bir mock kaydeder. Eşleşen istekler **ağa çıkmadan** bu yanıtı alır (capture aktif olmalı —
-    /// `startAutomaticCapture`/`install`). Birden çok mock eşleşirse ilk eklenen kazanır.
-    /// Yalnız non-prod debug içindir (Olaf'ın geri kalanı gibi `#if !PROD` altında kalmalı).
+    /// Registers a mock. Matching requests receive this response **without hitting the network**
+    /// (capture must be active — `startAutomaticCapture`/`install`). If multiple mocks match, the
+    /// first one added wins. Non-prod debug only (like the rest of Olaf, should stay under `#if !PROD`).
     public static func addMock(_ mock: OlafMockResponse) {
         box.mocks.append(mock)
     }
 
-    /// Tek bir mock'u kaldırır (viewer'daki mock listesi kullanır).
+    /// Removes a single mock (used by the viewer's mock list).
     public static func removeMock(id: UUID) {
         box.mocks.removeAll { $0.id == id }
     }
 
-    /// Tüm mock'ları kaldırır (istekler yeniden gerçek backend'e gider).
+    /// Removes all mocks (requests go to the real backend again).
     public static func removeAllMocks() {
         box.mocks = []
     }
 
-    /// Kayıtlı mock'lar (ekleme sırasıyla).
+    /// Registered mocks (in insertion order).
     public static var activeMocks: [OlafMockResponse] {
         box.mocks
     }
 
-    /// Verilen isteğe uyan ilk mock (dahili — `OlafURLProtocol` kullanır).
+    /// The first mock matching the given request (internal — used by `OlafURLProtocol`).
     static func mock(for request: URLRequest) -> OlafMockResponse? {
         let mocks = box.mocks
         guard !mocks.isEmpty else { return nil }
         return mocks.first { $0.matches(request) }
     }
 
-    // Dahili erişim (URLProtocol config'i okur).
+    // Internal access (read by URLProtocol's config).
     static var current: OlafNetworkConfiguration { box.value }
 
     private final class ConfigBox: @unchecked Sendable {

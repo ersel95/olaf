@@ -57,7 +57,7 @@ final class NetworkLogComposerTests: XCTestCase {
         XCTAssertFalse(noSDK.shouldCapture(URL(string: "https://app.firebaseio.com/y")))
         XCTAssertTrue(noSDK.shouldCapture(URL(string: "https://api-gateway.example.com/x")))
 
-        // exclude, include'dan önceliklidir
+        // exclude takes priority over include
         let both = OlafNetworkConfiguration(includedURLs: ["example.com"], excludedURLs: ["/health"])
         XCTAssertTrue(both.shouldCapture(URL(string: "https://example.com/transfer")))
         XCTAssertFalse(both.shouldCapture(URL(string: "https://example.com/health")))
@@ -67,13 +67,13 @@ final class NetworkLogComposerTests: XCTestCase {
 
     func testConfigurationDefaultsOpen() {
         let config = OlafNetworkConfiguration.default
-        XCTAssertTrue(config.capturesBodies)  // default açık
-        XCTAssertTrue(config.capturesHeaders) // default açık
+        XCTAssertTrue(config.capturesBodies)  // on by default
+        XCTAssertTrue(config.capturesHeaders) // on by default
         XCTAssertEqual(config.category, .network)
     }
 
     func testComposerStoresBodiesRawAsSeparateKeys() {
-        // composer requestBody/responseBody'yi ayrı anahtar olarak ham (maskelemesiz) saklar.
+        // composer stores requestBody/responseBody under separate keys, raw (unredacted).
         var e = event(status: 200)
         e.requestBody = #"{"accessToken":"abc123","amount":50}"#
         e.responseBody = #"{"balance":99999,"iban":"AZ21NABZ00000000137010001944"}"#
@@ -88,7 +88,7 @@ final class NetworkLogComposerTests: XCTestCase {
         e.requestHeaders = ["Authorization": "Bearer x", "Accept": "application/json"]
         e.responseHeaders = ["Set-Cookie": "sid=123"]
         let metadata = NetworkLogComposer.metadata(for: e)
-        XCTAssertEqual(metadata["reqH.Authorization"], "Bearer x") // ham olarak saklanır
+        XCTAssertEqual(metadata["reqH.Authorization"], "Bearer x") // stored raw
         XCTAssertEqual(metadata["reqH.Accept"], "application/json")
         XCTAssertEqual(metadata["respH.Set-Cookie"], "sid=123")
     }

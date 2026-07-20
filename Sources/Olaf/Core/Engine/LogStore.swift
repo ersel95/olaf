@@ -1,9 +1,9 @@
 import Foundation
 
-/// Olaf'un çekirdek deposu: in-memory ring buffer → (ops.) disk → canlı yayın.
+/// Olaf's core store: in-memory ring buffer → (optionally) disk → live broadcast.
 ///
-/// Tüm mutasyon tek bir serial kuyrukta yapılır → kayıt sırası deterministiktir ve
-/// veri yarışı yoktur. `@unchecked Sendable` bu serial-kuyruk sözleşmesine dayanır.
+/// All mutation happens on a single serial queue → entry ordering is deterministic and there
+/// are no data races. `@unchecked Sendable` relies on this serial-queue contract.
 final class LogStore: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "com.olaf.store", qos: .utility)
@@ -13,18 +13,18 @@ final class LogStore: @unchecked Sendable {
     private let osLogMirror: OSLogMirror?
     private let sessionID: String
 
-    /// Sabit kapasiteli halka tampon (en yeni `capacity` kayıt).
-    /// `ring` kapasiteye ulaşana dek büyür; dolunca `head`'deki (en eski) kayıt üzerine yazılır.
-    /// Append + evict **O(1)** (eski `Array.removeFirst` O(n) kaydırması yerine).
+    /// Fixed-capacity ring buffer (the newest `capacity` entries).
+    /// `ring` grows until it reaches capacity; once full, the entry at `head` (the oldest) is
+    /// overwritten. Append + evict are **O(1)** (instead of the O(n) shift from `Array.removeFirst`).
     private var ring: [LogEntry] = []
-    /// Tampon doluyken en eski kaydın `ring` içindeki indeksi.
+    /// Index of the oldest entry within `ring` once the buffer is full.
     private var head = 0
-    /// Canlı dinleyiciler (viewer). Kuyrukta erişilir.
+    /// Live listeners (the viewer). Accessed on the queue.
     private var continuations: [UUID: AsyncStream<LogEntry>.Continuation] = [:]
 
-    /// Tampondaki kayıtlar (eskiden yeniye), kuyruk içinde çağrılır.
+    /// The buffer's entries (oldest to newest), called from within the queue.
     private var orderedBuffer: [LogEntry] {
-        if ring.count < capacity { return ring }   // dolmadıysa head == 0, ekleme sırası korunur
+        if ring.count < capacity { return ring }   // if not yet full, head == 0, insertion order is preserved
         return Array(ring[head...] + ring[..<head])
     }
 
@@ -43,9 +43,9 @@ final class LogStore: @unchecked Sendable {
         self.ring.reserveCapacity(capacity)
     }
 
-    // MARK: - Yazma
+    // MARK: - Writing
 
-    /// Çağrı yerinden gelen veriyi alıp serial kuyrukta tampona/diske yazar.
+    /// Takes data from the call site and writes it to the buffer/disk on the serial queue.
     func ingest(
         date: Date,
         level: LogLevel,
@@ -74,7 +74,7 @@ final class LogStore: @unchecked Sendable {
             if ring.count < capacity {
                 ring.append(entry)
             } else {
-                ring[head] = entry            // en eski kaydın üzerine yaz
+                ring[head] = entry            // overwrite the oldest entry
                 head = (head + 1) % capacity  // O(1) evict
             }
 
@@ -87,15 +87,15 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
-    // MARK: - Okuma
+    // MARK: - Reading
 
-    /// Mevcut tampondaki tüm kayıtların anlık kopyası (eskiden yeniye).
+    /// An instant copy of all entries currently in the buffer (oldest to newest).
     func snapshot() -> [LogEntry] {
         queue.sync { orderedBuffer }
     }
 
-    /// `snapshot()`'ın bloke etmeyen sürümü: çağıran (ör. ana thread) `.utility` kuyruğu yoğun
-    /// yazma burst'ü işlerken `queue.sync` ile beklemesin diye.
+    /// Non-blocking version of `snapshot()`: so the caller (e.g. the main thread) doesn't wait on
+    /// `queue.sync` while the `.utility` queue is processing a heavy write burst.
     func snapshotAsync() async -> [LogEntry] {
         await withCheckedContinuation { continuation in
             queue.async { [self] in
@@ -104,10 +104,10 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
-    /// Yeni kayıtları canlı yayınlayan akış. Viewer abone olur.
+    /// A stream that live-broadcasts new entries. The viewer subscribes to it.
     func makeStream() -> AsyncStream<LogEntry> {
-        // Sınırlı tampon: viewer yavaşsa (veya duraklatılmışsa) bellek sınırsız büyümesin —
-        // en yeni `capacity` kayıt tutulur, eskiler düşer (tampon zaten en yeniyi gösterir).
+        // Bounded buffer: so memory doesn't grow unbounded if the viewer is slow (or paused) —
+        // the newest `capacity` entries are kept, older ones are dropped (the buffer already shows the newest).
         AsyncStream(bufferingPolicy: .bufferingNewest(capacity)) { continuation in
             let id = UUID()
             queue.async { [self] in
@@ -121,7 +121,7 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
-    // MARK: - Yönetim
+    // MARK: - Management
 
     func clear() {
         queue.async { [self] in
@@ -131,8 +131,8 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
-    /// Diskteki tüm kayıtları (oturumlar arası geçmiş dahil) ASENKRON ayrıştırır.
-    /// Ağır dosya I/O serial kuyrukta yapılır → çağıran (ör. ana thread) bloke olmaz.
+    /// Parses all entries on disk (including cross-session history) ASYNCHRONOUSLY.
+    /// Heavy file I/O happens on the serial queue → the caller (e.g. the main thread) is not blocked.
     func loadPersisted() async -> [LogEntry] {
         await withCheckedContinuation { continuation in
             queue.async { [self] in
@@ -141,7 +141,7 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
-    /// Diskteki geçmişten bir SAYFA okur (en yeniden geriye; bkz. `FilePersistence.loadEntriesPage`).
+    /// Reads a PAGE from on-disk history (newest to oldest; see `FilePersistence.loadEntriesPage`).
     func loadPersistedPage(before cursor: String?, minimumEntries: Int) async -> PersistedLogPage {
         await withCheckedContinuation { continuation in
             queue.async { [self] in
@@ -151,7 +151,7 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
-    /// Diskteki kayıtları birleştirip paylaşılabilir .log dosyası üretir (asenkron, bloke etmez).
+    /// Merges the on-disk entries and produces a shareable .log file (async, non-blocking).
     func exportFileURL() async -> URL? {
         await withCheckedContinuation { continuation in
             queue.async { [self] in
@@ -160,9 +160,9 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
-    /// Verilen kayıtları (ör. viewer'da o an **filtreli** görünen liste) paylaşılabilir .log
-    /// dosyasına yazar. Disk persistance'tan bağımsız — yalnız geçirilen kayıtları dışa aktarır.
-    /// Metin oluşturma + dosya I/O serial kuyrukta yapılır → çağıran bloke olmaz.
+    /// Writes the given entries (e.g. the currently **filtered** list in the viewer) to a
+    /// shareable .log file. Independent of disk persistence — exports only the passed-in entries.
+    /// Text generation + file I/O happen on the serial queue → the caller is not blocked.
     func exportFileURL(entries: [LogEntry]) async -> URL? {
         await withCheckedContinuation { continuation in
             queue.async { [self] in
@@ -172,8 +172,8 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
-    /// Verilen kayıtları **ham NDJSON** (satır başına bir JSON `LogEntry`) dosyasına yazar.
-    /// Disk formatıyla birebir aynı şema → jq/backend analizi/başka araçlara kayıpsız beslenebilir.
+    /// Writes the given entries to a **raw NDJSON** (one JSON `LogEntry` per line) file.
+    /// Identical schema to the on-disk format → can be fed losslessly into jq/backend analysis/other tools.
     func exportNDJSONFileURL(entries: [LogEntry]) async -> URL? {
         await withCheckedContinuation { continuation in
             queue.async {

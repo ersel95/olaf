@@ -3,22 +3,22 @@ import OSLog
 
 extension Olaf {
 
-    /// Sistemin OSLog deposundan **bu sürecin** kayıtlarını Olaf'a aktarır — diğer SDK'ların
-    /// `os_log`/`Logger` çıktıları dahil. Böylece Olaf'ı bilmeyen kütüphanelerin logları da
-    /// viewer'daki tek listede görünür/paylaşılır.
+    /// Imports **this process's** entries from the system's OSLog store into Olaf — including
+    /// `os_log`/`Logger` output from other SDKs. This way, logs from libraries that don't know
+    /// about Olaf also show up/get shared in the viewer's single list.
     ///
-    /// - Kayıtlar **özgün zaman damgasıyla** eklenir ama liste ekleme sırasına göre gösterilir:
-    ///   içe aktarılan blok, listede çağrı anının üstünde grup hâlinde görünür.
-    /// - Olaf'ın kendi OSLog aynası (`mirrorsToOSLog`) çift kayıt üretmesin diye, `excludingSubsystems`
-    ///   verilmezse **ana bundle identifier'ı** (default ayna subsystem'i) hariç tutulur; ayna için
-    ///   özel `subsystem` verdiyseniz onu geçirin.
-    /// - Ağır okuma `.utility` önceliğinde arka planda yapılır; çağıran bloke olmaz.
+    /// - Entries are added with their **original timestamp** but shown in insertion order in the
+    ///   list: the imported block appears as a group above the point where the call was made.
+    /// - To keep Olaf's own OSLog mirror (`mirrorsToOSLog`) from producing duplicate entries, if
+    ///   `excludingSubsystems` is not given, the **main bundle identifier** (the default mirror
+    ///   subsystem) is excluded; if you gave the mirror a custom `subsystem`, pass that instead.
+    /// - The heavy read happens in the background at `.utility` priority; the caller is not blocked.
     ///
     /// - Parameters:
-    ///   - since: Bu tarihten itibaren kayıtlar okunur (örn. `Date().addingTimeInterval(-3600)`).
-    ///   - category: Kayıtların düşeceği Olaf kategorisi (varsayılan `.oslog`).
-    ///   - excludingSubsystems: Atlanacak subsystem'ler. `nil` → ana bundle id hariç tutulur.
-    /// - Returns: İçe aktarılan kayıt sayısı. Olaf başlatılmadıysa `0`.
+    ///   - since: Entries are read from this date onward (e.g. `Date().addingTimeInterval(-3600)`).
+    ///   - category: The Olaf category entries will fall under (default `.oslog`).
+    ///   - excludingSubsystems: Subsystems to skip. `nil` → the main bundle id is excluded.
+    /// - Returns: The number of imported entries. `0` if Olaf hasn't been started.
     @discardableResult
     public static func importOSLogEntries(
         since: Date,
@@ -55,7 +55,7 @@ extension Olaf {
         }.value
     }
 
-    /// OSLog → Olaf seviye eşlemesi. (internal: test edilir.)
+    /// OSLog → Olaf level mapping. (internal: tested.)
     static func mapOSLogLevel(_ level: OSLogEntryLog.Level) -> LogLevel {
         switch level {
         case .debug: return .debug

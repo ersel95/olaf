@@ -3,7 +3,7 @@ import XCTest
 
 final class NetworkTimingAndPendingTests: XCTestCase {
 
-    // MARK: - Zamanlama metadata'sı
+    // MARK: - Timing metadata
 
     func testTimingMetadataKeys() {
         var event = NetworkLogEvent(
@@ -57,7 +57,7 @@ final class NetworkTimingAndPendingTests: XCTestCase {
         XCTAssertEqual(NetworkLogInfo(entry: plain)?.hasTimings, false)
     }
 
-    // MARK: - Aktif istek kaydı
+    // MARK: - Active request registry
 
     func testPendingRegistryLifecycle() {
         let registry = PendingRequestRegistry.shared
@@ -66,7 +66,7 @@ final class NetworkTimingAndPendingTests: XCTestCase {
         let first = registry.register(method: "GET", url: "https://a.com/1")
         let second = registry.register(method: "POST", url: "https://a.com/2")
         XCTAssertEqual(registry.snapshot.count, 2)
-        // En eski üstte sıralanır.
+        // Sorted with the oldest first.
         XCTAssertEqual(registry.snapshot.first?.id, first)
         XCTAssertEqual(OlafNetwork.pendingRequests.count, 2)
 
@@ -75,7 +75,7 @@ final class NetworkTimingAndPendingTests: XCTestCase {
 
         registry.unregister(second)
         XCTAssertTrue(registry.snapshot.isEmpty)
-        // Bilinmeyen id no-op'tur.
+        // An unknown id is a no-op.
         registry.unregister(first)
         XCTAssertTrue(registry.snapshot.isEmpty)
     }

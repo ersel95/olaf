@@ -1,35 +1,35 @@
 import Foundation
 
-/// Olaf çekirdeğinin yapılandırması. `Olaf.start(_:)` ile bir kez verilir.
+/// Configuration for the Olaf core. Supplied once via `Olaf.start(_:)`.
 public struct OlafConfiguration: Sendable {
 
-    /// Bu seviyenin altındaki loglar tamamen göz ardı edilir (mesaj bile compute edilmez).
+    /// Logs below this level are completely ignored (the message isn't even computed).
     public var minimumLevel: LogLevel
 
-    /// In-memory ring buffer kapasitesi (en yeni N kayıt RAM'de tutulur).
+    /// In-memory ring buffer capacity (the newest N entries are kept in RAM).
     public var inMemoryCapacity: Int
 
-    /// Logları diske de yazsın mı? (uygulama yeniden başladıktan sonra erişim için)
+    /// Should logs also be written to disk? (for access after the app restarts)
     public var persistsToDisk: Bool
 
-    /// Aktif log dosyası bu boyutu (byte) aşınca rotate edilir.
+    /// The active log file is rotated once it exceeds this size (bytes).
     public var maxFileSize: Int
 
-    /// Diskte tutulacak en fazla dosya sayısı (eskiler silinir).
+    /// Maximum number of files kept on disk (oldest are deleted).
     public var maxFileCount: Int
 
-    /// Export (.log paylaşımı) sırasında kullanılan **insan-okur** biçim. Disk depolaması
-    /// her zaman NDJSON'dur (geri okunabilirlik için); bu formatter yalnız paylaşım metnini üretir.
+    /// **Human-readable** format used during export (.log sharing). On-disk storage is always
+    /// NDJSON (for round-trip readability); this formatter only produces the shared text.
     public var exportFormatter: any LogFormatter
 
-    /// OSLog (`os.Logger`) köprüsü — loglar Console.app'te de görünsün mü?
+    /// OSLog (`os.Logger`) bridge — should logs also show up in Console.app?
     public var mirrorsToOSLog: Bool
 
-    /// OSLog köprüsü için subsystem (genelde bundle id).
+    /// Subsystem for the OSLog bridge (typically the bundle id).
     public var subsystem: String
 
     public init(
-        minimumLevel: LogLevel = .trace,   // default açık: tüm seviyeler yakalanır
+        minimumLevel: LogLevel = .trace,   // default on: all levels are captured
         inMemoryCapacity: Int = 2000,
         persistsToDisk: Bool = true,
         maxFileSize: Int = 1_048_576,        // 1 MB
@@ -48,6 +48,6 @@ public struct OlafConfiguration: Sendable {
         self.subsystem = subsystem
     }
 
-    /// Genel amaçlı varsayılan.
+    /// General-purpose default.
     public static let `default` = OlafConfiguration()
 }

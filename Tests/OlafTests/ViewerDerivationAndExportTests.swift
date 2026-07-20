@@ -16,44 +16,44 @@ private func makeEntry(
     )
 }
 
-/// `LogViewerModel`'in saf türetme fonksiyonları (memoize edilmiş @Published değerleri besler).
+/// `LogViewerModel`'s pure derivation functions (feed memoized @Published values).
 final class ViewerDerivationTests: XCTestCase {
 
     func testFilterIsNewestFirstAndHonorsLevels() {
         let entries = [
-            makeEntry("eski", level: .debug),
-            makeEntry("yeni", level: .error)
+            makeEntry("old", level: .debug),
+            makeEntry("new", level: .error)
         ]
         let all = LogViewerModel.filter(entries: entries, query: "", levels: Set(LogLevel.allCases), categories: [])
-        XCTAssertEqual(all.map(\.message), ["yeni", "eski"])   // en yeni üstte
+        XCTAssertEqual(all.map(\.message), ["new", "old"])   // newest on top
 
         let onlyErrors = LogViewerModel.filter(entries: entries, query: "", levels: [.error], categories: [])
-        XCTAssertEqual(onlyErrors.map(\.message), ["yeni"])
+        XCTAssertEqual(onlyErrors.map(\.message), ["new"])
     }
 
     func testFilterQueryMatchesMessageCategoryAndMetadata() {
         let entries = [
-            makeEntry("Login başarılı", category: .auth),
-            makeEntry("bakiye", metadata: ["requestBody": #"{"iban":"AZ21"}"#]),
-            makeEntry("alakasız")
+            makeEntry("Login successful", category: .auth),
+            makeEntry("balance", metadata: ["requestBody": #"{"iban":"AZ21"}"#]),
+            makeEntry("unrelated")
         ]
         let levels = Set(LogLevel.allCases)
         XCTAssertEqual(LogViewerModel.filter(entries: entries, query: "login", levels: levels, categories: []).count, 1)
         XCTAssertEqual(LogViewerModel.filter(entries: entries, query: "auth", levels: levels, categories: []).count, 1)
         XCTAssertEqual(LogViewerModel.filter(entries: entries, query: "az21", levels: levels, categories: []).count, 1)
-        XCTAssertEqual(LogViewerModel.filter(entries: entries, query: "yok-böyle", levels: levels, categories: []).count, 0)
+        XCTAssertEqual(LogViewerModel.filter(entries: entries, query: "no-such-match", levels: levels, categories: []).count, 0)
     }
 
     func testGroupSessionsExcludesCurrentAndSortsNewestSessionFirst() {
         let old = Date(timeIntervalSince1970: 1_000)
         let mid = Date(timeIntervalSince1970: 2_000)
         let entries = [
-            makeEntry("a", session: "eski-oturum", date: old),
-            makeEntry("b", session: "yeni-oturum", date: mid),
-            makeEntry("c", session: "mevcut", date: Date())
+            makeEntry("a", session: "old-session", date: old),
+            makeEntry("b", session: "new-session", date: mid),
+            makeEntry("c", session: "current", date: Date())
         ]
-        let groups = LogViewerModel.groupSessions(entries, excluding: "mevcut")
-        XCTAssertEqual(groups.map(\.id), ["yeni-oturum", "eski-oturum"])   // en yeni oturum önce
+        let groups = LogViewerModel.groupSessions(entries, excluding: "current")
+        XCTAssertEqual(groups.map(\.id), ["new-session", "old-session"])   // newest session first
         XCTAssertEqual(groups.first?.startDate, mid)
     }
 
@@ -67,7 +67,7 @@ final class ViewerDerivationTests: XCTestCase {
     }
 }
 
-/// NDJSON export — disk şemasıyla birebir aynı, geri okunabilir format.
+/// NDJSON export — a format identical to the on-disk schema, readable back losslessly.
 final class NDJSONExportTests: XCTestCase {
 
     func testExportedNDJSONRoundtrips() async throws {
@@ -76,8 +76,8 @@ final class NDJSONExportTests: XCTestCase {
             osLogMirror: nil, sessionID: "s"
         )
         let entries = [
-            makeEntry("ilk", level: .warning, metadata: ["k": "v"]),
-            makeEntry("ikinci", category: .network)
+            makeEntry("first", level: .warning, metadata: ["k": "v"]),
+            makeEntry("second", category: .network)
         ]
 
         let exportedURL = await store.exportNDJSONFileURL(entries: entries)
@@ -90,15 +90,15 @@ final class NDJSONExportTests: XCTestCase {
             .split(separator: "\n", omittingEmptySubsequences: true)
         let decoded = try lines.map { try decoder.decode(LogEntry.self, from: Data($0.utf8)) }
 
-        // ISO-8601 saniye hassasiyetinde olduğundan tarih birebir karşılaştırılmaz; kimlik + içerik yeter.
+        // Since ISO-8601 has second-level precision, dates aren't compared exactly; identity + content are enough.
         XCTAssertEqual(decoded.map(\.id), entries.map(\.id))
-        XCTAssertEqual(decoded.map(\.message), ["ilk", "ikinci"])
+        XCTAssertEqual(decoded.map(\.message), ["first", "second"])
         XCTAssertEqual(decoded.first?.metadata["k"], "v")
         XCTAssertEqual(decoded.first?.level, .warning)
     }
 }
 
-/// Runtime'da değiştirilebilir toplama eşiği.
+/// The collection threshold, adjustable at runtime.
 final class RuntimeLevelTests: XCTestCase {
 
     func testMinimumLevelAdjustableAtRuntime() {
@@ -107,12 +107,12 @@ final class RuntimeLevelTests: XCTestCase {
             minimumLevel: .debug, persistsToDisk: false, mirrorsToOSLog: false
         ))
 
-        if case .drop = runtime.target(for: .trace) {} else { XCTFail("trace eşiğin altında düşmeli") }
-        if case .store = runtime.target(for: .info) {} else { XCTFail("info toplanmalı") }
+        if case .drop = runtime.target(for: .trace) {} else { XCTFail("trace should fall below the threshold") }
+        if case .store = runtime.target(for: .info) {} else { XCTFail("info should be collected") }
 
         runtime.minimumLevel = .warning
         XCTAssertEqual(runtime.minimumLevel, .warning)
-        if case .drop = runtime.target(for: .info) {} else { XCTFail("eşik yükselince info düşmeli") }
-        if case .store = runtime.target(for: .error) {} else { XCTFail("error toplanmalı") }
+        if case .drop = runtime.target(for: .info) {} else { XCTFail("info should drop once the threshold is raised") }
+        if case .store = runtime.target(for: .error) {} else { XCTFail("error should be collected") }
     }
 }

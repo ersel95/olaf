@@ -1,7 +1,8 @@
 import Foundation
 
-/// `.network` kaydından cURL temsili üretir. Header/gövde değerleri **ham**dır (maskeleme yok);
-/// `Authorization`/`Cookie` dahil sırlar çıktıya aynen girer — paylaşmadan önce gözden geçirin.
+/// Produces a cURL representation from a `.network` entry. Header/body values are **raw** (no
+/// masking); secrets, including `Authorization`/`Cookie`, pass through verbatim into the output —
+/// review before sharing.
 enum CurlBuilder {
     static func curl(from info: NetworkLogInfo) -> String {
         var lines = ["curl -X \(info.method ?? "GET") \(quote(info.url ?? ""))"]
@@ -14,7 +15,7 @@ enum CurlBuilder {
         return lines.joined(separator: " \\\n  ")
     }
 
-    /// Tek tırnaklı shell argümanı; içteki tek tırnakları güvenli kaçışla sarar.
+    /// Single-quoted shell argument; safely escapes any embedded single quotes.
     private static func quote(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }

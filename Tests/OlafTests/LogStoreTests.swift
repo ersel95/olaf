@@ -44,7 +44,7 @@ final class LogStoreTests: XCTestCase {
     }
 
     func testRingBufferMultipleWrapsPreserveOrder() {
-        // Kapasitenin katından fazla yazım → head birden çok kez sarmalı, sıra korunmalı.
+        // More writes than a multiple of capacity → head should wrap around several times while order is preserved.
         let store = makeStore(capacity: 3)
         for i in 1...8 { ingest(store, "\(i)") }
         let snapshot = store.snapshot()
@@ -59,7 +59,7 @@ final class LogStoreTests: XCTestCase {
     }
 
     func testRawDataStoredUnchanged() {
-        // Maskeleme/filtreleme yok: hassas görünümlü veri bile ham haliyle saklanır.
+        // No masking/filtering: even sensitive-looking data is stored exactly as-is.
         let store = makeStore(capacity: 10)
         ingest(store, "PAN=4508034012345678")
         let stored = store.snapshot().first?.message ?? ""
@@ -70,12 +70,12 @@ final class LogStoreTests: XCTestCase {
         let store = makeStore(capacity: 10)
         ingest(store, "a")
         store.clear()
-        // clear async; snapshot serial kuyrukta sıraya girer → temizlik tamamlanmış olur.
+        // clear is async; snapshot gets queued on the serial queue → clearing will have completed by then.
         XCTAssertTrue(store.snapshot().isEmpty)
     }
 
     func testExportWritesOnlyGivenEntries() async throws {
-        // Filtreli export: viewer'da görünen alt küme geçilir → dosya yalnız onları içermeli.
+        // Filtered export: the subset visible in the viewer is passed in → the file should only contain those.
         let store = makeStore(capacity: 10)
         for i in 1...5 { ingest(store, "msg-\(i)") }
         let subset = Array(store.snapshot().prefix(2))   // "msg-1", "msg-2"
@@ -100,7 +100,7 @@ final class LogStoreTests: XCTestCase {
             return nil
         }
 
-        // Aboneliğin kuyruğa kaydı için kısa bekleme.
+        // A short wait for the subscription to be registered on the queue.
         try? await Task.sleep(nanoseconds: 50_000_000)
         ingest(store, "live")
 

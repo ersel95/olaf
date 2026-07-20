@@ -1,123 +1,133 @@
 # Changelog
 
-Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
-(0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
+The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
+(0.x — API not yet stable). For older versions, see the git tag history.
+
+## [0.44.0] — 2026-07-20
+### Changed
+- **Full English localization**: all Turkish content — code comments, viewer UI strings, log
+  message markers, README/CHANGELOG/INTEGRATION/AGENTS docs, DocC catalog, integration
+  templates — translated to English for global use. Notable user-visible string changes:
+  cancelled marker is now "→ cancelled", statistics status classes are "Error"/"Cancelled",
+  decoding error messages are in English. `docs/bug-reporter-ozet.md` renamed to
+  `docs/bug-reporter-summary.md`. No API, metadata key, or behavior changes.
 
 ## [0.43.0] — 2026-07-20
-### Eklendi
-- **Viewer'dan mock'a çevirme**: network kaydının detayında "Mock'a çevir" — yakalanan yanıt
-  düzenlenebilir editörde açılır (URL kalıbı, metot kısıtı, status/gövde, gecikme, taşıma
-  hatası seçimi) ve kaydedilince cihaz üzerinde, kod yazmadan mock aktifleşir.
-- **Mock listesi** (⋯ → Mock'lar): aktif mock'ları görüntüleme, kaydırarak tekil silme,
-  "Tümünü kaldır". `OlafMockResponse` artık `Identifiable`; `OlafNetwork.removeMock(id:)`.
+### Added
+- **Convert to mock from the viewer**: "Convert to mock" in a network entry's detail view — the
+  captured response opens in an editable editor (URL pattern, method restriction, status/body,
+  delay, transport error selection), and once saved, the mock becomes active on-device without
+  writing any code.
+- **Mock list** (⋯ → Mocks): view active mocks, swipe to delete individually,
+  "Remove all". `OlafMockResponse` is now `Identifiable`; `OlafNetwork.removeMock(id:)`.
 
 ## [0.42.0] — 2026-07-20
-### Eklendi
-- **Response mocking**: `OlafNetwork.addMock(OlafMockResponse(...))` — eşleşen istekler ağa
-  çıkmadan tanımlı yanıtı alır (status/header/gövde, `delaySeconds` ile yavaş ağ,
-  `.failure(...)` ile taşıma hatası simülasyonu). İlk eklenen mock kazanır; capture URL
-  filtreleri mock'ları etkilemez. Kayıtlar `[mock]` işaretiyle loglanır, detayda
-  "Kaynak: Mock" görünür.
+### Added
+- **Response mocking**: `OlafNetwork.addMock(OlafMockResponse(...))` — matching requests get the
+  defined response without hitting the network (status/header/body, `delaySeconds` for a slow
+  network, `.failure(...)` for simulating transport errors). The first mock added wins; capture URL
+  filters don't affect mocks. Entries are logged with a `[mock]` marker, and the detail view shows
+  "Source: Mock".
 
 ## [0.41.0] — 2026-07-20
-### Eklendi
-- **Sabitleme (pin)**: satıra basılı tutup "Sabitle" — sabitler oturum listesinin üstünde,
-  filtrelerden bağımsız ayrı bölümde görünür (oturum içi; kalıcı değildir).
-- **Çoklu seçim paylaşımı** (⋯ → Seç): oturum listesinde birden çok kayıt işaretlenip tek
-  `.log` dosyası olarak paylaşılabilir.
+### Added
+- **Pinning**: long-press an entry and "Pin" — pinned entries appear above the session list, in a
+  separate section independent of filters (session-scoped; not persistent).
+- **Multi-select sharing** (⋯ → Select): mark multiple entries in the session list and share them
+  as a single `.log` file.
 
 ## [0.40.0] — 2026-07-20
-### Eklendi
-- **İçerik türü filtresi** (filtre ekranı → "İçerik türü"): network yanıtları
-  JSON/XML/HTML/Görsel/Metin/Diğer sınıflarına göre süzülebilir (seçiliyken yalnız o türler
-  listelenir).
-- **Görsel önizleme**: `image/*` yanıt gövdeleri `maxImageBodyBytes` (varsayılan 256 KB)
-  sınırının altındaysa yakalanır ve detay ekranında önizlenir
-  (`OlafNetworkConfiguration.maxImageBodyBytes`, `0` = kapalı).
+### Added
+- **Content-type filter** (filter screen → "Content type"): network responses can be filtered by
+  JSON/XML/HTML/Image/Text/Other classes (only those types are listed when selected).
+- **Image preview**: `image/*` response bodies are captured and previewed in the detail screen if
+  under the `maxImageBodyBytes` limit (default 256 KB)
+  (`OlafNetworkConfiguration.maxImageBodyBytes`, `0` = disabled).
 
 ## [0.39.0] — 2026-07-20
-### Eklendi
-- **Decode hatası yakalama**: `OlafDecoding.decode(_:from:url:)` (JSONDecoder sarmalayıcısı,
-  hatayı aynen fırlatır) ve `Olaf.logDecodingError(_:url:data:typeName:)` — hatalı alanın tam
-  yolu (`user.accounts[0].iban`) çıkarılır, ham gövdeyle birlikte `.decoding` kategorisine
-  loglanır; detay ekranında "Decode Hatası" bölümü.
+### Added
+- **Decode error capture**: `OlafDecoding.decode(_:from:url:)` (a JSONDecoder wrapper that rethrows
+  the original error as-is) and `Olaf.logDecodingError(_:url:data:typeName:)` — extracts the full
+  path of the failing field (`user.accounts[0].iban`), logs it to the `.decoding` category together
+  with the raw body; a "Decode Error" section appears in the detail screen.
 
 ## [0.38.0] — 2026-07-20
-### Eklendi
-- **Postman Collection export** (⋯ → Paylaş → "Postman Collection"): görünen network
-  istekleri Collection v2.1 olarak dışa aktarılır (aynı method+URL bir kez); Postman'e
-  Import ile alınıp yeniden çalıştırılabilir.
+### Added
+- **Postman Collection export** (⋯ → Share → "Postman Collection"): visible network
+  requests are exported as a Collection v2.1 (deduplicated by method+URL); can be imported into
+  Postman and re-run.
 
 ## [0.37.0] — 2026-07-20
-### Eklendi
-- **İstatistik ekranı** (⋯ → İstatistikler): görünen network kayıtları için hata oranı,
-  ortalama/medyan/p95 süre, toplam boyutlar, durum sınıfı ve metot dağılımı (bar'lı),
-  en yavaş 5 istek ve en çok istek alan host'lar.
+### Added
+- **Statistics screen** (⋯ → Statistics): for the visible network entries — error rate,
+  average/median/p95 duration, total sizes, status class and method distribution (bar chart),
+  the 5 slowest requests, and the hosts receiving the most requests.
 
 ## [0.36.0] — 2026-07-20
-### Eklendi
-- **HAR export**: görünen network kayıtları HAR 1.2 belgesi olarak paylaşılabilir
-  (Charles/Proxyman/Chrome DevTools doğrudan açar) — ⋯ → Paylaş → "HAR (network)".
-  Zamanlama fazları (dns/connect/ssl/wait/receive) HAR timings'e eşlenir.
+### Added
+- **HAR export**: visible network entries can be shared as a HAR 1.2 document
+  (opens directly in Charles/Proxyman/Chrome DevTools) — ⋯ → Share → "HAR (network)".
+  Timing phases (dns/connect/ssl/wait/receive) are mapped to HAR timings.
 
 ## [0.35.0] — 2026-07-20
-### Eklendi
-- **Geçmişte sayfalama**: `Olaf.loadPersistedPage(before:minimumEntries:)` — geçmiş artık tek
-  seferde değil, en yeniden geriye dosya-sınırlı imleçle sayfa sayfa yüklenir. Viewer'da sonsuz
-  kaydırma + "Daha eskileri yükle" satırı; arama/filtrelerin yüklenen kayıtlarda çalıştığı
-  bilgi notu. Sayfalar arasında rotation olsa bile kayıt tekrarı oluşmaz.
-- **Esc ile kapatma**: donanım klavyesi (simülatörde Mac klavyesi) Esc'i viewer'ı kapatır;
-  `presentExternal` ile açılan dış araçta Esc önce aracı kapatıp viewer'a döner.
+### Added
+- **History pagination**: `Olaf.loadPersistedPage(before:minimumEntries:)` — history is no longer
+  loaded all at once, but page by page from newest to oldest with a file-bounded cursor. Infinite
+  scroll + "Load older" row in the viewer; an info note that search/filters apply to loaded entries.
+  No duplicate entries occur across pages even if rotation happens in between.
+- **Dismiss with Esc**: pressing Esc on a hardware keyboard (Mac keyboard in the simulator) closes
+  the viewer; when an external tool opened via `presentExternal` is showing, Esc first dismisses
+  the tool and returns to the viewer.
 
 ## [0.34.0] — 2026-07-20
-### Eklendi
-- `PrivacyInfo.xcprivacy` — SDK privacy manifest'i (veri toplanmaz, tracking yok; yalnız
-  rotation için dosya-tarihi okuma beyanı `C617.1`).
-- DocC kataloğu (`Olaf.docc`) — API dokümantasyonu landing page + konu grupları.
-- `CHANGELOG.md` (bu dosya) ve README'ye CI rozeti.
+### Added
+- `PrivacyInfo.xcprivacy` — SDK privacy manifest (no data collection, no tracking; only a
+  file-timestamp read declaration `C617.1` for rotation).
+- DocC catalog (`Olaf.docc`) — API documentation landing page + topic groups.
+- `CHANGELOG.md` (this file) and a CI badge on the README.
 
 ## [0.33.0] — 2026-07-20
-### Eklendi
+### Added
 - **OSLogStore importer**: `Olaf.importOSLogEntries(since:category:excludingSubsystems:)` —
-  bu sürecin OSLog kayıtlarını (diğer SDK'ların `os_log` çıktıları dahil) Olaf'a aktarır;
-  viewer menüsünde "OSLog'u içe aktar (1 saat)". `LogCategory.oslog` eklendi.
-- **swift-log backend template'i**: `Integration/OlafLogHandler.swift` —
-  `LoggingSystem.bootstrap` ile tüm `Logging.Logger` çağrıları Olaf'a akar
-  (sıfır-bağımlılık kuralı gereği paket bağımlılığı değil, host'a kopyalanan template).
+  imports this process's OSLog entries (including `os_log` output from other SDKs) into Olaf;
+  "Import OSLog (1 hour)" in the viewer menu. Added `LogCategory.oslog`.
+- **swift-log backend template**: `Integration/OlafLogHandler.swift` —
+  with `LoggingSystem.bootstrap`, all `Logging.Logger` calls flow into Olaf
+  (not a package dependency, per the zero-dependency rule — a template copied into the host).
 
 ## [0.32.0] — 2026-07-20
-### Eklendi
-- `Olaf.minimumLevel` — toplama eşiği runtime'da değiştirilebilir; filtre ekranında
-  "Toplama eşiği" ayarı.
-- NDJSON export: `Olaf.exportNDJSONFileURL(entries:)` + viewer'da "Paylaş (NDJSON)".
-### Değişti
-- Viewer türetilmiş değerleri (`filteredEntries`/`sessionGroups`/`availableCategories`)
-  memoize edildi: render başına değil, girdi değişince bir kez hesaplanır (büyük Geçmiş'te
-  takılma önlenir).
+### Added
+- `Olaf.minimumLevel` — the collection threshold can be changed at runtime; a "Collection
+  threshold" setting in the filter screen.
+- NDJSON export: `Olaf.exportNDJSONFileURL(entries:)` + "Share (NDJSON)" in the viewer.
+### Changed
+- Derived viewer values (`filteredEntries`/`sessionGroups`/`availableCategories`) are now
+  memoized: computed once when inputs change rather than on every render (prevents stutter with
+  a large History).
 
 ## [0.31.0] — 2026-07-20
-### Eklendi
-- **Aktif istekler barı**: devam eden istekler viewer üstünde geçen süresiyle canlı görünür
-  (`OlafNetwork.pendingRequests`); asılı istekler anında fark edilir.
-- **Zamanlama kırılımı**: `URLSessionTaskMetrics`'ten DNS / TCP / TLS / TTFB, protokol
-  (h2/h3) ve bağlantı yeniden kullanımı — detay ekranında "Zamanlama" bölümü.
-- README/INTEGRATION: URLProtocol yakalamasının bilinen sınırları dokümante edildi.
+### Added
+- **Active requests bar**: in-flight requests appear live at the top of the viewer with their
+  elapsed time (`OlafNetwork.pendingRequests`); hung requests are noticed instantly.
+- **Timing breakdown**: from `URLSessionTaskMetrics` — DNS / TCP / TLS / TTFB, protocol
+  (h2/h3), and connection reuse — a "Timing" section in the detail screen.
+- README/INTEGRATION: documented the known limitations of URLProtocol-based capture.
 
 ## [0.30.0] — 2026-07-20
-### Değişti
-- **Paylaşılan proxy session** (`OlafProxySession`): istek başına ephemeral session yerine tek
-  session — bağlantı havuzu/TLS yeniden kullanımı; paylaşılan `HTTPCookieStorage` korunur
-  (cookie tabanlı oturumlar capture altında bozulmaz).
-- İptal edilen istekler (`NSURLErrorCancelled`) `.error` değil `.info` ("→ iptal") loglanır.
-- Swift 6 concurrency uyarıları sıfırlandı (delegate conformance yönetici sınıfa taşındı).
-### Eklendi
-- GitHub Actions CI (macOS test + iOS build) ve network katmanı testleri.
+### Changed
+- **Shared proxy session** (`OlafProxySession`): a single session instead of an ephemeral
+  per-request session — connection pooling/TLS reuse; the shared `HTTPCookieStorage` is
+  preserved (cookie-based sessions aren't broken by capture).
+- Canceled requests (`NSURLErrorCancelled`) are logged as `.info` ("→ canceled"), not `.error`.
+- Swift 6 concurrency warnings eliminated (delegate conformance moved to the manager class).
+### Added
+- GitHub Actions CI (macOS test + iOS build) and network layer tests.
 
 ## [0.29.0] — 2026-07-20
-### Kaldırıldı (BREAKING)
-- Bug-reporter/upload mekanizması (`OlafUpload` target'ı, BugReport UI akışı,
-  `ScreenshotDetector`, `LogCategory.screenshot`) — ayrı bir projede geliştirilecek;
-  özet: `docs/bug-reporter-ozet.md`.
-### Değişti (BREAKING)
-- Tek SPM ürünü/target'ı: `OlafCore` + `OlafUI` + `OlafNetwork` → `Olaf`
-  (host tek ürün ekler, tek `import Olaf`).
+### Removed (BREAKING)
+- The bug-reporter/upload mechanism (`OlafUpload` target, BugReport UI flow,
+  `ScreenshotDetector`, `LogCategory.screenshot`) — to be developed in a separate project;
+  see summary: `docs/bug-reporter-summary.md`.
+### Changed (BREAKING)
+- Single SPM product/target: `OlafCore` + `OlafUI` + `OlafNetwork` → `Olaf`
+  (the host adds a single product, a single `import Olaf`).

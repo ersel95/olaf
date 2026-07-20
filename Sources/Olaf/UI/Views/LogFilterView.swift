@@ -1,7 +1,7 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// Filtre ekranı: seviye ve kategori toggle'ları.
+/// Filter screen: level and category toggles.
 struct LogFilterView: View {
     @ObservedObject var model: LogViewerModel
     @Environment(\.dismiss) private var dismiss
@@ -9,13 +9,13 @@ struct LogFilterView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Kapsam") {
-                    Picker("Kayıtlar", selection: Binding(
+                Section("Scope") {
+                    Picker("Entries", selection: Binding(
                         get: { model.scope },
                         set: { model.setScope($0) }
                     )) {
-                        Text("Bu oturum").tag(LogViewerModel.Scope.session)
-                        Text("Tüm geçmiş").tag(LogViewerModel.Scope.history)
+                        Text("This session").tag(LogViewerModel.Scope.session)
+                        Text("All history").tag(LogViewerModel.Scope.history)
                     }
                 }
 
@@ -33,16 +33,16 @@ struct LogFilterView: View {
                     }
                 } header: {
                     HStack {
-                        Text("Seviyeler")
+                        Text("Levels")
                         Spacer()
-                        Button(allLevelsOn ? "Hiçbiri" : "Tümü") { toggleAllLevels() }
+                        Button(allLevelsOn ? "None" : "All") { toggleAllLevels() }
                             .font(.caption)
                             .textCase(nil)
                     }
                 }
 
                 Section {
-                    Picker("Eşik", selection: Binding(
+                    Picker("Threshold", selection: Binding(
                         get: { Olaf.minimumLevel },
                         set: { Olaf.minimumLevel = $0 }
                     )) {
@@ -51,9 +51,9 @@ struct LogFilterView: View {
                         }
                     }
                 } header: {
-                    Text("Toplama eşiği")
+                    Text("Collection threshold")
                 } footer: {
-                    Text("Eşiğin altındaki seviyeler hiç toplanmaz (yukarıdaki görüntüleme filtrelerinden bağımsızdır; uygulama yeniden başlayınca config değerine döner).")
+                    Text("Levels below the threshold are never collected (independent of the display filters above; reverts to the config value on app restart).")
                 }
 
                 Section {
@@ -66,14 +66,14 @@ struct LogFilterView: View {
                         }
                     }
                 } header: {
-                    Text("İçerik türü (network)")
+                    Text("Content type (network)")
                 } footer: {
-                    Text("Seçim yapıldığında yalnız bu türlerdeki network yanıtları listelenir (network dışı kayıtlar gizlenir).")
+                    Text("When a selection is made, only network responses of these types are listed (non-network entries are hidden).")
                 }
 
                 let categories = model.availableCategories
                 if !categories.isEmpty {
-                    Section("Kategoriler") {
+                    Section("Categories") {
                         ForEach(categories, id: \.self) { category in
                             Toggle(isOn: Binding(
                                 get: { model.selectedCategories.isEmpty || model.selectedCategories.contains(category) },
@@ -85,15 +85,15 @@ struct LogFilterView: View {
                     }
                 }
             }
-            .navigationTitle("Filtreler")
+            .navigationTitle("Filters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Sıfırla") { model.resetFilters() }
+                    Button("Reset") { model.resetFilters() }
                         .disabled(!model.isFiltering)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Bitti") { dismiss() }
+                    Button("Done") { dismiss() }
                 }
             }
         }

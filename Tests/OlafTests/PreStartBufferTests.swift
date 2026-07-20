@@ -11,7 +11,7 @@ final class PreStartBufferTests: XCTestCase {
     func testTargetIsBufferBeforeStart() {
         let runtime = OlafRuntime()
         guard case .buffer = runtime.target(for: .info) else {
-            return XCTFail("start öncesi hedef .buffer olmalı")
+            return XCTFail("target before start should be .buffer")
         }
     }
 
@@ -23,7 +23,7 @@ final class PreStartBufferTests: XCTestCase {
         runtime.start(with: OlafConfiguration(persistsToDisk: false, mirrorsToOSLog: false))
 
         guard case .store(let store) = runtime.target(for: .info) else {
-            return XCTFail("start sonrası hedef .store olmalı")
+            return XCTFail("target after start should be .store")
         }
         XCTAssertEqual(store.snapshot().map(\.message), ["early-1", "early-2"])
     }

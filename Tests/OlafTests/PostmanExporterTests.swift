@@ -18,7 +18,7 @@ final class PostmanExporterTests: XCTestCase {
     }
 
     func testCollectionStructureAndDedupe() throws {
-        // Aynı method+URL iki kez → tek item; farklı method → ayrı item.
+        // Same method+URL twice → single item; different method → separate item.
         let entries = [
             networkEntry(),
             networkEntry(),

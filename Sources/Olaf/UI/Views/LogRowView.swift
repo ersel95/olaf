@@ -1,8 +1,8 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// Tek log satırı. `.network` kayıtları kompakt network satırı olarak, diğerleri
-/// seviye-renkli log satırı olarak render edilir.
+/// A single log row. `.network` entries render as a compact network row; others
+/// render as a level-colored log row.
 struct LogRowView: View {
     let entry: LogEntry
 
@@ -15,7 +15,7 @@ struct LogRowView: View {
     }
 }
 
-// MARK: - Network satırı
+// MARK: - Network row
 
 private struct NetworkRow: View {
     let info: NetworkLogInfo
@@ -50,7 +50,7 @@ private struct NetworkRow: View {
     }
 }
 
-// MARK: - Log mesajı satırı
+// MARK: - Log message row
 
 private struct LogMessageRow: View {
     let entry: LogEntry

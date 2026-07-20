@@ -1,12 +1,12 @@
 import Foundation
 
-/// `Olaf.loadPersistedPage(before:minimumEntries:)`'in dönüşü: geçmişin bir sayfası.
+/// The return value of `Olaf.loadPersistedPage(before:minimumEntries:)`: a page of history.
 public struct PersistedLogPage: Sendable {
-    /// Sayfanın kayıtları — **eskiden yeniye** (çağıran, önceki sayfaların BAŞINA ekler).
+    /// The page's entries — **oldest to newest** (the caller prepends them to previous pages).
     public let entries: [LogEntry]
 
-    /// Daha eski kayıtlar için bir sonraki çağrıya verilecek **opak** imleç.
-    /// `nil` → geçmişin sonuna gelindi.
+    /// The **opaque** cursor to pass to the next call for older entries.
+    /// `nil` → the end of history has been reached.
     public let nextCursor: String?
 
     public init(entries: [LogEntry], nextCursor: String?) {

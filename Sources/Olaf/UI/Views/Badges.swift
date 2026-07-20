@@ -1,7 +1,7 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// HTTP durum kodu / hata için renkli kapsül.
+/// Colored pill for the HTTP status code / error.
 struct StatusPill: View {
     let statusCode: Int?
     let isFailure: Bool
@@ -32,7 +32,7 @@ struct StatusPill: View {
     }
 }
 
-/// HTTP metodu rozeti (monospace).
+/// HTTP method badge (monospace).
 struct MethodBadge: View {
     let method: String
 
@@ -46,7 +46,7 @@ struct MethodBadge: View {
     }
 }
 
-/// Log seviyesi için sol renkli nokta.
+/// Colored dot on the left for the log level.
 struct LevelDot: View {
     let level: LogLevel
     var body: some View {

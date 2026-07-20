@@ -1,54 +1,54 @@
 # ``Olaf``
 
-Uygulama + network loglarını cihazda görüntüleyip paylaşmayı sağlayan, tamamen local Swift
-network logger'ı. Backend yoktur; hiçbir veri ağ üzerinden gönderilmez.
+A fully local Swift network logger that lets you view and share app + network logs on-device.
+There is no backend; no data is ever sent over the network.
 
 ## Overview
 
-Olaf üç parçadan oluşan tek bir modüldür:
+Olaf is a single module made up of three parts:
 
-- **Core** — `Olaf` facade'ı: ring buffer, NDJSON disk persistansı (oturumlar arası geçmiş),
-  OSLog köprüsü, start-öncesi log tamponlama. UIKit'siz; her platformda derlenir.
-- **Network** — `OlafNetwork.startAutomaticCapture()`: URLSessionConfiguration swizzle ile tüm
-  session'ların istek/yanıtlarını (gövde/header/zamanlama dahil) `.network` kategorisinde yakalar.
-  Paylaşılan tek proxy session kullanır; TLS doğrulaması sistemde kalır (SSL kırılmaz).
-- **UI** — `OlafUI.install()`: shake → SwiftUI viewer (Oturum/Geçmiş, filtre, arama, aktif
-  istekler barı, paylaşım: .log / NDJSON / cURL).
+- **Core** — the `Olaf` facade: ring buffer, NDJSON disk persistence (history across sessions),
+  OSLog bridge, pre-start log buffering. UIKit-free; compiles on every platform.
+- **Network** — `OlafNetwork.startAutomaticCapture()`: captures every session's requests/responses
+  (including body/header/timing) in the `.network` category, via a URLSessionConfiguration swizzle.
+  Uses a single shared proxy session; TLS validation stays with the system (SSL is not broken).
+- **UI** — `OlafUI.install()`: shake → SwiftUI viewer (Session/History, filter, search, active
+  requests bar, sharing: .log / NDJSON / cURL).
 
-Tüm veri **ham** saklanır ve gösterilir (maskeleme yoktur) → yalnız non-prod debug'da çalıştırın
-(`#if !PROD`).
+All data is stored and displayed **raw** (there is no masking) → run this only in non-prod debug
+builds (`#if !PROD`).
 
 ```swift
-// Uygulama başlangıcında (paylaşılan URLSession kurulmadan ÖNCE):
+// At app startup (BEFORE the shared URLSession is set up):
 Olaf.start(.default)
 OlafNetwork.startAutomaticCapture()
 Task { @MainActor in OlafUI.install() }
 
-// Loglama:
-Olaf.info("Login başarılı", category: .auth, metadata: ["method": "biometric"])
+// Logging:
+Olaf.info("Login succeeded", category: .auth, metadata: ["method": "biometric"])
 ```
 
 ## Topics
 
-### Başlarken
+### Getting started
 
 - ``Olaf/start(_:)``
 - ``OlafConfiguration``
 - ``OlafUI``
 
-### Loglama
+### Logging
 
 - ``LogLevel``
 - ``LogCategory``
 - ``LogEntry``
 
-### Network yakalama
+### Network capture
 
 - ``OlafNetwork``
 - ``OlafNetworkConfiguration``
 - ``PendingNetworkRequest``
 
-### Okuma ve dışa aktarma
+### Reading and exporting
 
 - ``Olaf/snapshot()``
 - ``Olaf/loadPersistedEntries()``
@@ -57,6 +57,6 @@ Olaf.info("Login başarılı", category: .auth, metadata: ["method": "biometric"
 - ``Olaf/exportNDJSONFileURL(entries:)``
 - ``Olaf/importOSLogEntries(since:category:excludingSubsystems:)``
 
-### Viewer genişletme
+### Extending the viewer
 
 - ``ExternalToolBridge``

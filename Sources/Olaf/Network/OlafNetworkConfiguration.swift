@@ -1,40 +1,40 @@
 import Foundation
 
-/// Olaf network capture yapılandırması.
+/// Olaf network capture configuration.
 public struct OlafNetworkConfiguration: Sendable {
 
-    /// İstek/yanıt gövdelerini de logla. **Varsayılan açık.** (Gövdeler ham olarak saklanır;
-    /// gerekmiyorsa `false` yapın.)
+    /// Also log request/response bodies. **On by default.** (Bodies are stored raw;
+    /// set to `false` if not needed.)
     public var capturesBodies: Bool
 
-    /// İstek/yanıt header'larını da logla. **Varsayılan açık** (header'lar ham olarak saklanır).
+    /// Also log request/response headers. **On by default** (headers are stored raw).
     public var capturesHeaders: Bool
 
-    /// Gövde loglanırken kesilecek maksimum karakter sayısı.
+    /// Maximum character count bodies are truncated to when logged.
     public var maxBodyLength: Int
 
-    /// `image/*` yanıt gövdelerinde **önizleme** için saklanacak üst sınır (byte). Bu boyuta kadar
-    /// olan görseller base64 olarak kayda eklenir ve detay ekranında gösterilir; büyükler yalnız
-    /// boyut bilgisiyle geçer (RAM/disk şişmesin). `0` → görsel önizleme kapalı.
+    /// Upper limit (bytes) stored for **preview** of `image/*` response bodies. Images up to this
+    /// size are appended to the record as base64 and shown on the detail screen; larger ones pass
+    /// through with size info only (to avoid bloating RAM/disk). `0` → image preview disabled.
     public var maxImageBodyBytes: Int
 
-    /// Network kayıtlarının düşeceği kategori.
+    /// The category network records are logged under.
     public var category: LogCategory
 
-    /// **Yalnız bu** URL parçalarını (host/path) içeren istekler yakalanır. Boş = tümü.
-    /// Örn. yalnız kendi API'niz: `["api-gateway", "myapp.com"]`.
+    /// **Only** requests whose URL contains one of these parts (host/path) are captured. Empty = all.
+    /// E.g. to capture only your own API: `["api-gateway", "myapp.com"]`.
     public var includedURLs: [String]
 
-    /// Bu URL parçalarını içeren istekler **atlanır** (yakalanmaz — istek olduğu gibi geçer).
-    /// Örn. SDK gürültüsünü gizlemek: `["firebaseio", "crashlytics", "googleapis", "app-measurement"]`.
+    /// Requests containing these URL parts are **skipped** (not captured — the request passes through as-is).
+    /// E.g. to hide SDK noise: `["firebaseio", "crashlytics", "googleapis", "app-measurement"]`.
     public var excludedURLs: [String]
 
-    /// **Yalnız capture proxy'si için** sunucu sertifikasını koşulsuz kabul et. **Varsayılan `false`** (güvenli:
-    /// sistem doğrulaması). Capture, isteği kendi URLSession'ından yeniden gönderir; host kendi özel CA'sına
-    /// (örn. iç test gateway'i) veya pinning'e güveniyorsa, default sistem doğrulaması bu trafiği reddeder
-    /// (TLS -9807). Host bu trafiği zaten güveniyorsa, **yalnız non-prod** için bunu `true` yapıp capture'ın
-    /// host'un güvendiği sertifikaları kabul etmesini sağlayabilir. Olaf zaten `#if !PROD` ile derlenir;
-    /// canlı trafik etkilenmez. Prod'da ASLA açma.
+    /// Accept the server certificate unconditionally, **for the capture proxy only**. **`false` by default**
+    /// (safe: system validation). Capture re-sends the request from its own URLSession; if the host trusts
+    /// its own custom CA (e.g. an internal test gateway) or uses pinning, default system validation will
+    /// reject that traffic (TLS -9807). If the host already trusts this traffic, set this to `true`
+    /// (**non-prod only**) so capture accepts the certificates the host trusts. Olaf is already compiled
+    /// under `#if !PROD`; live traffic is unaffected. NEVER enable in prod.
     public var allowsArbitraryServerTrustForCapture: Bool
 
     public init(
@@ -57,7 +57,7 @@ public struct OlafNetworkConfiguration: Sendable {
         self.allowsArbitraryServerTrustForCapture = allowsArbitraryServerTrustForCapture
     }
 
-    /// Bu URL yakalanmalı mı? (allow/deny filtresi — `OlafURLProtocol.canInit`'te kullanılır)
+    /// Should this URL be captured? (allow/deny filter — used in `OlafURLProtocol.canInit`)
     public func shouldCapture(_ url: URL?) -> Bool {
         guard let target = url?.absoluteString.lowercased() else { return includedURLs.isEmpty }
         if excludedURLs.contains(where: { target.contains($0) }) { return false }

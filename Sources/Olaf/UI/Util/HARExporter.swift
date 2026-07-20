@@ -1,15 +1,15 @@
 import Foundation
 
-/// Görünen network kayıtlarını **HAR 1.2** (HTTP Archive) belgesine dönüştürür.
-/// HAR; Charles, Proxyman, Chrome DevTools gibi araçlarca doğrudan açılır.
+/// Converts the visible network entries into a **HAR 1.2** (HTTP Archive) document.
+/// HAR opens directly in tools like Charles, Proxyman, and Chrome DevTools.
 ///
-/// Kaynak, yakalama anındaki metadata'dır; birebir ölçülemeyen HAR alanları için spec'in
-/// "bilinmiyor" değeri (`-1`) kullanılır. Gövdeler yakalandığı hâliyle yazılır (gerekirse
-/// kesilmiş / pretty-print edilmiş). İçerik **ham**dır — paylaşmadan önce gözden geçirin.
+/// The source is the metadata captured at capture time; for HAR fields that can't be measured
+/// exactly, the spec's "unknown" value (`-1`) is used. Bodies are written as captured (possibly
+/// truncated / pretty-printed). Content is **raw** — review before sharing.
 enum HARExporter {
 
-    /// Verilen kayıtlardan (network olmayanlar atlanır) HAR JSON metni üretir.
-    /// Hiç network kaydı yoksa da geçerli (boş `entries`) bir belge döner.
+    /// Produces HAR JSON text from the given entries (non-network ones are skipped).
+    /// Also returns a valid (empty `entries`) document when there are no network entries at all.
     static func harDocument(from entries: [LogEntry]) -> String? {
         let harEntries = entries.compactMap { entry -> [String: Any]? in
             guard let info = NetworkLogInfo(entry: entry) else { return nil }
@@ -33,7 +33,7 @@ enum HARExporter {
 
     private static func harEntry(info: NetworkLogInfo, date: Date) -> [String: Any] {
         let total = info.durationMs ?? 0
-        // HAR sözleşmesi: `connect`, `ssl`'i kapsar → bilinen fazlar dns+connect+wait.
+        // HAR contract: `connect` encompasses `ssl` → known phases are dns+connect+wait.
         let known = (info.dnsMs ?? 0) + (info.connectMs ?? 0) + (info.ttfbMs ?? 0)
         let receive = max(0, total - known)
 
@@ -89,7 +89,7 @@ enum HARExporter {
         ]
     }
 
-    // MARK: - Yardımcılar
+    // MARK: - Helpers
 
     private static func harHeaders(_ headers: [(key: String, value: String)]) -> [[String: String]] {
         headers.map { ["name": $0.key, "value": $0.value] }
@@ -104,7 +104,7 @@ enum HARExporter {
         return items.map { ["name": $0.name, "value": $0.value ?? ""] }
     }
 
-    /// ALPN adını HAR'ın beklediği gösterime çevirir.
+    /// Converts the ALPN name into the representation HAR expects.
     private static func httpVersion(_ protocolName: String?) -> String {
         switch protocolName?.lowercased() {
         case "h2": return "HTTP/2"

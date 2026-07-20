@@ -2,7 +2,7 @@
 import SwiftUI
 
 extension LogLevel {
-    /// Viewer'da seviyeyi ayırt etmek için renk.
+    /// Color used to distinguish the level in the viewer.
     var color: Color {
         switch self {
         case .trace: return .gray
@@ -17,7 +17,7 @@ extension LogLevel {
 }
 
 extension LogEntry {
-    /// Liste/detayda kopyalanabilir tek satır temsil.
+    /// A single-line, copyable representation for the list/detail view.
     var oneLineDescription: String {
         PlainTextFormatter().string(from: self)
     }

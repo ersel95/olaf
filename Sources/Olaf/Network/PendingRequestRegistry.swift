@@ -1,21 +1,21 @@
 import Foundation
 
-/// Devam eden (henüz tamamlanmamış) bir network yakalaması.
+/// An in-flight (not yet completed) network capture.
 public struct PendingNetworkRequest: Identifiable, Sendable {
     public let id: UUID
     public let method: String
     public let url: String
     public let startDate: Date
 
-    /// Başlangıçtan bu yana geçen süre (saniye).
+    /// Elapsed time since start (seconds).
     public var elapsedSeconds: Int {
         max(0, Int(Date().timeIntervalSince(startDate)))
     }
 }
 
-/// In-flight yakalamaların kilitle korunan kaydı. `OlafURLProtocol` isteği başlatırken kaydeder,
-/// tamamlanınca (başarı/hata/iptal) düşürür. Viewer "Aktif istekler" bölümünü buradan besler —
-/// 1 sn'lik `TimelineView` tick'i ile anlık görüntü okunur; ayrı yayın mekanizması gerekmez.
+/// Lock-protected registry of in-flight captures. `OlafURLProtocol` registers a request when it
+/// starts, and drops it on completion (success/error/cancel). Feeds the viewer's "Active requests"
+/// section — a snapshot is read on a 1s `TimelineView` tick; no separate broadcast mechanism needed.
 final class PendingRequestRegistry: @unchecked Sendable {
 
     static let shared = PendingRequestRegistry()
@@ -33,13 +33,13 @@ final class PendingRequestRegistry: @unchecked Sendable {
         lock.lock(); items[id] = nil; lock.unlock()
     }
 
-    /// Başlangıç zamanına göre (en eski üstte) sıralı anlık görüntü.
+    /// Snapshot sorted by start time (oldest first).
     var snapshot: [PendingNetworkRequest] {
         lock.lock(); defer { lock.unlock() }
         return items.values.sorted { $0.startDate < $1.startDate }
     }
 
-    /// Test izolasyonu için: tüm kayıtları düşürür.
+    /// For test isolation: drops all entries.
     func removeAll() {
         lock.lock(); items.removeAll(); lock.unlock()
     }

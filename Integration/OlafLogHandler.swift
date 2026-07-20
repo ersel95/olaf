@@ -1,18 +1,18 @@
 //  OlafLogHandler.swift
 //
-//  DROP-IN TEMPLATE — Olaf paketinin parçası DEĞİLDİR (Sources/ dışında, SPM derlemez).
-//  swift-log kullanan host'lar için köprü: `LoggingSystem.bootstrap` sonrası uygulamadaki ve
-//  bağımlılıklardaki TÜM `Logging.Logger` çağrıları Olaf'a akar (Logger label'ı → kategori).
+//  DROP-IN TEMPLATE — NOT part of the Olaf package (outside Sources/, not compiled by SPM).
+//  A bridge for hosts using swift-log: after `LoggingSystem.bootstrap`, ALL `Logging.Logger`
+//  calls in the app and its dependencies flow into Olaf (the Logger's label → category).
 //
-//  Olaf bilinçli olarak SIFIR bağımlılık taşır (ve tek SPM ürünüdür) → swift-log'a paket
-//  bağımlılığı eklenmez; bu dosyayı host uygulamaya kopyalayın.
+//  Olaf deliberately carries ZERO dependencies (and is a single SPM product) → no package
+//  dependency on swift-log is added; copy this file into the host app.
 //
-//  Gereksinim: host projede swift-log bağımlılığı (https://github.com/apple/swift-log).
+//  Requirement: the host project has a swift-log dependency (https://github.com/apple/swift-log).
 //
-//  Kurulum (uygulama başlangıcında, `Olaf.start` SONRASI, bir kez):
+//  Setup (once, at app startup, AFTER `Olaf.start`):
 //      LoggingSystem.bootstrap { label in OlafLogHandler(label: label) }
 //
-//  Başka backend'lerle birlikte kullanmak için:
+//  To use alongside other backends:
 //      LoggingSystem.bootstrap { label in
 //          MultiplexLogHandler([
 //              OlafLogHandler(label: label),
@@ -26,7 +26,7 @@ import Olaf
 
 public struct OlafLogHandler: LogHandler {
 
-    /// swift-log Logger etiketi — Olaf kategorisi olarak kullanılır.
+    /// The swift-log Logger label — used as the Olaf category.
     private let label: String
 
     public var logLevel: Logging.Logger.Level = .trace
@@ -50,7 +50,7 @@ public struct OlafLogHandler: LogHandler {
         function: String,
         line: UInt
     ) {
-        // Handler metadata'sı + çağrı metadata'sı birleştirilir (çağrı önceliklidir), string'e düzlenir.
+        // The handler's metadata + the call's metadata are merged (the call takes priority), flattened to strings.
         var merged = self.metadata
         if let explicitMetadata {
             merged.merge(explicitMetadata) { _, explicit in explicit }
@@ -69,7 +69,7 @@ public struct OlafLogHandler: LogHandler {
         )
     }
 
-    /// swift-log → Olaf seviye eşlemesi (birebir).
+    /// swift-log → Olaf level mapping (one-to-one).
     private static func mapLevel(_ level: Logging.Logger.Level) -> LogLevel {
         switch level {
         case .trace: return .trace

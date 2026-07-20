@@ -8,7 +8,7 @@ final class MockingTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - Eşleşme kuralları
+    // MARK: - Matching rules
 
     func testMatchingRules() {
         let anyMethod = OlafMockResponse(urlContains: "/V1/Accounts", json: "{}")
@@ -21,7 +21,7 @@ final class MockingTests: XCTestCase {
         XCTAssertTrue(postMock.matches(postOnly))
         XCTAssertFalse(postMock.matches(URLRequest(url: URL(string: "https://a.com/v1/transfer")!))) // GET
 
-        // İlk eklenen kazanır.
+        // The first one added wins.
         OlafNetwork.addMock(OlafMockResponse(urlContains: "/v1", statusCode: 201, json: "{}"))
         OlafNetwork.addMock(OlafMockResponse(urlContains: "/v1", statusCode: 500, json: "{}"))
         let matched = OlafNetwork.mock(for: URLRequest(url: URL(string: "https://a.com/v1/x")!))
@@ -34,13 +34,13 @@ final class MockingTests: XCTestCase {
         OlafNetwork.configuration = OlafNetworkConfiguration(excludedURLs: ["mocked.example"])
 
         let request = URLRequest(url: URL(string: "https://mocked.example/api")!)
-        XCTAssertFalse(OlafURLProtocol.canInit(with: request))   // exclude → yakalanmaz
+        XCTAssertFalse(OlafURLProtocol.canInit(with: request))   // exclude → not captured
 
         OlafNetwork.addMock(OlafMockResponse(urlContains: "mocked.example", json: "{}"))
-        XCTAssertTrue(OlafURLProtocol.canInit(with: request))    // mock önceliklidir
+        XCTAssertTrue(OlafURLProtocol.canInit(with: request))    // mock takes priority
     }
 
-    // MARK: - Uçtan uca teslimat (gerçek URLSession üzerinden, ağa çıkmadan)
+    // MARK: - End-to-end delivery (via a real URLSession, without hitting the network)
 
     private func mockedSession() -> URLSession {
         let config = URLSessionConfiguration.ephemeral
@@ -55,7 +55,7 @@ final class MockingTests: XCTestCase {
             json: #"{"mocked":true}"#
         ))
 
-        // Var olmayan bir host: mock devreye girmezse istek ağda başarısız olurdu.
+        // A host that doesn't exist: if the mock didn't kick in, the request would fail on the network.
         let url = URL(string: "https://mock.olaf-test/api/v1/accounts")!
         let (data, response) = try await mockedSession().data(from: url)
 
@@ -72,13 +72,13 @@ final class MockingTests: XCTestCase {
 
         do {
             _ = try await mockedSession().data(from: URL(string: "https://fail.olaf-test/x")!)
-            XCTFail("taşıma hatası fırlatılmalıydı")
+            XCTFail("a transport error should have been thrown")
         } catch {
             XCTAssertEqual((error as? URLError)?.code, .timedOut)
         }
     }
 
-    // MARK: - Viewer akışı yardımcıları
+    // MARK: - Viewer flow helpers
 
     func testSuggestedMockPatternIsHostPlusPathWithoutQuery() {
         let entry = LogEntry(
@@ -99,11 +99,11 @@ final class MockingTests: XCTestCase {
         OlafNetwork.removeMock(id: first.id)
         XCTAssertEqual(OlafNetwork.activeMocks.map(\.urlContains), ["/b"])
 
-        OlafNetwork.removeMock(id: first.id)   // bilinmeyen id no-op
+        OlafNetwork.removeMock(id: first.id)   // unknown id is a no-op
         XCTAssertEqual(OlafNetwork.activeMocks.count, 1)
     }
 
-    // MARK: - Loglama işareti
+    // MARK: - Logging flag
 
     func testComposerMarksMockedEvents() {
         var event = NetworkLogEvent(

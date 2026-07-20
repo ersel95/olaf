@@ -1,11 +1,11 @@
 import Foundation
 
-/// Eşleşen isteklere **ağa çıkılmadan** döndürülecek sahte yanıt (response mocking).
+/// A fake response returned for matching requests **without hitting the network** (response mocking).
 ///
-/// Edge-case'leri gerçek backend'e dokunmadan test etmeyi sağlar: hata gövdeleri, boş listeler,
-/// 5xx senaryoları, yavaş yanıt (`delaySeconds`) veya taşıma hatası (`transportError` — örn.
-/// internet yok). Mock'lanan istekler `.network` kategorisine normal şekilde loglanır ve
-/// detayda "Mock" olarak işaretlenir.
+/// Lets you test edge cases without touching the real backend: error bodies, empty lists,
+/// 5xx scenarios, slow responses (`delaySeconds`), or transport errors (`transportError` — e.g.
+/// no internet). Mocked requests are logged normally under the `.network` category and
+/// marked as "Mock" in the detail view.
 ///
 /// ```swift
 /// OlafNetwork.addMock(OlafMockResponse(
@@ -15,24 +15,24 @@ import Foundation
 /// OlafNetwork.addMock(.failure(urlContains: "/v1/transfer", error: .timedOut, delaySeconds: 3))
 /// ```
 ///
-/// Eşleşme: URL (lowercase) `urlContains` parçasını içeriyorsa ve `method` uyuyorsa
-/// (nil = tüm metotlar). Birden çok mock eşleşirse **ilk eklenen** kazanır.
-/// Capture filtreleri (`includedURLs`/`excludedURLs`) mock'ları etkilemez.
+/// Matching: the URL (lowercase) contains the `urlContains` part and `method` matches
+/// (nil = all methods). If multiple mocks match, the **first one added** wins.
+/// Capture filters (`includedURLs`/`excludedURLs`) don't affect mocks.
 public struct OlafMockResponse: Sendable, Identifiable {
 
-    /// Kayıt kimliği (viewer'daki mock listesinden tekil silme için).
+    /// Record identifier (for removing a single mock from the viewer's mock list).
     public let id: UUID
 
-    /// URL'in içermesi gereken parça (karşılaştırma lowercase yapılır).
+    /// The part the URL must contain (compared lowercase).
     public var urlContains: String
-    /// Eşleşecek HTTP metodu (`nil` = tümü). Karşılaştırma büyük harfle yapılır.
+    /// The HTTP method to match (`nil` = all). Compared uppercase.
     public var method: String?
     public var statusCode: Int
     public var headers: [String: String]
     public var body: Data
-    /// Yanıt bu kadar saniye geciktirilir (yavaş ağ simülasyonu; bekleyen istek barında görünür).
+    /// The response is delayed by this many seconds (slow network simulation; shows up in the pending requests bar).
     public var delaySeconds: TimeInterval
-    /// Set ise HTTP yanıtı yerine **taşıma hatası** döner (örn. `.notConnectedToInternet`).
+    /// If set, returns a **transport error** instead of an HTTP response (e.g. `.notConnectedToInternet`).
     public var transportError: URLError.Code?
 
     public init(
@@ -54,7 +54,7 @@ public struct OlafMockResponse: Sendable, Identifiable {
         self.transportError = transportError
     }
 
-    /// JSON gövdeli mock için kısayol (`Content-Type: application/json`).
+    /// Shortcut for a mock with a JSON body (`Content-Type: application/json`).
     public init(
         urlContains: String,
         method: String? = nil,
@@ -72,7 +72,7 @@ public struct OlafMockResponse: Sendable, Identifiable {
         )
     }
 
-    /// Taşıma hatası mock'u için kısayol (yanıt yok; URLError fırlar).
+    /// Shortcut for a transport-error mock (no response; throws a URLError).
     public static func failure(
         urlContains: String,
         method: String? = nil,
@@ -87,7 +87,7 @@ public struct OlafMockResponse: Sendable, Identifiable {
         )
     }
 
-    /// Bu mock verilen isteğe uyuyor mu?
+    /// Does this mock match the given request?
     func matches(_ request: URLRequest) -> Bool {
         guard let url = request.url?.absoluteString.lowercased(), url.contains(urlContains) else {
             return false

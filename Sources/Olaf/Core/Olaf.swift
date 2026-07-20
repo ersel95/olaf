@@ -1,43 +1,43 @@
 import Foundation
 
-/// Olaf'un genel (public) cephesi. Tek satır kurulum + ergonomik log API'si.
+/// Olaf's public facade. One-line setup + an ergonomic logging API.
 ///
 /// ```swift
 /// Olaf.start(.default)
-/// Olaf.info("Login başarılı", category: .auth, metadata: ["method": "biometric"])
-/// Olaf.error("Transfer reddedildi", category: .payment, metadata: ["code": code])
+/// Olaf.info("Login successful", category: .auth, metadata: ["method": "biometric"])
+/// Olaf.error("Transfer declined", category: .payment, metadata: ["code": code])
 /// ```
 public enum Olaf {
 
-    /// Süreç boyunca tek örnek. `start(_:)` çağrılana dek pasiftir.
-    /// (internal: OSLog importer gibi modül-içi uzantılar store'a buradan erişir.)
+    /// Process-wide singleton. Inactive until `start(_:)` is called.
+    /// (internal: in-module extensions like the OSLog importer access the store through this.)
     static let runtime = OlafRuntime()
 
-    // MARK: - Kurulum
+    // MARK: - Setup
 
-    /// Olaf'u başlatır. İdempotenttir — birden çok çağrı ilkini korur.
+    /// Starts Olaf. Idempotent — multiple calls keep the first one.
     public static func start(_ configuration: OlafConfiguration = .default) {
         runtime.start(with: configuration)
     }
 
-    /// Çalışma anında tamamen aç/kapa (kill switch). Kapalıyken hiçbir log işlenmez.
+    /// Full runtime on/off switch (kill switch). No logs are processed while disabled.
     public static var isEnabled: Bool {
         get { runtime.isEnabled }
         set { runtime.isEnabled = newValue }
     }
 
-    /// Olaf başlatıldı mı?
+    /// Has Olaf been started?
     public static var isStarted: Bool { runtime.isStarted }
 
-    /// Toplama eşiği: bu seviyenin altındaki loglar hiç işlenmez (mesaj compute bile edilmez).
-    /// `start` config'inden gelir; çalışma anında değiştirilebilir (örn. gürültüyü kısmak için
-    /// "yalnız warning+ topla"). Kalıcı değildir — süreç ömrüyle sınırlıdır.
+    /// Collection threshold: logs below this level are never processed (the message isn't even
+    /// computed). Comes from the `start` config; can be changed at runtime (e.g. to cut down
+    /// noise by "only collecting warning+"). Not persistent — scoped to the process lifetime.
     public static var minimumLevel: LogLevel {
         get { runtime.minimumLevel }
         set { runtime.minimumLevel = newValue }
     }
 
-    /// Mevcut uygulama oturumunun kimliği (her `start()` yeni üretir). Geçmişte oturum gruplama için.
+    /// Identifier of the current app session (each `start()` generates a new one). Used for grouping sessions in history.
     public static var currentSessionID: String { runtime.currentSessionID }
 
     // MARK: - Log API
@@ -67,7 +67,7 @@ public enum Olaf {
                 thread: OlafRuntime.currentThreadLabel()
             )
         case .buffer:
-            // start() öncesi → tamponla (start'ta flush edilir, erken loglar kaybolmaz).
+            // Before start() → buffer (flushed on start, so early logs aren't lost).
             runtime.buffer(
                 date: Date(),
                 level: level,
@@ -110,7 +110,7 @@ public enum Olaf {
         log(.critical, message(), category: category, metadata: metadata, file: file, line: line, function: function)
     }
 
-    /// Bir `Error` nesnesini doğrudan loglar. Mesaj `localizedDescription`, tip bilgisi metadata'ya eklenir.
+    /// Logs an `Error` object directly. The message is `localizedDescription`; type info is added to metadata.
     public static func error(_ error: Error, category: LogCategory = .general, metadata: [String: String] = [:], file: String = #fileID, line: Int = #line, function: String = #function) {
         var enriched = metadata
         enriched["errorType"] = String(describing: type(of: error))
@@ -120,19 +120,19 @@ public enum Olaf {
 
     // MARK: - Navigation tracking
 
-    /// Bir ekran geçişini `.navigation` kategorisinde loglar. Generic, string-tabanlı API —
-    /// SDK herhangi bir navigasyon kütüphanesine (Coordinator vb.) **bağımlı değildir**; host
-    /// kendi navigasyon hook'undan bu metodu çağırır.
+    /// Logs a screen transition under the `.navigation` category. A generic, string-based API —
+    /// the SDK is **not dependent** on any navigation library (Coordinator, etc.); the host
+    /// calls this method from its own navigation hook.
     ///
     /// ```swift
-    /// // Coordinator observer adapter'ından (host tarafı):
+    /// // From a Coordinator observer adapter (host side):
     /// Olaf.trackScreen("dashboard", kind: "push")
     /// Olaf.trackScreen("paymentSheet", kind: "sheet")
     /// ```
     ///
     /// - Parameters:
-    ///   - name: Ekran kimliği / adı (örn. `CoordinatorEntryPoint.id`). Mesaj olarak loglanır.
-    ///   - kind: Geçiş türü ("push", "sheet", "popup", "root", "dismiss" …). Metadata'ya yazılır.
+    ///   - name: Screen identifier / name (e.g. `CoordinatorEntryPoint.id`). Logged as the message.
+    ///   - kind: Transition type ("push", "sheet", "popup", "root", "dismiss" …). Written to metadata.
     public static func trackScreen(
         _ name: String,
         kind: String = "push",
@@ -151,33 +151,33 @@ public enum Olaf {
         )
     }
 
-    // MARK: - Okuma & yönetim (viewer bu API üzerinden besler)
+    // MARK: - Reading & management (the viewer is fed through this API)
 
-    /// Mevcut tampondaki (bu oturum, bellek) kayıtların anlık kopyası (eskiden yeniye).
+    /// An instant copy of the entries currently in the buffer (this session, in memory), oldest to newest.
     public static func snapshot() -> [LogEntry] {
         runtime.store?.snapshot() ?? []
     }
 
-    /// `snapshot()`'ın bloke etmeyen sürümü. Çekirdek kuyruk yoğun yazma burst'ü işlerken
-    /// ana thread'i `queue.sync` ile bekletmemek için viewer bunu kullanır.
+    /// Non-blocking version of `snapshot()`. The viewer uses this so the main thread isn't
+    /// blocked by `queue.sync` while the core queue is processing a heavy write burst.
     public static func snapshotAsync() async -> [LogEntry] {
         guard let store = runtime.store else { return [] }
         return await store.snapshotAsync()
     }
 
-    /// Diskteki tüm kayıtlar — **önceki oturumlar dahil** (ring buffer kapasitesinden bağımsız).
-    /// Ağır dosya I/O arka planda yapılır; çağıran (ör. ana thread) bloke olmaz.
-    /// Büyük geçmişlerde tamamını belleğe almamak için `loadPersistedPage(before:minimumEntries:)`
-    /// ile sayfalı okuma tercih edin (viewer bunu kullanır).
+    /// All entries on disk — **including previous sessions** (independent of ring buffer capacity).
+    /// Heavy file I/O runs in the background; the caller (e.g. the main thread) is not blocked.
+    /// For large histories, prefer paginated reads via `loadPersistedPage(before:minimumEntries:)`
+    /// to avoid loading everything into memory at once (the viewer uses this).
     public static func loadPersistedEntries() async -> [LogEntry] {
         guard let store = runtime.store else { return [] }
         return await store.loadPersisted()
     }
 
-    /// Diskteki geçmişi **sayfalı** okur — en yeniden geriye doğru. İlk sayfa için `before: nil`;
-    /// sonraki (daha eski) sayfa için önceki sayfanın `nextCursor`'ını verin. `nextCursor == nil`
-    /// geçmişin sonu demektir. Sayfa, en az `minimumEntries` kayıt içerene dek bütün NDJSON
-    /// dosyalarından oluşur (dosyalar bölünmez).
+    /// Reads on-disk history **paginated** — newest to oldest. Pass `before: nil` for the first
+    /// page; for the next (older) page, pass the previous page's `nextCursor`. `nextCursor == nil`
+    /// means the end of history. A page is assembled from whole NDJSON files until it contains at
+    /// least `minimumEntries` entries (files are never split).
     public static func loadPersistedPage(
         before cursor: String? = nil,
         minimumEntries: Int = 500
@@ -186,31 +186,31 @@ public enum Olaf {
         return await store.loadPersistedPage(before: cursor, minimumEntries: minimumEntries)
     }
 
-    /// Yeni kayıtları canlı yayınlayan akış.
+    /// A stream that live-broadcasts new entries.
     public static func stream() -> AsyncStream<LogEntry> {
         runtime.store?.makeStream() ?? AsyncStream { $0.finish() }
     }
 
-    /// Tüm logları (bellek + disk) temizler.
+    /// Clears all logs (memory + disk).
     public static func clear() {
         runtime.store?.clear()
     }
 
-    /// Tüm logları tek dosyada birleştirip paylaşılabilir bir URL döndürür (asenkron, bloke etmez).
+    /// Merges all logs into a single file and returns a shareable URL (async, non-blocking).
     public static func exportFileURL() async -> URL? {
         guard let store = runtime.store else { return nil }
         return await store.exportFileURL()
     }
 
-    /// Verilen kayıtları paylaşılabilir bir dosyaya yazar (asenkron, bloke etmez). Viewer, o an
-    /// **filtreli** görünen listeyi paylaşmak için bunu kullanır; kayıt seçimi çağırana aittir.
+    /// Writes the given entries to a shareable file (async, non-blocking). The viewer uses this
+    /// to share the currently **filtered** list; entry selection is up to the caller.
     public static func exportFileURL(entries: [LogEntry]) async -> URL? {
         guard let store = runtime.store else { return nil }
         return await store.exportFileURL(entries: entries)
     }
 
-    /// Verilen kayıtları **ham NDJSON** (.ndjson — satır başına bir JSON `LogEntry`) dosyasına
-    /// yazar. Disk formatıyla aynı şema: jq/backend analizi/başka araçlara kayıpsız beslenebilir.
+    /// Writes the given entries to a **raw NDJSON** (.ndjson — one JSON `LogEntry` per line) file.
+    /// Same schema as the on-disk format: can be fed losslessly into jq/backend analysis/other tools.
     public static func exportNDJSONFileURL(entries: [LogEntry]) async -> URL? {
         guard let store = runtime.store else { return nil }
         return await store.exportNDJSONFileURL(entries: entries)

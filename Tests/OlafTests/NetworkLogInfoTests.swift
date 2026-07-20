@@ -1,7 +1,7 @@
 import XCTest
 @testable import Olaf
 
-/// `NetworkLogInfo`'nun metadata ayrıştırması — anahtarlar `NetworkLogComposer` ile hizalı kalmalı.
+/// `NetworkLogInfo`'s metadata parsing — keys must stay aligned with `NetworkLogComposer`.
 final class NetworkLogInfoTests: XCTestCase {
 
     private func networkEntry(metadata: [String: String]) -> LogEntry {
@@ -20,7 +20,7 @@ final class NetworkLogInfoTests: XCTestCase {
     }
 
     func testComposerMetadataRoundtrip() {
-        // Composer'ın ürettiği metadata, viewer tarafında birebir geri okunabilmeli.
+        // The metadata produced by the composer must be readable back verbatim on the viewer side.
         var event = NetworkLogEvent(
             method: "POST",
             url: "https://api.example.com/v1/pay?id=7",
@@ -46,10 +46,10 @@ final class NetworkLogInfoTests: XCTestCase {
         XCTAssertEqual(unwrapped.requestBody, #"{"a":1}"#)
         XCTAssertEqual(unwrapped.responseBody, #"{"ok":true}"#)
         XCTAssertFalse(unwrapped.cancelled)
-        // Header'lar prefix'ten ayrıştırılır ve ada göre sıralanır.
+        // Headers are parsed from the prefix and sorted by name.
         XCTAssertEqual(unwrapped.requestHeaders.map(\.key), ["Accept", "Authorization"])
         XCTAssertEqual(unwrapped.responseHeaders.first?.value, "application/json")
-        // URL parçalama.
+        // URL parsing.
         XCTAssertEqual(unwrapped.host, "api.example.com")
         XCTAssertEqual(unwrapped.path, "/v1/pay?id=7")
         XCTAssertFalse(unwrapped.isFailure)
@@ -61,7 +61,7 @@ final class NetworkLogInfoTests: XCTestCase {
             "reqBytes": "0", "respBytes": "0", "cancelled": "true"
         ]))
         XCTAssertEqual(info?.cancelled, true)
-        XCTAssertEqual(info?.isFailure, false)   // iptal bir hata değildir
+        XCTAssertEqual(info?.isFailure, false)   // cancellation is not an error
     }
 
     func testFailureDetection() {

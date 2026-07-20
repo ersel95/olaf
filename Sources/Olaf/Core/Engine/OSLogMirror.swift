@@ -1,8 +1,8 @@
 import Foundation
 import os
 
-/// Kayıtları `os.Logger`'a yansıtır → Console.app ve sistem log akışında görünür.
-/// Yalnız `LogStore`'un serial kuyruğundan çağrılır.
+/// Mirrors entries to `os.Logger` → visible in Console.app and the system log stream.
+/// Only ever called from `LogStore`'s serial queue.
 final class OSLogMirror: @unchecked Sendable {
 
     private let subsystem: String
@@ -14,8 +14,8 @@ final class OSLogMirror: @unchecked Sendable {
 
     func log(_ entry: LogEntry) {
         let logger = logger(for: entry.category.rawValue)
-        // `.public`: mesaj HAM'dır ve Console.app'te açık görünür — Olaf yalnız non-prod'da
-        // çalıştırılmalıdır (hassas veri sorumluluğu host'ta; bkz. CLAUDE.md/README kuralları).
+        // `.public`: the message is RAW and visible in the clear in Console.app — Olaf must only
+        // run in non-prod (sensitive-data responsibility lies with the host; see CLAUDE.md/README rules).
         logger.log(level: entry.level.osLogType, "\(entry.message, privacy: .public)")
     }
 

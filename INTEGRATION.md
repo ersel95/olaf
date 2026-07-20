@@ -1,36 +1,36 @@
-# Olaf — Entegrasyon Rehberi
+# Olaf — Integration Guide
 
-Olaf'u uygulamaya bağlamak için rehber.
+A guide for wiring Olaf into your app.
 
-> **Tasarım ilkesi:** Olaf hiçbir dış araca bağlı değildir. Dış tanılama araçları
-> (örn. başka bir network logger) jenerik `ExternalToolBridge` ile host tarafında eklenebilir.
-> Hızlı yol: tek-dosya template [`Integration/OlafIntegration.swift`](Integration/OlafIntegration.swift)
-> ve makine-takipli [`AGENTS.md`](AGENTS.md).
+> **Design principle:** Olaf is not tied to any external tool. External diagnostics tools
+> (e.g. another network logger) can be added on the host side via the generic `ExternalToolBridge`.
+> Fast path: the single-file template [`Integration/OlafIntegration.swift`](Integration/OlafIntegration.swift)
+> and the machine-followable [`AGENTS.md`](AGENTS.md).
 
-> **Gating notu:** TestFlight build'i genelde UAT/Prod config'tedir; `#if DEBUG` yalnız Test config'te tanımlıdır.
-> Olaf'u `#if DEBUG`'a bağlama — `#if !PROD` derleme sınırı (önerilen, capture kodu prod binary'sine girmez)
-> veya runtime feature flag kullan.
+> **Gating note:** A TestFlight build is usually in a UAT/Prod config; `#if DEBUG` is only defined in the Test config.
+> Don't tie Olaf to `#if DEBUG` — use the `#if !PROD` compile-time boundary (recommended, keeps capture code
+> out of the prod binary) or a runtime feature flag.
 
 ---
 
-## 1. Paketi ekle
+## 1. Add the package
 
-Xcode → Add Packages → `https://github.com/ersel95/olaf` → ana app target'ına ("Choose Package Products"):
-- `Olaf` — **tek ürün**: motor + network capture + in-app viewer birlikte gelir.
+Xcode → Add Packages → `https://github.com/ersel95/olaf` → to your main app target ("Choose Package Products"):
+- `Olaf` — **single product**: engine + network capture + in-app viewer all included.
 
-> **Kapsam matrisi — hangi özellik hangi çağrı ile açılır:**
+> **Feature matrix — which call turns on which feature:**
 >
-> | Özellik | Açma koşulu |
+> | Feature | Enabled by |
 > |---|---|
 > | Log API (trace…critical) | `Olaf.start(...)` |
 > | Shake → log viewer | `OlafUI.install()` |
 > | Network capture | `OlafNetwork.startAutomaticCapture()` |
 > | Navigation breadcrumb | `Olaf.trackScreen(...)` (§6) |
 
-## 2. Entegrasyon dosyasını kopyala
+## 2. Copy the integration file
 
-[`Integration/OlafIntegration.swift`](Integration/OlafIntegration.swift) dosyasını host app'e (örn. `Core/Utils/`)
-kopyalayın. İçinde `OlafManager` (başlatma + loglama) hazırdır. `// ADAPT:` satırlarını uyarlayın.
+Copy [`Integration/OlafIntegration.swift`](Integration/OlafIntegration.swift) into the host app (e.g. `Core/Utils/`).
+It contains `OlafManager` (startup + logging), ready to go. Adapt the `// ADAPT:` lines.
 
 ```swift
 @_exported import Olaf
@@ -51,87 +51,89 @@ public final class OlafManager {
 }
 ```
 
-## 3. Başlatmayı bağla
+## 3. Wire up startup
 
-App giriş noktanızda — **paylaşılan URLSession kurulmadan ÖNCE** (SwiftUI `App.init` veya
-`AppDelegate.didFinishLaunching` başı, session preload'undan önce):
+At your app's entry point — **BEFORE the shared URLSession is set up** (at the start of SwiftUI's
+`App.init` or `AppDelegate.didFinishLaunching`, before any session preloading):
 ```swift
 OlafManager.shared.initialize()
 ```
-Shake jesti Olaf'a aittir; cihaz sallanınca viewer açılır.
+The shake gesture belongs to Olaf; shaking the device opens the viewer.
 
-## 4. Network loglarını Olaf'ta listelemek — `OlafNetwork`
+## 4. Listing network logs in Olaf — `OlafNetwork`
 
-İstek/yanıtları `.network` kategorisinde **ham** (maskelemesiz) loglar.
+Logs requests/responses **raw** (unmasked) in the `.network` category.
 
-### ÖNERİLEN: tek satır otomatik capture (networking koduna dokunmadan)
-`startAutomaticCapture()`, `URLSessionConfiguration`'ı swizzle ederek tüm session'lara (Alamofire dahil)
-protokolü enjekte eder. Proxy session TLS doğrulamasını **sistem doğrulamasına bırakır**
-(`.performDefaultHandling`) → capture katmanı host'un cert pinning'ini veya OS trust zincirini
-**ezmez/baypaslamaz**; geçersiz sertifikalar yine reddedilir. (Not: Bu nedenle yalnızca cihazın
-sistem trust zincirinin kabul ettiği sertifikalar yakalanır; host kendi özel pinning'ini
-uyguluyorsa o trafik proxy üzerinden başarısız olabilir — bu beklenen ve güvenli davranıştır.)
-`initialize` içinde hazır:
+### RECOMMENDED: one-line automatic capture (no changes to your networking code)
+`startAutomaticCapture()` injects the protocol into all sessions (including Alamofire) by
+swizzling `URLSessionConfiguration`. The proxy session **leaves TLS validation to the system**
+(`.performDefaultHandling`) → the capture layer does **not override/bypass** the host's cert
+pinning or the OS trust chain; invalid certificates are still rejected. (Note: as a result, only
+certificates accepted by the device's system trust chain are captured; if the host applies its
+own custom pinning, that traffic may fail through the proxy — this is expected and safe behavior.)
+Already wired up in `initialize`:
 ```swift
-OlafNetwork.startAutomaticCapture()                                // gövde+header default açık
+OlafNetwork.startAutomaticCapture()                                // body+header capture on by default
 OlafNetwork.startAutomaticCapture(OlafNetworkConfiguration(
     capturesBodies: false,
-    includedURLs: ["api-gateway"],                                   // boş = tümü
-    excludedURLs: ["firebaseio", "crashlytics", "googleapis"]        // SDK gürültüsünü gizle (öncelikli)
+    includedURLs: ["api-gateway"],                                   // empty = all
+    excludedURLs: ["firebaseio", "crashlytics", "googleapis"]        // hide SDK noise (takes priority)
 ))
 ```
 
-### Kendi özel session'ınız varsa: deterministik enjeksiyon
-Host kendi `URLSessionConfiguration`'ını kuruyorsa, otomatik swizzle yerine session kurulurken tek satır:
+### If you have your own custom session: deterministic injection
+If the host sets up its own `URLSessionConfiguration`, instead of automatic swizzling, add one line when setting up the session:
 ```swift
-// OlafManager içindeki configureNetworkCapture(_:) yardımcısı:
+// The configureNetworkCapture(_:) helper inside OlafManager:
 OlafManager.shared.configureNetworkCapture(configuration)
-// (içeride: OlafNetwork.install(into: configuration))
+// (internally: OlafNetwork.install(into: configuration))
 ```
-Bunu kullanıyorsanız `startAutomaticCapture`'a gerek kalmaz. Başka bir capture aracının URLProtocol'ünü
-aynı trafiğe zincirlemek için `OlafNetwork.install(into:chainingTo:)` kullanılabilir.
+If you use this, `startAutomaticCapture` is not needed. To chain another capture tool's URLProtocol
+onto the same traffic, use `OlafNetwork.install(into:chainingTo:)`.
 
-> **Güvenlik:** Gövde/header default açıktır → tüm trafik **ham** loglanır (maskeleme/filtreleme yapılmaz;
-> token/PAN/IBAN/Authorization dahil her şey olduğu gibi saklanır). Capture katmanı TLS doğrulamasını
-> ASLA gevşetmez (cert pinning baypaslanmaz). Hassas veri sızıntısını önlemek host'un sorumluluğundadır →
-> capture **yalnız non-prod debug** içindir, PROD'da çalışmamalı.
+> **Security:** Body/header capture is on by default → all traffic is logged **raw** (no
+> masking/filtering; everything, including token/PAN/IBAN/Authorization, is stored as-is). The
+> capture layer NEVER relaxes TLS validation (cert pinning is not bypassed). Preventing sensitive
+> data leaks is the host's responsibility → capture is **for non-prod debug only** and must not
+> run in PROD.
 
-> **Bilinen sınırlar:** WebSocket ve background session trafiği yakalanmaz (URLSession bunları
-> URLProtocol'e yönlendirmez). `uploadTask(fromFile:)` gövdeleri yakalanmaz. Session-seviyesi ayarlar
-> (`waitsForConnectivity` vb.) proxy'ye taşınmaz; çerezler paylaşılan `HTTPCookieStorage` ile korunur.
-> Çok büyük upload gövdeleri için `capturesBodies: false` önerilir (stream RAM'e okunur).
+> **Known limitations:** WebSocket and background session traffic are not captured (URLSession
+> doesn't route them through URLProtocol). `uploadTask(fromFile:)` bodies are not captured.
+> Session-level settings (`waitsForConnectivity` etc.) are not carried over to the proxy; cookies
+> are preserved via the shared `HTTPCookieStorage`. For very large upload bodies, `capturesBodies:
+> false` is recommended (the stream is read into RAM).
 
-## 5. Uygulamada loglama — her zaman `OlafManager` üzerinden
+## 5. Logging in the app — always through `OlafManager`
 
-Uygulama kodu `Olaf`'a doğrudan bağlanmaz; manager üzerinden loglar (`trace/debug/info/notice/warning/error/critical`
-+ `error(Error)`; çağıran dosya/satır korunur, PROD'da no-op).
+App code doesn't connect to `Olaf` directly; it logs through the manager (`trace/debug/info/notice/warning/error/critical`
++ `error(Error)`; the calling file/line is preserved, and it's a no-op in PROD).
 ```swift
-OlafManager.shared.warning("token decode hatası", category: .security)
+OlafManager.shared.warning("token decode error", category: .security)
 OlafManager.shared.error(error, category: .payment, metadata: ["code": code])
 ```
 
-### Kategorileri genişletme
-Entegrasyon dosyasındaki `extension LogCategory` bloğuna projenizin modüllerini ekleyin:
+### Extending categories
+Add your project's modules to the `extension LogCategory` block in the integration file:
 ```swift
 public extension LogCategory {
     static let cards: LogCategory = "cards"
     static let transfers: LogCategory = "transfers"
 }
 ```
-Dosya `@_exported import Olaf` içerir → çağrı yerleri `import Olaf` yazmadan kullanabilir.
+The file contains `@_exported import Olaf` → call sites can use it without writing `import Olaf`.
 
 ---
 
-## 6. Navigation breadcrumb (ekran geçişleri)
+## 6. Navigation breadcrumb (screen transitions)
 
-`Olaf.trackScreen(_:kind:)` ekran geçişlerini `.navigation` kategorisinde loglar. SDK herhangi bir
-navigasyon kütüphanesine **bağımlı değildir** (Coordinator'a import etmez); host kendi navigasyon
-hook'undan çağırır.
+`Olaf.trackScreen(_:kind:)` logs screen transitions in the `.navigation` category. The SDK is
+**not dependent** on any navigation library (doesn't import into your Coordinator); the host calls
+it from its own navigation hook.
 
-### 6.1 Coordinator kullanan projeler (önerilen)
-Host app'e küçük bir adapter ekleyin (Olaf'a değil — host target'a):
+### 6.1 Projects using a Coordinator (recommended)
+Add a small adapter to the host app (not to Olaf — to the host target):
 ```swift
-import CoordinatorCore   // host'un kendi navigasyon paketi
+import CoordinatorCore   // the host's own navigation package
 import Olaf
 
 final class OlafNavigationObserver: CoordinatorActivityObserver {
@@ -146,101 +148,105 @@ final class OlafNavigationObserver: CoordinatorActivityObserver {
     }
 }
 ```
-Kaydı `AppCoordinator` dispatcher kurulumuna **tek satır** (mevcut observer'ların yanına):
+Register it with a **single line** in the `AppCoordinator` dispatcher setup (next to existing observers):
 ```swift
 dispatcher.addActivityObserver(OlafNavigationObserver())
 ```
-> Push (NavigationStack) ekranları modal kanalından gelmiyorsa: ya observer'ın
-> `coordinatorDidObserveUserInteraction()`'ında `topMostViewInfo.screen.id` okuyup
-> `Olaf.trackScreen(..., kind: "push")` çağırın, ya da `BaseCoordinator` stack `didSet`'ine tek
-> `notify(kind:"push")` satırı ekleyin (host kararı).
+> If push (NavigationStack) screens don't come through the modal channel: either read
+> `topMostViewInfo.screen.id` in the observer's `coordinatorDidObserveUserInteraction()` and call
+> `Olaf.trackScreen(..., kind: "push")`, or add a single `notify(kind: "push")` line to the
+> `BaseCoordinator` stack's `didSet` (host's choice).
 
-### 6.2 Coordinator kullanmayan projeler (alternatif)
-Ekran göründüğünde manuel çağırın:
+### 6.2 Projects not using a Coordinator (alternative)
+Call it manually when a screen appears:
 ```swift
 .onAppear { Olaf.trackScreen("DashboardView", kind: "push") }
 ```
 
 ---
 
-## 7. Doğrulama
+## 7. Verification
 
-1. `#if !PROD` aktif bir config'te (Debug/UAT) build alın.
-2. Uygulamayı çalıştırın, birkaç ekranda gezinin (network/log birikir).
-3. **Cihazı sallayın** → viewer açılır; app + network logları tek listede görünmelidir.
-4. Bir network satırına girin → status banner, header'lar, pretty-JSON gövde ve paylaşım
-   (Basit/Tam log + cURL) çalışmalıdır.
+1. Build in a config where `#if !PROD` is active (Debug/UAT).
+2. Run the app, navigate through a few screens (network/log entries accumulate).
+3. **Shake the device** → the viewer opens; app + network logs should appear in a single list.
+4. Open a network entry → the status banner, headers, pretty-printed JSON body, and sharing
+   (Simple/Full log + cURL) should all work.
 
-> **Sürüm uyumu:** iOS 17+. **Dış bağımlılık yok.** UIKit kodları `#if canImport(UIKit)` gate'lidir
-> (non-UI mantık macOS'ta da derlenir/test edilir).
+> **Version compatibility:** iOS 17+. **No external dependencies.** UIKit code is gated behind
+> `#if canImport(UIKit)` (non-UI logic also compiles/tests on macOS).
 
 ---
 
-## 8. Köprüler (opsiyonel)
+## 8. Bridges (optional)
 
-### 8.1 swift-log backend'i — `OlafLogHandler` (template)
-Host swift-log kullanıyorsa [`Integration/OlafLogHandler.swift`](Integration/OlafLogHandler.swift)
-dosyasını app'e kopyalayın (Olaf sıfır bağımlılık taşıdığından swift-log'a paket bağımlılığı yoktur;
-swift-log host projede olmalıdır). Sonra uygulama başlangıcında, `Olaf.start` SONRASI bir kez:
+### 8.1 swift-log backend — `OlafLogHandler` (template)
+If the host uses swift-log, copy [`Integration/OlafLogHandler.swift`](Integration/OlafLogHandler.swift)
+into the app (since Olaf carries zero dependencies, there's no package dependency on swift-log;
+swift-log must already be present in the host project). Then, once at app startup, AFTER
+`Olaf.start`:
 ```swift
 LoggingSystem.bootstrap { label in OlafLogHandler(label: label) }
 ```
-Uygulamadaki ve bağımlılıklardaki tüm `Logging.Logger` çağrıları Olaf'a akar; Logger `label`'ı
-Olaf kategorisi olur, metadata korunur.
+All `Logging.Logger` calls in the app and its dependencies will flow into Olaf; the Logger's
+`label` becomes the Olaf category, and metadata is preserved.
 
-### 8.2 OSLog içe aktarma
-Olaf'ı bilmeyen SDK'ların `os_log`/`Logger` çıktılarını da tek listede görmek için:
+### 8.2 Importing OSLog
+To see `os_log`/`Logger` output from SDKs that don't know about Olaf, in the same list:
 ```swift
 try await Olaf.importOSLogEntries(since: Date().addingTimeInterval(-3600))
 ```
-Viewer menüsünde de var: **⋯ → "OSLog'u içe aktar (1 saat)"**. Olaf'ın kendi OSLog aynası çift
-kayıt üretmesin diye ana bundle id'si (default ayna subsystem'i) otomatik hariç tutulur; aynaya
-özel `subsystem` verdiyseniz `excludingSubsystems:` ile geçirin. Not: kayıtlar özgün zaman
-damgasını taşır ama listede içe aktarma anının üstünde grup hâlinde görünür.
+Also available in the viewer menu: **⋯ → "Import OSLog (1 hour)"**. To keep Olaf's own OSLog
+mirror from producing duplicate entries, the main bundle id (the default mirror subsystem) is
+automatically excluded; if you gave the mirror a custom `subsystem`, pass it via
+`excludingSubsystems:`. Note: entries carry their original timestamp but appear grouped above the
+import moment in the list.
 
 ---
 
-## 9. Response mocking (opsiyonel)
+## 9. Response mocking (optional)
 
-Bir endpoint'in yanıtını beğenmediğinizde kendi yanıtınızı tanımlarsınız; o URL'e giden istekler
-**ağa hiç çıkmadan** sizin yanıtınızı alır ve uygulama gerçek backend'den gelmiş gibi devam eder
-(URLSession/Alamofire fark etmez; capture kurulu olmalı — `startAutomaticCapture`/`install`):
+When you don't like an endpoint's response, you can define your own; requests to that URL
+**never hit the network** and get your response instead, and the app continues on as if it came
+from the real backend (URLSession/Alamofire makes no difference; capture must be set up —
+`startAutomaticCapture`/`install`):
 
 ```swift
-// Boş liste senaryosu:
+// Empty-list scenario:
 OlafNetwork.addMock(OlafMockResponse(urlContains: "/v1/accounts", json: #"{"accounts": []}"#))
 
-// 500 + özel gövde, yalnız POST:
+// 500 + custom body, POST only:
 OlafNetwork.addMock(OlafMockResponse(
     urlContains: "/v1/transfer", method: "POST",
     statusCode: 500, json: #"{"code": "LIMIT_EXCEEDED"}"#
 ))
 
-// Yavaş ağ (3 sn) + timeout hatası:
+// Slow network (3s) + timeout error:
 OlafNetwork.addMock(.failure(urlContains: "/v1/rates", error: .timedOut, delaySeconds: 3))
 
-OlafNetwork.removeAllMocks()   // gerçek backend'e dönüş
+OlafNetwork.removeAllMocks()   // back to the real backend
 ```
 
-- Eşleşme: URL `urlContains` parçasını içeriyorsa (+ opsiyonel `method`); birden çok mock
-  eşleşirse **ilk eklenen** kazanır. Capture URL filtreleri mock'ları etkilemez.
-- Mock'lanan istekler listede `[mock]` işaretiyle loglanır; detayda "Kaynak: Mock" görünür.
-  `delaySeconds` süresince "Aktif istekler" barında beklerler (yavaş ağ simülasyonu).
-- **Cihaz üzerinde, kod yazmadan**: viewer'da bir network kaydının detayı → **"Mock'a çevir"** —
-  yakalanan yanıt editörde açılır (status/gövde/gecikme/taşıma hatası düzenlenir), kaydedilince
-  aktifleşir. Aktif mock'lar **⋯ → Mock'lar** ekranından görüntülenir/silinir.
-- Diğer her şey gibi **yalnız non-prod** (`#if !PROD`) içindir.
+- Matching: if the URL contains the `urlContains` fragment (+ optional `method`); if multiple
+  mocks match, the **first one added** wins. Capture URL filters don't affect mocks.
+- Mocked requests are logged in the list with a `[mock]` marker; the detail view shows
+  "Source: Mock". They sit in the "Active requests" bar for `delaySeconds` (simulating a slow
+  network).
+- **On-device, without writing code**: in the viewer, a network entry's detail → **"Convert to
+  mock"** — the captured response opens in an editor (edit status/body/delay/transport error),
+  and it activates once saved. Active mocks can be viewed/deleted from **⋯ → Mocks**.
+- Like everything else, this is **non-prod only** (`#if !PROD`).
 
 ---
 
-## Dış bir tanılama aracı eklemek
-Jenerik geçiş `ExternalToolBridge` ile yapılır:
+## Adding an external diagnostics tool
+Generic handoff is done via `ExternalToolBridge`:
 ```swift
 struct SomeToolBridge: ExternalToolBridge {
     let title = "SomeTool"
-    @MainActor func open() { /* dismiss + show, ya da OlafUI.presentExternal { ... } */ }
+    @MainActor func open() { /* dismiss + show, or OlafUI.presentExternal { ... } */ }
 }
 OlafUI.register(SomeToolBridge())
 ```
-Gömülebilir SwiftUI araçları için `OlafUI.presentExternal { SomeView() }`; kendini sunan UIKit araçları için
-`OlafUI.dismiss()` + aracın kendi `show()`'u.
+For embeddable SwiftUI tools, use `OlafUI.presentExternal { SomeView() }`; for self-presenting UIKit tools, use
+`OlafUI.dismiss()` + the tool's own `show()`.

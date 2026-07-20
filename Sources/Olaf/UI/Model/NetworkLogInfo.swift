@@ -1,7 +1,7 @@
 import Foundation
 
-/// `.network` kategorili bir `LogEntry`'nin metadata'sını yapısal network bilgisine ayrıştırır.
-/// (Metadata anahtarları `OlafNetwork.NetworkLogComposer` ile hizalıdır.)
+/// Parses the metadata of a `.network`-category `LogEntry` into structured network info.
+/// (Metadata keys are aligned with `OlafNetwork.NetworkLogComposer`.)
 struct NetworkLogInfo {
     let method: String?
     let url: String?
@@ -10,18 +10,18 @@ struct NetworkLogInfo {
     let requestBytes: Int?
     let responseBytes: Int?
     let error: String?
-    /// İstek tamamlanmadan iptal edildi (hata değil; `.info` seviyesinde loglanır).
+    /// The request was cancelled before completing (not an error; logged at `.info` level).
     let cancelled: Bool
-    /// Yanıt mock'tan üretildi (ağa çıkılmadı).
+    /// The response was produced by a mock (no network call made).
     let mocked: Bool
     let requestBody: String?
     let responseBody: String?
-    /// `image/*` yanıt gövdesi (sınır altındaysa yakalanır) — detayda önizleme için.
+    /// `image/*` response body (captured if under the size limit) — for the detail preview.
     let responseImageData: Data?
     let requestHeaders: [(key: String, value: String)]
     let responseHeaders: [(key: String, value: String)]
 
-    // Zamanlama kırılımı (`t.` öneki — NetworkLogComposer ile hizalı; toplanamadıysa nil).
+    // Timing breakdown (`t.` prefix — aligned with NetworkLogComposer; nil if not collected).
     let dnsMs: Int?
     let connectMs: Int?
     let tlsMs: Int?
@@ -29,7 +29,7 @@ struct NetworkLogInfo {
     let protocolName: String?
     let reusedConnection: Bool?
 
-    /// Detayda "Zamanlama" bölümü gösterilecek mi?
+    /// Should the "Timing" section be shown in the detail view?
     var hasTimings: Bool {
         dnsMs != nil || connectMs != nil || tlsMs != nil || ttfbMs != nil
             || protocolName != nil || reusedConnection != nil
@@ -66,7 +66,7 @@ struct NetworkLogInfo {
         reusedConnection = m["t.reused"].map { $0 == "true" }
     }
 
-    /// URL'in path (+ query) kısmı; satırda kısa gösterim için.
+    /// The URL's path (+ query) part; for a short display in the row.
     var path: String {
         guard let url, let comps = URLComponents(string: url) else { return url ?? "-" }
         var p = comps.path.isEmpty ? "/" : comps.path
@@ -74,14 +74,14 @@ struct NetworkLogInfo {
         return p
     }
 
-    /// URL host'u.
+    /// The URL's host.
     var host: String {
         guard let url, let comps = URLComponents(string: url) else { return "" }
         return comps.host ?? ""
     }
 
-    /// Mock editörünün önerdiği eşleşme kalıbı: host + path (query'siz) — aynı endpoint'in
-    /// tüm çağrılarını yakalayacak kadar genel, başka endpoint'lere taşmayacak kadar özgül.
+    /// The match pattern suggested by the mock editor: host + path (without query) — general enough
+    /// to catch all calls to the same endpoint, specific enough not to spill over to other endpoints.
     var suggestedMockPattern: String {
         guard let url, let comps = URLComponents(string: url) else { return url ?? "" }
         return (comps.host ?? "") + (comps.path.isEmpty ? "/" : comps.path)

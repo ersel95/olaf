@@ -1,11 +1,11 @@
 import Foundation
 
-/// Logları diske **NDJSON** (satır başına bir JSON `LogEntry`) olarak yazar; boyut bazlı
-/// rotation ve dosya-sayısı retention uygular. NDJSON sayesinde kayıtlar tam doğrulukla
-/// geri okunabilir (oturumlar arası geçmiş). Export ise insan-okur düz metne dönüştürülür.
+/// Writes logs to disk as **NDJSON** (one JSON `LogEntry` per line); applies size-based
+/// rotation and file-count retention. Thanks to NDJSON, entries can be read back with full
+/// fidelity (cross-session history). Export, on the other hand, converts to human-readable plain text.
 ///
-/// Bu tip **kendi başına thread-safe değildir**; yalnızca `LogStore`'un serial
-/// kuyruğundan çağrılır. `@unchecked Sendable` bu sözleşmeye dayanır.
+/// This type is **not thread-safe on its own**; it is only ever called from `LogStore`'s serial
+/// queue. `@unchecked Sendable` relies on this contract.
 final class FilePersistence: @unchecked Sendable {
 
     private let directory: URL
@@ -22,8 +22,8 @@ final class FilePersistence: @unchecked Sendable {
 
     private var handle: FileHandle?
     private var currentSize: Int = 0
-    /// Aynı saniye içinde birden çok rotation olduğunda dosya adı çakışmasını (→ log kaybı)
-    /// önlemek için monotonik sayaç. Serial kuyrukta arttığından yarış yoktur.
+    /// Monotonic counter to prevent file-name collisions (→ log loss) when multiple rotations
+    /// happen within the same second. Incremented on the serial queue, so there's no race.
     private var rotationCounter = 0
 
     init?(directory: URL, maxFileSize: Int, maxFileCount: Int) {
@@ -53,45 +53,46 @@ final class FilePersistence: @unchecked Sendable {
         try? handle?.close()
     }
 
-    // MARK: - Yazma
+    // MARK: - Writing
 
     func write(_ entry: LogEntry) {
         guard let handle, let json = try? encoder.encode(entry) else { return }
         var data = json
         data.append(0x0A) // '\n'
         do {
-            // Handle açılışta (ve rotate'te) sona konumlandırılır; tek yazıcı olduğundan pointer
-            // sonda kalır → her yazımda `seekToEnd()` syscall'ı gereksiz, kaldırıldı.
+            // The handle is positioned at the end on open (and on rotate); since there's a single
+            // writer, the pointer stays at the end → a `seekToEnd()` syscall on every write is
+            // unnecessary and has been removed.
             try handle.write(contentsOf: data)
             currentSize += data.count
             if currentSize >= maxFileSize {
                 rotate()
             }
         } catch {
-            // Disk hatası logging'i çökertmemeli; sessizce geç.
+            // A disk error must not crash logging; fail silently.
         }
     }
 
-    // MARK: - Okuma (oturumlar arası geçmiş)
+    // MARK: - Reading (cross-session history)
 
-    /// Diskteki tüm kayıtları (eskiden yeniye) ayrıştırıp döndürür. Bozuk satırlar atlanır.
+    /// Parses and returns all entries on disk (oldest to newest). Corrupted lines are skipped.
     func loadEntries() -> [LogEntry] {
         try? handle?.synchronize()
         return (rotatedFilesSortedAscending() + [activeFileURL]).flatMap(decodeFile)
     }
 
-    /// Diskteki geçmişi **sayfalı** okur — en yeni dosyalardan geriye doğru. Sayfa birimi dosyadır:
-    /// `minimumEntries`'e ulaşana (veya dosyalar bitene) dek bütün dosyalar eklenir; dosyalar
-    /// bölünmez (bir dosya en fazla `maxFileSize` olduğundan sayfa boyutu sınırlıdır).
+    /// Reads on-disk history **paginated** — from the newest files backwards. The page unit is a
+    /// file: whole files are added until `minimumEntries` is reached (or files run out); files are
+    /// never split (since a file is capped at `maxFileSize`, page size is bounded).
     ///
-    /// İmleç, bir SONRAKİ sayfanın başlayacağı dosyanın adıdır (bu sayfa üretilirken sabitlenir).
-    /// Böylece sayfalar arasında aktif dosya rotate olsa bile kayıt tekrarı oluşmaz: yeni rotate
-    /// edilen dosyalar imleçten daha yeni kaldığından kapsam dışıdır. İmleç dosyası bu arada
-    /// silinmişse (prune) sözlüksel olarak daha eski ilk dosyaya düşülür (dosya adları sabit
-    /// genişlik zaman damgalı → sözlüksel sıra kronolojiktir).
+    /// The cursor is the name of the file where the NEXT page will start (fixed at the time this
+    /// page is produced). This way, even if the active file rotates between pages, no entry is
+    /// duplicated: newly rotated files are newer than the cursor and thus out of scope. If the
+    /// cursor's file has since been deleted (pruned), we fall back to the lexicographically oldest
+    /// file preceding it (file names use a fixed-width timestamp → lexicographic order is chronological).
     func loadEntriesPage(before cursorFileName: String?, minimumEntries: Int) -> PersistedLogPage {
         try? handle?.synchronize()
-        // En yeniden en eskiye: aktif dosya + rotated'ler (tersten).
+        // Newest to oldest: active file + rotated files (reversed).
         let files = [activeFileURL] + rotatedFilesSortedAscending().reversed()
 
         let startIndex: Int
@@ -118,15 +119,15 @@ final class FilePersistence: @unchecked Sendable {
         }
 
         return PersistedLogPage(
-            // Dosyalar en yeniden eskiye tüketildi; sayfa içeriği eskiden yeniye döner.
+            // Files were consumed newest to oldest; the page content is returned oldest to newest.
             entries: consumed.reversed().flatMap { $0 },
             nextCursor: index < files.count ? files[index].lastPathComponent : nil
         )
     }
 
-    /// Tek bir NDJSON dosyasını ayrıştırır (eskiden yeniye). Bozuk satırlar atlanır.
-    /// Data'yı `\n` (0x0A) üzerinden bölmek, satırları String'e çevirip tekrar UTF-8'e encode
-    /// etme (çift dönüşüm) maliyetinden kaçınır.
+    /// Parses a single NDJSON file (oldest to newest). Corrupted lines are skipped.
+    /// Splitting the data on `\n` (0x0A) avoids the cost of converting lines to `String` and
+    /// re-encoding to UTF-8 (a double conversion).
     private func decodeFile(_ file: URL) -> [LogEntry] {
         guard let data = try? Data(contentsOf: file) else { return [] }
         return data.split(separator: 0x0A, omittingEmptySubsequences: true).compactMap {
@@ -134,7 +135,7 @@ final class FilePersistence: @unchecked Sendable {
         }
     }
 
-    // MARK: - Temizleme & export
+    // MARK: - Clearing & export
 
     func clear() {
         try? handle?.close()
@@ -145,14 +146,14 @@ final class FilePersistence: @unchecked Sendable {
         try? openActiveFile()
     }
 
-    /// Diskteki tüm kayıtları, verilen formatter ile **insan-okur düz metin** bir dosyaya
-    /// dönüştürür ve paylaşılabilir URL döndürür.
+    /// Converts all entries on disk into a **human-readable plain-text** file using the given
+    /// formatter, and returns a shareable URL.
     func consolidatedTextURL(using formatter: any LogFormatter) -> URL? {
         let text = loadEntries().map { formatter.string(from: $0) }.joined(separator: "\n")
         return LogExportFile.write(text, fileManager: fileManager)
     }
 
-    // MARK: - Dahili
+    // MARK: - Internal
 
     private var activeFileURL: URL {
         directory.appendingPathComponent(activeFileName)
@@ -174,11 +175,11 @@ final class FilePersistence: @unchecked Sendable {
 
         rotationCounter += 1
         let stamp = Int(Date().timeIntervalSince1970)
-        // Saniye (sabit genişlik) + monotonik sayaç → aynı saniyedeki çok sayıda rotation çakışmaz.
+        // Second (fixed width) + monotonic counter → many rotations within the same second don't collide.
         var rotatedURL = directory.appendingPathComponent(
             String(format: "\(rotatedPrefix)%010d-%06d.\(fileExtension)", stamp, rotationCounter)
         )
-        // Süreç yeniden başlayıp aynı saniyede rotate ederse (sayaç sıfırlanır) yine de benzersizleştir.
+        // If the process restarts and rotates within the same second (counter reset), still ensure uniqueness.
         if fileManager.fileExists(atPath: rotatedURL.path) {
             rotatedURL = directory.appendingPathComponent(
                 "\(rotatedPrefix)\(stamp)-\(UUID().uuidString.prefix(8)).\(fileExtension)"
@@ -191,10 +192,10 @@ final class FilePersistence: @unchecked Sendable {
         pruneOldFiles()
     }
 
-    /// `maxFileCount`'u aşan en eski rotated dosyaları siler (aktif dosya hariç).
+    /// Deletes the oldest rotated files that exceed `maxFileCount` (excluding the active file).
     private func pruneOldFiles() {
         let rotated = rotatedFilesSortedAscending()
-        // Aktif dosya da sayıma dahil → en fazla (maxFileCount - 1) rotated tutulur.
+        // The active file also counts → at most (maxFileCount - 1) rotated files are kept.
         let allowedRotated = max(0, maxFileCount - 1)
         guard rotated.count > allowedRotated else { return }
         for url in rotated.prefix(rotated.count - allowedRotated) {
@@ -218,7 +219,7 @@ final class FilePersistence: @unchecked Sendable {
                     && $0.lastPathComponent != activeFileName
                     && $0.pathExtension == fileExtension
             }
-            // Önce oluşturma tarihi (isim şemasından bağımsız doğru kronolojik sıra), eşitlikte isim.
+            // Primarily creation date (correct chronological order independent of naming scheme), then name on ties.
             .sorted { lhs, rhs in
                 let lDate = (try? lhs.resourceValues(forKeys: [.creationDateKey]))?.creationDate
                 let rDate = (try? rhs.resourceValues(forKeys: [.creationDateKey]))?.creationDate
@@ -228,8 +229,8 @@ final class FilePersistence: @unchecked Sendable {
     }
 
     private func applyProtection(to url: URL) {
-        // İlk kilit açılışına kadar şifreli; banking-grade taban koruma.
-        // `FileProtectionType` yalnız iOS/iPadOS'ta mevcut (macOS test build'inde no-op).
+        // Encrypted until first unlock; banking-grade baseline protection.
+        // `FileProtectionType` is only available on iOS/iPadOS (a no-op in the macOS test build).
         #if os(iOS)
         try? fileManager.setAttributes(
             [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],

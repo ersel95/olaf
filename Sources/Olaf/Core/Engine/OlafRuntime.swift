@@ -1,7 +1,7 @@
 import Foundation
 
-/// `Olaf` cephesinin arkasındaki durum sahibi. Store yaşam döngüsünü, kill switch'i ve
-/// seviye eşiğini kilitle korur. `@unchecked Sendable` — tüm değişken durum `lock` arkasında.
+/// The state owner behind the `Olaf` facade. Guards the store's lifecycle, the kill switch, and
+/// the level threshold with a lock. `@unchecked Sendable` — all mutable state sits behind `lock`.
 final class OlafRuntime: @unchecked Sendable {
 
     private let lock = NSLock()
@@ -10,8 +10,8 @@ final class OlafRuntime: @unchecked Sendable {
     private var _enabled = true
     private var _sessionID = ""
 
-    /// `start()` çağrılmadan ÖNCE atılan loglar buraya tamponlanır ve start'ta flush edilir.
-    /// (Uygulama açılışındaki erken loglar — örn. splash — kaybolmasın.)
+    /// Logs emitted BEFORE `start()` is called are buffered here and flushed on start.
+    /// (So early logs during app launch — e.g. splash — aren't lost.)
     private var _pending: [PendingLog] = []
     private let maxPending = 1000
 
@@ -27,16 +27,16 @@ final class OlafRuntime: @unchecked Sendable {
         let thread: String
     }
 
-    /// Bir log çağrısının nereye gideceği.
+    /// Where a log call should go.
     enum LogTarget {
-        case store(LogStore)   // başlatıldı + seviye eşiğini geçti → doğrudan yaz
-        case buffer            // henüz başlatılmadı → tamponla (start'ta flush)
-        case drop              // kapalı veya seviye eşiğin altında → at
+        case store(LogStore)   // started + passed the level threshold → write directly
+        case buffer            // not yet started → buffer (flushed on start)
+        case drop              // disabled or below the level threshold → discard
     }
 
-    // MARK: - Yaşam döngüsü
+    // MARK: - Lifecycle
 
-    /// İdempotent başlatma. İlk çağrı kazanır.
+    /// Idempotent start. The first call wins.
     func start(with configuration: OlafConfiguration) {
         lock.lock(); defer { lock.unlock() }
         guard _store == nil else { return }
@@ -67,7 +67,7 @@ final class OlafRuntime: @unchecked Sendable {
         )
         _minimumLevel = configuration.minimumLevel
 
-        // start öncesi tamponlanan logları (seviye eşiğine göre) flush et.
+        // Flush logs buffered before start (according to the level threshold).
         if let store = _store, !_pending.isEmpty {
             for pending in _pending where pending.level >= _minimumLevel {
                 store.ingest(
@@ -86,7 +86,7 @@ final class OlafRuntime: @unchecked Sendable {
         }
     }
 
-    // MARK: - Erişim
+    // MARK: - Access
 
     var store: LogStore? {
         lock.lock(); defer { lock.unlock() }
@@ -98,7 +98,7 @@ final class OlafRuntime: @unchecked Sendable {
         return _store != nil
     }
 
-    /// Mevcut oturum kimliği (`start()` sonrası dolar; öncesinde boş).
+    /// Current session identifier (populated after `start()`; empty before that).
     var currentSessionID: String {
         lock.lock(); defer { lock.unlock() }
         return _sessionID
@@ -109,24 +109,24 @@ final class OlafRuntime: @unchecked Sendable {
         set { lock.lock(); _enabled = newValue; lock.unlock() }
     }
 
-    /// Toplama eşiği. `start` config'inden gelir; runtime'da değiştirilebilir
-    /// (örn. viewer'daki "Toplama eşiği" ayarı). Kalıcı değildir — süreç ömrüyle sınırlıdır.
+    /// Collection threshold. Comes from the `start` config; can be changed at runtime
+    /// (e.g. the "Collection threshold" setting in the viewer). Not persistent — scoped to the process lifetime.
     var minimumLevel: LogLevel {
         get { lock.lock(); defer { lock.unlock() }; return _minimumLevel }
         set { lock.lock(); _minimumLevel = newValue; lock.unlock() }
     }
 
-    /// Bir log çağrısının hedefini belirler (mesaj yalnız `.drop` değilse compute edilir).
+    /// Determines the target of a log call (the message is only computed if not `.drop`).
     func target(for level: LogLevel) -> LogTarget {
         lock.lock(); defer { lock.unlock() }
         guard _enabled else { return .drop }
         if let store = _store {
             return level >= _minimumLevel ? .store(store) : .drop
         }
-        return .buffer   // henüz başlatılmadı → tamponla
+        return .buffer   // not yet started → buffer
     }
 
-    /// Start öncesi log'u tamponlar (start bu arada çağrıldıysa doğrudan store'a yazar).
+    /// Buffers a pre-start log (writes directly to the store if start was called in the meantime).
     func buffer(
         date: Date,
         level: LogLevel,
@@ -149,9 +149,9 @@ final class OlafRuntime: @unchecked Sendable {
         }
     }
 
-    // MARK: - Yardımcılar
+    // MARK: - Helpers
 
-    /// Oturum kimliği: zaman damgası tabanlı sıralanabilir bir önek + kısa rastgele kuyruk.
+    /// Session identifier: a sortable timestamp-based prefix + a short random suffix.
     static func makeSessionID() -> String {
         "\(Int(Date().timeIntervalSince1970 * 1000))-\(UUID().uuidString.prefix(8))"
     }
@@ -162,7 +162,7 @@ final class OlafRuntime: @unchecked Sendable {
         return base.appendingPathComponent("Olaf", isDirectory: true)
     }
 
-    /// Çağıran thread'in okunur etiketi: "main" / thread adı / dispatch queue label.
+    /// A readable label for the calling thread: "main" / thread name / dispatch queue label.
     static func currentThreadLabel() -> String {
         if Thread.isMainThread { return "main" }
         if let name = Thread.current.name, !name.isEmpty { return name }

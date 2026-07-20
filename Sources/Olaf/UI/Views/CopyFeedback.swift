@@ -2,8 +2,8 @@
 import SwiftUI
 import UIKit
 
-/// Panoya kopyalar + haptic geri bildirim verir + verilen bayrağı kısa süre `true` yapar
-/// (toast göstermek için).
+/// Copies to the clipboard + gives haptic feedback + briefly sets the given flag to `true`
+/// (to show a toast).
 @MainActor
 func olafCopy(_ text: String, showing flag: Binding<Bool>) {
     UIPasteboard.general.string = text
@@ -14,7 +14,7 @@ func olafCopy(_ text: String, showing flag: Binding<Bool>) {
     }
 }
 
-/// "Kopyalandı" toast'unu altta gösteren modifier.
+/// Modifier that shows a "Copied" toast at the bottom.
 private struct CopyToastModifier: ViewModifier {
     @Binding var isPresented: Bool
 
@@ -22,7 +22,7 @@ private struct CopyToastModifier: ViewModifier {
         content
             .overlay(alignment: .bottom) {
                 if isPresented {
-                    Label("Kopyalandı", systemImage: "checkmark.circle.fill")
+                    Label("Copied", systemImage: "checkmark.circle.fill")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 16)
@@ -39,7 +39,7 @@ private struct CopyToastModifier: ViewModifier {
 }
 
 extension View {
-    /// "Kopyalandı" toast geri bildirimi.
+    /// "Copied" toast feedback.
     func copyToast(_ isPresented: Binding<Bool>) -> some View {
         modifier(CopyToastModifier(isPresented: isPresented))
     }

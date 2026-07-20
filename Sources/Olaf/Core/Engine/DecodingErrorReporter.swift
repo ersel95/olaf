@@ -2,15 +2,15 @@ import Foundation
 
 extension Olaf {
 
-    /// Bir `Codable` decode hatasını, **hatalı alanın yolunu** (`user.accounts[0].iban` gibi)
-    /// çıkararak loglar. Sunucu şeması ile modelin uyuşmadığı yeri, ham yanıt gövdesiyle yan
-    /// yana görmeyi sağlar (viewer'da "Decode Hatası" bölümü).
+    /// Logs a `Codable` decoding error, extracting **the path of the offending field**
+    /// (e.g. `user.accounts[0].iban`). Lets you see where the server schema and the model
+    /// disagree side-by-side with the raw response body (the "Decoding Error" section in the viewer).
     ///
     /// - Parameters:
-    ///   - error: Yakalanan hata (`DecodingError` ise yol/derinlik çıkarılır; değilse açıklaması).
-    ///   - url: Yanıtın geldiği URL (varsa) — kaydın hangi isteğe ait olduğunu bağlar.
-    ///   - data: Decode edilmeye çalışılan ham gövde (ilk 8000 karakteri kayda eklenir).
-    ///   - typeName: Decode edilmek istenen tip adı (`OlafDecoding` otomatik geçirir).
+    ///   - error: The caught error (path/detail are extracted if it's a `DecodingError`; otherwise its description).
+    ///   - url: The URL the response came from (if any) — ties the entry to the request it belongs to.
+    ///   - data: The raw body that failed to decode (its first 8000 characters are added to the entry).
+    ///   - typeName: The name of the type that was being decoded (`OlafDecoding` passes this automatically).
     public static func logDecodingError(
         _ error: Error,
         url: URL? = nil,
@@ -30,17 +30,17 @@ extension Olaf {
             metadata["responseBody"] = String(decoding: data.prefix(8000), as: UTF8.self)
         }
 
-        var message = "Decode hatası"
+        var message = "Decoding error"
         if let typeName { message += " (\(typeName))" }
         if let path = described.path { message += ": \(path)" }
         log(.error, message, category: category, metadata: metadata, file: file, line: line, function: function)
     }
 }
 
-/// `JSONDecoder` sarmalayıcısı: başarısız decode'u otomatik loglar ve hatayı **aynen** fırlatır.
+/// `JSONDecoder` wrapper: automatically logs a failed decode and rethrows the error **as-is**.
 ///
 /// ```swift
-/// // try decoder.decode(User.self, from: data) yerine:
+/// // Instead of try decoder.decode(User.self, from: data):
 /// let user = try OlafDecoding.decode(User.self, from: data, url: response.url)
 /// ```
 public enum OlafDecoding {
@@ -66,7 +66,7 @@ public enum OlafDecoding {
     }
 }
 
-/// `DecodingError`'dan insan-okur yol + açıklama çıkarır. (internal: test edilir.)
+/// Extracts a human-readable path + description from a `DecodingError`. (internal: tested.)
 enum DecodingErrorDescriber {
 
     static func describe(_ error: Error) -> (path: String?, detail: String) {
@@ -77,14 +77,14 @@ enum DecodingErrorDescriber {
         case .keyNotFound(let key, let context):
             return (
                 path(context.codingPath + [key]),
-                "Anahtar bulunamadı: '\(key.stringValue)' — \(context.debugDescription)"
+                "Key not found: '\(key.stringValue)' — \(context.debugDescription)"
             )
         case .typeMismatch(let type, let context):
-            return (path(context.codingPath), "Tip uyuşmazlığı: \(type) bekleniyordu — \(context.debugDescription)")
+            return (path(context.codingPath), "Type mismatch: expected \(type) — \(context.debugDescription)")
         case .valueNotFound(let type, let context):
-            return (path(context.codingPath), "Değer yok (null): \(type) bekleniyordu — \(context.debugDescription)")
+            return (path(context.codingPath), "Value not found (null): expected \(type) — \(context.debugDescription)")
         case .dataCorrupted(let context):
-            return (path(context.codingPath), "Bozuk veri — \(context.debugDescription)")
+            return (path(context.codingPath), "Corrupted data — \(context.debugDescription)")
         @unknown default:
             return (nil, String(describing: decodingError))
         }

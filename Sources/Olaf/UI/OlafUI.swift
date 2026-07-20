@@ -1,19 +1,19 @@
 import Foundation
 import SwiftUI
 
-/// OlafUI'ın genel cephesi: shake → viewer kurulumu, dış araç kaydı, sunum.
+/// General-purpose facade for OlafUI: shake → viewer setup, external tool registration, presentation.
 ///
 /// ```swift
 /// Olaf.start(.default)
-/// OlafUI.install()       // viewer (shake) kurulumu
+/// OlafUI.install()       // viewer (shake) setup
 /// ```
 ///
-/// Kendi özel tanılama aracını eklemek istersen `install(tools:)` veya `register(_:)` kullanabilirsin.
+/// If you want to add your own custom diagnostic tool, use `install(tools:)` or `register(_:)`.
 public enum OlafUI {
 
-    /// Cihaz sallandığında viewer'ı açacak gözlemciyi kurar ve verilen dış araçları kaydeder.
-    /// İdempotent; bir kez çağırın.
-    /// - Parameter tools: Host'un eklemek istediği özel dış araç köprüleri.
+    /// Installs the observer that opens the viewer when the device is shaken, and registers the
+    /// given external tools. Idempotent; call once.
+    /// - Parameter tools: Custom external tool bridges the host wants to add.
     @MainActor
     public static func install(tools: [any ExternalToolBridge] = []) {
         #if canImport(UIKit)
@@ -24,17 +24,17 @@ public enum OlafUI {
         }
     }
 
-    /// Tek bir özel dış araç köprüsü kaydeder. Viewer'da geçiş butonu olur.
+    /// Registers a single custom external tool bridge. Becomes a switch-to button in the viewer.
     public static func register(_ bridge: any ExternalToolBridge) {
         ExternalToolRegistry.shared.register(bridge)
     }
 
-    /// Kayıtlı tüm dış araçları kaldırır.
+    /// Removes all registered external tools.
     public static func unregisterAllTools() {
         ExternalToolRegistry.shared.removeAll()
     }
 
-    /// Viewer'ı programatik aç.
+    /// Opens the viewer programmatically.
     @MainActor
     public static func present() {
         #if canImport(UIKit)
@@ -42,9 +42,9 @@ public enum OlafUI {
         #endif
     }
 
-    /// Viewer'ı programatik kapat.
-    /// - Parameter completion: Viewer tamamen kapandıktan SONRA çalışır. Kendini sunan UIKit
-    ///   araçları `show()`'u burada çağırmalı (dismiss animasyonu bitmeden sunum başarısız olur).
+    /// Closes the viewer programmatically.
+    /// - Parameter completion: Runs AFTER the viewer has fully closed. Self-presenting UIKit
+    ///   tools should call their `show()` here (presenting before the dismiss animation finishes fails).
     @MainActor
     public static func dismiss(completion: (() -> Void)? = nil) {
         #if canImport(UIKit)
@@ -54,10 +54,10 @@ public enum OlafUI {
         #endif
     }
 
-    /// Gömülebilir bir SwiftUI aracını Olaf'un kendi penceresi üzerinde modal olarak sunar.
-    /// Kapanınca Olaf viewer'a geri dönülür.
+    /// Presents an embeddable SwiftUI tool modally over Olaf's own window.
+    /// Returns to the Olaf viewer when dismissed.
     ///
-    /// Kendini sunan UIKit araçları bunun yerine `dismiss()` + kendi `show()`'unu kullanmalıdır.
+    /// Self-presenting UIKit tools should use `dismiss()` + their own `show()` instead.
     @MainActor
     public static func presentExternal<Content: View>(@ViewBuilder _ content: () -> Content) {
         #if canImport(UIKit)

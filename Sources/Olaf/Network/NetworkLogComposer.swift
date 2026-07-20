@@ -1,6 +1,6 @@
 import Foundation
 
-/// Bir network olayının ham verisi (maskeleme/filtreleme yapılmaz, olduğu gibi loglanır).
+/// Raw data of a network event (no redaction/filtering — logged as-is).
 struct NetworkLogEvent {
     var method: String
     var url: String
@@ -13,33 +13,33 @@ struct NetworkLogEvent {
     var responseBody: String?
     var requestHeaders: [String: String]?
     var responseHeaders: [String: String]?
-    /// İstek tamamlanmadan iptal edildi (`NSURLErrorCancelled` — örn. ekran kapandı, prefetch
-    /// vazgeçildi). Gerçek bir hata değildir; `.info` seviyesinde loglanır, `error` alanı boş kalır.
+    /// The request was cancelled before completing (`NSURLErrorCancelled` — e.g. screen dismissed,
+    /// prefetch abandoned). Not a real error; logged at `.info` level, `error` field stays empty.
     var cancelled: Bool = false
-    /// `URLSessionTaskMetrics`'ten çıkarılan zamanlama kırılımı (toplanamadıysa `nil`).
+    /// Timing breakdown derived from `URLSessionTaskMetrics` (`nil` if it couldn't be collected).
     var timing: NetworkTimingMetrics?
-    /// `image/*` yanıt gövdesi (base64) — yalnız `maxImageBodyBytes` sınırının altındaki
-    /// görsellerde dolar; viewer detayında önizleme olarak gösterilir.
+    /// `image/*` response body (base64) — only populated for images under the
+    /// `maxImageBodyBytes` limit; shown as a preview in the viewer detail.
     var responseImageBase64: String?
-    /// Yanıt mock'tan üretildi (ağa çıkılmadı — bkz. `OlafMockResponse`).
+    /// The response was produced by a mock (no network call — see `OlafMockResponse`).
     var mocked: Bool = false
 }
 
-/// Bir isteğin faz-faz zamanlama kırılımı ("API mi yavaş, ağ mı?" sorusunun cevabı).
-/// Yeniden kullanılan bağlantılarda DNS/bağlantı/TLS fazları doğal olarak boş gelir.
+/// A request's phase-by-phase timing breakdown (answers "is it the API that's slow, or the network?").
+/// DNS/connect/TLS phases are naturally empty for reused connections.
 struct NetworkTimingMetrics: Sendable {
     var dnsMs: Int?
     var connectMs: Int?
     var tlsMs: Int?
-    /// İstek gönderiminin başlangıcı → yanıtın ilk byte'ı (time to first byte).
+    /// Start of the request send → first byte of the response (time to first byte).
     var ttfbMs: Int?
-    /// Uygulanan protokol (örn. "h2", "http/1.1", "h3").
+    /// The protocol used (e.g. "h2", "http/1.1", "h3").
     var protocolName: String?
-    /// Havuzdaki mevcut bağlantı yeniden kullanıldı mı (yeni handshake yok)?
+    /// Was an existing pooled connection reused (no new handshake)?
     var reusedConnection: Bool?
 }
 
-/// Network olayını seviye + mesaj + metadata'ya dönüştürür. Saf fonksiyonlar → test edilebilir.
+/// Converts a network event into level + message + metadata. Pure functions → testable.
 enum NetworkLogComposer {
 
     static func level(statusCode: Int?, error: String?, cancelled: Bool = false) -> LogLevel {
@@ -56,7 +56,7 @@ enum NetworkLogComposer {
     static func message(for event: NetworkLogEvent) -> String {
         var parts = ["\(event.method)", event.url]
         if let status = event.statusCode { parts.append("→ \(status)") }
-        if event.cancelled { parts.append("→ iptal") }
+        if event.cancelled { parts.append("→ cancelled") }
         if event.error != nil { parts.append("→ ✗") }
         if event.mocked { parts.append("[mock]") }
         parts.append("(\(event.durationMs)ms)")
@@ -75,14 +75,14 @@ enum NetworkLogComposer {
         if let error = event.error { metadata["error"] = error }
         if event.cancelled { metadata["cancelled"] = "true" }
         if event.mocked { metadata["mocked"] = "true" }
-        // Gövdeler ayrı `requestBody`/`responseBody` anahtarlarıyla ham olarak saklanır.
+        // Bodies are stored raw under separate `requestBody`/`responseBody` keys.
         if let body = event.requestBody { metadata["requestBody"] = body }
         if let body = event.responseBody { metadata["responseBody"] = body }
         if let image = event.responseImageBase64 { metadata["responseImageBase64"] = image }
-        // Header'lar ayrı anahtarlarla ham olarak saklanır.
+        // Headers are stored raw under separate keys.
         for (key, value) in event.requestHeaders ?? [:] { metadata["reqH.\(key)"] = value }
         for (key, value) in event.responseHeaders ?? [:] { metadata["respH.\(key)"] = value }
-        // Zamanlama kırılımı `t.` önekiyle saklanır (viewer "Zamanlama" bölümü bunları okur).
+        // Timing breakdown is stored with a `t.` prefix (read by the viewer's "Timing" section).
         if let timing = event.timing {
             if let v = timing.dnsMs { metadata["t.dnsMs"] = String(v) }
             if let v = timing.connectMs { metadata["t.connectMs"] = String(v) }

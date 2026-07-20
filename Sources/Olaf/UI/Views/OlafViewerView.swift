@@ -1,7 +1,7 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// Olaf in-app viewer kök ekranı. Cihaz sallandığında bu açılır.
+/// Root screen of the Olaf in-app viewer. Opens when the device is shaken.
 public struct OlafViewerView: View {
 
     @StateObject private var model = LogViewerModel()
@@ -10,7 +10,7 @@ public struct OlafViewerView: View {
     @State private var isFilterPresented = false
     @State private var isStatsPresented = false
     @State private var isMocksPresented = false
-    /// Çoklu seçim modu (yalnız Oturum kapsamında).
+    /// Multi-select mode (Session scope only).
     @State private var isSelecting = false
     @State private var selectedIDs = Set<UUID>()
 
@@ -31,7 +31,7 @@ public struct OlafViewerView: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $model.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Loglarda ara")
+            .searchable(text: $model.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search logs")
             .toolbar { toolbarContent }
             .safeAreaInset(edge: .bottom) { externalToolBar }
             .sheet(isPresented: $isFilterPresented) {
@@ -48,24 +48,24 @@ public struct OlafViewerView: View {
     }
 
     private var scopePicker: some View {
-        Picker("Kapsam", selection: Binding(
+        Picker("Scope", selection: Binding(
             get: { model.scope },
             set: { model.setScope($0) }
         )) {
-            Text("Oturum").tag(LogViewerModel.Scope.session)
-            Text("Geçmiş").tag(LogViewerModel.Scope.history)
+            Text("Session").tag(LogViewerModel.Scope.session)
+            Text("History").tag(LogViewerModel.Scope.history)
         }
         .pickerStyle(.segmented)
         .padding(.horizontal)
         .padding(.vertical, 6)
     }
 
-    // MARK: - Liste
+    // MARK: - List
 
     @ViewBuilder
     private var logList: some View {
         if model.isLoading {
-            ProgressView("Geçmiş yükleniyor…")
+            ProgressView("Loading history…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if model.scope == .history {
             historyList
@@ -74,12 +74,12 @@ public struct OlafViewerView: View {
         }
     }
 
-    /// Mevcut oturum — sabitler üstte, düz liste (en yeni üstte), çoklu seçim destekli.
+    /// Current session — pins on top, flat list (newest first), multi-select supported.
     @ViewBuilder
     private var sessionList: some View {
         let entries = model.filteredEntries
         if entries.isEmpty && model.pinnedEntries.isEmpty {
-            ContentUnavailableView("Kayıt yok", systemImage: "doc.text.magnifyingglass", description: Text("Filtreyle eşleşen log bulunamadı."))
+            ContentUnavailableView("No entries", systemImage: "doc.text.magnifyingglass", description: Text("No logs matched the filter."))
                 .frame(maxHeight: .infinity)
         } else {
             List(selection: $selectedIDs) {
@@ -102,7 +102,7 @@ public struct OlafViewerView: View {
         }
     }
 
-    /// Sabitlenen kayıtlar — filtrelerden bağımsız, listenin üstünde.
+    /// Pinned entries — independent of filters, at the top of the list.
     private var pinnedSection: some View {
         Section {
             ForEach(model.pinnedEntries) { entry in
@@ -110,7 +110,7 @@ public struct OlafViewerView: View {
                     .contextMenu { pinButton(entry) }
             }
         } header: {
-            Label("Sabitlenenler", systemImage: "pin.fill")
+            Label("Pinned", systemImage: "pin.fill")
                 .font(.caption)
         }
     }
@@ -120,22 +120,22 @@ public struct OlafViewerView: View {
         return Button {
             model.togglePin(entry)
         } label: {
-            Label(isPinned ? "Sabitlemeyi kaldır" : "Sabitle",
+            Label(isPinned ? "Unpin" : "Pin",
                   systemImage: isPinned ? "pin.slash" : "pin")
         }
     }
 
-    /// Çoklu seçim modunda alttaki paylaşım barı.
+    /// Bottom share bar shown in multi-select mode.
     private var selectionBar: some View {
         HStack {
-            Text("\(selectedIDs.count) kayıt seçildi")
+            Text("\(selectedIDs.count) entries selected")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Spacer()
             Button {
                 shareSelected()
             } label: {
-                Label("Paylaş", systemImage: "square.and.arrow.up")
+                Label("Share", systemImage: "square.and.arrow.up")
                     .font(.callout.weight(.semibold))
             }
             .buttonStyle(.borderedProminent)
@@ -154,12 +154,12 @@ public struct OlafViewerView: View {
         }
     }
 
-    /// Geçmiş — önceki oturumlara göre gruplanmış (her oturum bir bölüm), sayfalı.
+    /// History — grouped by previous sessions (each session is a section), paginated.
     @ViewBuilder
     private var historyList: some View {
         let sessions = model.sessionGroups
         if sessions.isEmpty && !model.hasMoreHistory {
-            ContentUnavailableView("Geçmiş oturum yok", systemImage: "clock.arrow.circlepath", description: Text("Önceki oturumlardan log bulunamadı."))
+            ContentUnavailableView("No history sessions", systemImage: "clock.arrow.circlepath", description: Text("No logs found from previous sessions."))
                 .frame(maxHeight: .infinity)
         } else {
             List {
@@ -181,8 +181,8 @@ public struct OlafViewerView: View {
         }
     }
 
-    /// Liste sonunda görününce otomatik daha eski sayfayı yükler (sonsuz kaydırma);
-    /// buton, otomatik tetikleme kaçarsa el ile devam imkânı verir.
+    /// Automatically loads an older page when it appears at the end of the list (infinite
+    /// scroll); the button offers a manual fallback if the automatic trigger is missed.
     private var loadMoreSection: some View {
         Section {
             Button {
@@ -193,7 +193,7 @@ public struct OlafViewerView: View {
                     if model.isLoadingMore {
                         ProgressView()
                     } else {
-                        Label("Daha eskileri yükle", systemImage: "arrow.down.circle")
+                        Label("Load older entries", systemImage: "arrow.down.circle")
                     }
                     Spacer()
                 }
@@ -201,7 +201,7 @@ public struct OlafViewerView: View {
             .disabled(model.isLoadingMore)
             .onAppear { model.loadOlderHistory() }
         } footer: {
-            Text("Arama ve filtreler yalnız yüklenen kayıtlarda çalışır.")
+            Text("Search and filters only apply to loaded entries.")
                 .font(.caption2)
         }
     }
@@ -210,7 +210,7 @@ public struct OlafViewerView: View {
         HStack {
             Label(session.startDate.formatted(date: .abbreviated, time: .standard), systemImage: "clock")
             Spacer()
-            Text("\(session.entries.count) kayıt")
+            Text("\(session.entries.count) entries")
         }
         .font(.caption)
         .textCase(nil)
@@ -221,7 +221,7 @@ public struct OlafViewerView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button("Kapat") { onClose() }
+            Button("Close") { onClose() }
         }
         ToolbarItem(placement: .principal) {
             Image("OlafLogo", bundle: .module)
@@ -237,11 +237,11 @@ public struct OlafViewerView: View {
             } label: {
                 Image(systemName: model.isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
             }
-            .accessibilityLabel("Filtreler")
+            .accessibilityLabel("Filters")
         }
         ToolbarItem(placement: .topBarTrailing) {
             if isSelecting {
-                Button("Bitti") {
+                Button("Done") {
                     isSelecting = false
                     selectedIDs.removeAll()
                 }
@@ -249,15 +249,15 @@ public struct OlafViewerView: View {
                 Menu {
                     followToggle
                     if model.scope == .session {
-                        Button { isSelecting = true } label: { Label("Seç", systemImage: "checkmark.circle") }
+                        Button { isSelecting = true } label: { Label("Select", systemImage: "checkmark.circle") }
                     }
                     Divider()
                     shareMenu
-                    Button { isStatsPresented = true } label: { Label("İstatistikler", systemImage: "chart.bar") }
-                    Button { isMocksPresented = true } label: { Label("Mock'lar", systemImage: "arrow.triangle.2.circlepath") }
+                    Button { isStatsPresented = true } label: { Label("Statistics", systemImage: "chart.bar") }
+                    Button { isMocksPresented = true } label: { Label("Mocks", systemImage: "arrow.triangle.2.circlepath") }
                     Divider()
-                    Button { importOSLog() } label: { Label("OSLog'u içe aktar (1 saat)", systemImage: "square.and.arrow.down") }
-                    Button(role: .destructive) { model.clear() } label: { Label("Temizle", systemImage: "trash") }
+                    Button { importOSLog() } label: { Label("Import OSLog (1 hour)", systemImage: "square.and.arrow.down") }
+                    Button(role: .destructive) { model.clear() } label: { Label("Clear", systemImage: "trash") }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -268,14 +268,14 @@ public struct OlafViewerView: View {
     @ViewBuilder
     private var followToggle: some View {
         if model.isFollowing {
-            Button { model.isFollowing = false } label: { Label("Duraklat", systemImage: "pause.fill") }
+            Button { model.isFollowing = false } label: { Label("Pause", systemImage: "pause.fill") }
         } else {
-            Button { model.resumeFollowing() } label: { Label("Devam et", systemImage: "play.fill") }
+            Button { model.resumeFollowing() } label: { Label("Resume", systemImage: "play.fill") }
         }
     }
 
-    /// Ana ekranda her zaman görünen, kayıtlı dış araçlara tek dokunuşla
-    /// geçiş için belirgin alt bar. Kayıtlı araç yoksa hiç görünmez.
+    /// A prominent bottom bar, always visible on the main screen, for switching to registered
+    /// external tools with a single tap. Not shown at all if no tool is registered.
     @ViewBuilder
     private var externalToolBar: some View {
         let tools = model.externalTools
@@ -299,15 +299,15 @@ public struct OlafViewerView: View {
         }
     }
 
-    /// Paylaşım biçimleri alt menüsü (görünen — filtreli — kayıtlar üzerinden).
+    /// Share-format submenu (over the visible — filtered — entries).
     private var shareMenu: some View {
         Menu {
-            Button { share(.log) } label: { Label(".log (düz metin)", systemImage: "doc.text") }
-            Button { share(.ndjson) } label: { Label("NDJSON (ham)", systemImage: "curlybraces.square") }
+            Button { share(.log) } label: { Label(".log (plain text)", systemImage: "doc.text") }
+            Button { share(.ndjson) } label: { Label("NDJSON (raw)", systemImage: "curlybraces.square") }
             Button { share(.har) } label: { Label("HAR (network)", systemImage: "network") }
             Button { share(.postman) } label: { Label("Postman Collection", systemImage: "paperplane") }
         } label: {
-            Label("Paylaş", systemImage: "square.and.arrow.up")
+            Label("Share", systemImage: "square.and.arrow.up")
         }
     }
 
@@ -328,7 +328,7 @@ public struct OlafViewerView: View {
         }
     }
 
-    /// Son 1 saatin OSLog kayıtlarını (diğer SDK'ların os_log çıktıları dahil) içe aktarır.
+    /// Imports the last 1 hour of OSLog entries (including os_log output from other SDKs).
     private func importOSLog() {
         Task {
             _ = try? await Olaf.importOSLogEntries(since: Date().addingTimeInterval(-3600))

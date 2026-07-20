@@ -6,7 +6,7 @@ final class FormatterTests: XCTestCase {
     private func makeEntry(
         level: LogLevel = .info,
         category: LogCategory = .auth,
-        message: String = "merhaba",
+        message: String = "hello",
         metadata: [String: String] = ["method": "biometric"]
     ) -> LogEntry {
         LogEntry(
@@ -26,7 +26,7 @@ final class FormatterTests: XCTestCase {
         let line = PlainTextFormatter().string(from: makeEntry())
         XCTAssertTrue(line.contains("[INFO]"))
         XCTAssertTrue(line.contains("[auth]"))
-        XCTAssertTrue(line.contains("merhaba"))
+        XCTAssertTrue(line.contains("hello"))
         XCTAssertTrue(line.contains("method=biometric"))
         XCTAssertTrue(line.contains("LoginView.swift:42"))
     }
@@ -42,7 +42,7 @@ final class FormatterTests: XCTestCase {
         let line = JSONLogFormatter().string(from: makeEntry())
         let data = try XCTUnwrap(line.data(using: .utf8))
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        XCTAssertEqual(object?["message"] as? String, "merhaba")
+        XCTAssertEqual(object?["message"] as? String, "hello")
         XCTAssertEqual(object?["line"] as? Int, 42)
     }
 

@@ -1,10 +1,10 @@
 import XCTest
 @testable import Olaf
 
-/// Yakalama kuralları: iptal semantiği (composer) + `canInit` kapsam kararları.
+/// Capture rules: cancellation semantics (composer) + `canInit` scoping decisions.
 final class NetworkCaptureRulesTests: XCTestCase {
 
-    // MARK: - İptal edilen istekler (hata değil, .info)
+    // MARK: - Cancelled requests (not an error, .info)
 
     private func cancelledEvent() -> NetworkLogEvent {
         NetworkLogEvent(
@@ -23,15 +23,15 @@ final class NetworkCaptureRulesTests: XCTestCase {
 
     func testCancelledLevelIsInfoNotError() {
         XCTAssertEqual(NetworkLogComposer.level(statusCode: nil, error: nil, cancelled: true), .info)
-        // İptal, hata mesajından önceliklidir (iptalde error zaten boş bırakılır).
+        // Cancellation takes priority over an error message (error is already left empty when cancelled).
         XCTAssertEqual(NetworkLogComposer.level(statusCode: nil, error: "cancelled", cancelled: true), .info)
-        // Varsayılan parametre eski davranışı korur.
+        // The default parameter preserves the old behavior.
         XCTAssertEqual(NetworkLogComposer.level(statusCode: nil, error: "timeout"), .error)
     }
 
     func testCancelledMessageAndMetadata() {
         let event = cancelledEvent()
-        XCTAssertTrue(NetworkLogComposer.message(for: event).contains("iptal"))
+        XCTAssertTrue(NetworkLogComposer.message(for: event).contains("cancelled"))
         let metadata = NetworkLogComposer.metadata(for: event)
         XCTAssertEqual(metadata["cancelled"], "true")
         XCTAssertNil(metadata["error"])
@@ -41,12 +41,12 @@ final class NetworkCaptureRulesTests: XCTestCase {
         var event = cancelledEvent()
         event.cancelled = false
         XCTAssertNil(NetworkLogComposer.metadata(for: event)["cancelled"])
-        XCTAssertFalse(NetworkLogComposer.message(for: event).contains("iptal"))
+        XCTAssertFalse(NetworkLogComposer.message(for: event).contains("cancelled"))
     }
 
-    // MARK: - canInit kapsam kararları
+    // MARK: - canInit scoping decisions
 
-    /// Global config'i değiştiren testler bitince default'a döndürür.
+    /// Restores the default once tests that change the global config finish.
     private func withConfiguration(_ config: OlafNetworkConfiguration, _ body: () -> Void) {
         let previous = OlafNetwork.configuration
         OlafNetwork.configuration = config

@@ -2,8 +2,8 @@
 import UIKit
 import SwiftUI
 
-/// Viewer'ı uygulamanın kendi navigation/coordinator yapısına dokunmadan, **ayrı bir
-/// `UIWindow`** içinde sunar. Böylece her projede çakışmasız çalışır.
+/// Presents the viewer in a **separate `UIWindow`**, without touching the app's own
+/// navigation/coordinator structure. This way it works conflict-free in every project.
 @MainActor
 final class OlafPresenter {
 
@@ -16,7 +16,7 @@ final class OlafPresenter {
 
     var isPresented: Bool { window != nil }
 
-    /// Sallama → aç/kapat gözlemcisini kurar. İdempotent.
+    /// Sets up the shake → open/close observer. Idempotent.
     func installShakeObserver() {
         guard shakeObserver == nil else { return }
         ShakeDetector.install()
@@ -38,8 +38,8 @@ final class OlafPresenter {
     func present() {
         guard window == nil, let scene = Self.activeScene() else { return }
 
-        // Saydam bir kök VC üzerinde viewer'ı **modal** sunarak alttan yukarı (coverVertical)
-        // kayma animasyonu elde ediyoruz; düz `rootViewController` ataması animasyonsuz olurdu.
+        // We present the viewer **modally** over a transparent root VC to get a bottom-to-top
+        // (coverVertical) slide animation; a plain `rootViewController` assignment would be unanimated.
         let window = UIWindow(windowScene: scene)
         window.windowLevel = .alert + 1
         let container = UIViewController()
@@ -51,15 +51,15 @@ final class OlafPresenter {
         let host = OlafKeyHostingController(
             rootView: OlafViewerView(onClose: { [weak self] in self?.dismiss() })
         )
-        // Esc (donanım klavyesi — simülatörde Mac klavyesi) viewer'ı kapatır.
+        // Esc (hardware keyboard — the Mac keyboard in the simulator) closes the viewer.
         host.onEscape = { [weak self] in self?.dismiss() }
         host.modalPresentationStyle = .fullScreen
         container.present(host, animated: true)
     }
 
-    /// - Parameter completion: Pencere tamamen kaldırıldıktan SONRA çalışır. Kendini sunan UIKit
-    ///   araçları `show()`'u burada çağırmalı; aksi halde dismiss animasyonu sürerken sunum
-    ///   "presentation in progress" hatasıyla sessizce başarısız olur.
+    /// - Parameter completion: Runs AFTER the window has been fully removed. Self-presenting
+    ///   UIKit tools should call their `show()` here; otherwise presentation silently fails with
+    ///   a "presentation in progress" error while the dismiss animation is still running.
     func dismiss(completion: (() -> Void)? = nil) {
         guard let window else { completion?(); return }
         let teardown = { [weak self] in
@@ -67,7 +67,7 @@ final class OlafPresenter {
             self?.window = nil
             completion?()
         }
-        // Modal sunum varsa aşağı kayarak kapansın; yoksa pencereyi doğrudan kaldır.
+        // If there's a modal presentation, close it by sliding down; otherwise remove the window directly.
         if let presented = window.rootViewController?.presentedViewController {
             presented.dismiss(animated: true, completion: teardown)
         } else {
@@ -75,8 +75,8 @@ final class OlafPresenter {
         }
     }
 
-    /// Gömülebilir SwiftUI aracını Olaf penceresi üzerinde modal olarak sunar.
-    /// Olaf açık değilse önce açar, böylece geri dönülecek bir bağlam olur.
+    /// Presents an embeddable SwiftUI tool modally over the Olaf window.
+    /// If Olaf isn't open, opens it first so there is a context to return to.
     func presentExternal<Content: View>(rootView: Content) {
         if window == nil { present() }
         guard let root = window?.rootViewController else { return }
@@ -85,7 +85,7 @@ final class OlafPresenter {
         while let presented = top.presentedViewController { top = presented }
 
         let host = OlafKeyHostingController(rootView: rootView)
-        // Esc dış aracı kapatır → Olaf viewer'a geri dönülür (viewer'ın kendi Esc'i onu kapatır).
+        // Esc closes the external tool → returns to the Olaf viewer (the viewer's own Esc closes it).
         host.onEscape = { [weak host] in host?.dismiss(animated: true) }
         host.modalPresentationStyle = .fullScreen
         top.present(host, animated: true)
@@ -99,9 +99,9 @@ final class OlafPresenter {
     }
 }
 
-/// Esc (donanım klavyesi — simülatörde geliştiricinin Mac klavyesi) ile kapatma destekli
-/// hosting controller. `keyCommands` responder zincirinden toplandığı için SwiftUI focus
-/// gerektirmez; Olaf penceresi key olduğu sürece çalışır.
+/// Hosting controller with Esc (hardware keyboard — the developer's Mac keyboard in the
+/// simulator) close support. Since `keyCommands` is collected from the responder chain, it
+/// doesn't require SwiftUI focus; it works as long as the Olaf window is key.
 @MainActor
 private final class OlafKeyHostingController<Content: View>: UIHostingController<Content> {
 
@@ -113,7 +113,7 @@ private final class OlafKeyHostingController<Content: View>: UIHostingController
             modifierFlags: [],
             action: #selector(handleEscape)
         )
-        // Sistem davranışları (örn. focus sistemi) Esc'i yutmasın.
+        // Don't let system behaviors (e.g. the focus system) swallow Esc.
         escape.wantsPriorityOverSystemBehavior = true
         return [escape]
     }

@@ -45,7 +45,7 @@ final class ContentKindTests: XCTestCase {
         XCTAssertEqual(onlyImages.count, 1)
         XCTAssertEqual(NetworkContentKind.of(onlyImages[0]), .image)
 
-        // Filtre kapalıyken (boş küme) hiçbir kayıt gizlenmez.
+        // With the filter off (empty set), no records are hidden.
         let all = LogViewerModel.filter(
             entries: entries, query: "", levels: levels, categories: [], contentKinds: []
         )
@@ -53,7 +53,7 @@ final class ContentKindTests: XCTestCase {
     }
 
     func testImageBase64RoundtripThroughComposerAndInfo() {
-        let pixel = Data([0x89, 0x50, 0x4E, 0x47])   // sahte binary içerik
+        let pixel = Data([0x89, 0x50, 0x4E, 0x47])   // fake binary content
         var event = NetworkLogEvent(
             method: "GET", url: "https://a.com/logo.png", statusCode: 200, durationMs: 5,
             requestBytes: 0, responseBytes: pixel.count, error: nil,

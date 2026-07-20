@@ -1,15 +1,16 @@
 import Foundation
 
-/// Olaf viewer'ından başka bir tanılama aracına geçişi temsil eder.
+/// Represents a transition from the Olaf viewer to another diagnostic tool.
 ///
-/// Paket hiçbir dış araca bağlı **değildir**: uygulama kendi köprüsünü bu protokole uydurup
-/// `OlafUI.register(_:)` ile kaydeder. Kayıtlı köprü yoksa viewer'da buton görünmez.
+/// The package is **not** tied to any external tool: the app conforms its own bridge to this
+/// protocol and registers it with `OlafUI.register(_:)`. No button appears in the viewer if no
+/// bridge is registered.
 public protocol ExternalToolBridge: Sendable {
-    /// Viewer toolbar'ında görünecek başlık.
+    /// Title shown in the viewer toolbar.
     var title: String { get }
-    /// Sistem sembol adı (SF Symbol), opsiyonel.
+    /// System symbol name (SF Symbol), optional.
     var systemImage: String? { get }
-    /// Aracı aç. Olaf viewer'ı kapatmak çağıranın sorumluluğundadır (genelde önce dismiss).
+    /// Opens the tool. Closing the Olaf viewer is the caller's responsibility (usually dismiss first).
     @MainActor func open()
 }
 
@@ -17,7 +18,7 @@ public extension ExternalToolBridge {
     var systemImage: String? { nil }
 }
 
-/// Kayıtlı dış araç köprülerinin süreç-geneli kaydı. Thread-safe.
+/// Process-wide registry of registered external tool bridges. Thread-safe.
 final class ExternalToolRegistry: @unchecked Sendable {
 
     static let shared = ExternalToolRegistry()

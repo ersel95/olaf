@@ -1,17 +1,17 @@
 #if canImport(UIKit)
 import UIKit
 
-/// `UIActivityViewController`'ı en üstteki view controller'dan **doğrudan sunar**.
+/// Presents `UIActivityViewController` **directly** from the topmost view controller.
 ///
-/// Not: `UIActivityViewController` bir SwiftUI `.sheet` içine `UIViewControllerRepresentable`
-/// olarak gömülürse boş/beyaz ekran çıkar (child VC olarak çalışmaz, sunulması gerekir).
-/// Bu yüzden UIKit ile doğrudan present ediyoruz.
+/// Note: if `UIActivityViewController` is embedded in a SwiftUI `.sheet` as a
+/// `UIViewControllerRepresentable`, it produces a blank/white screen (it doesn't work as a child
+/// VC, it must be presented). That's why we present it directly via UIKit.
 @MainActor
 func presentShareSheet(_ items: [Any]) {
     guard !items.isEmpty, let presenter = topViewController() else { return }
 
     let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-    // iPad: popover anchor (sourceView olmazsa çöker).
+    // iPad: popover anchor (crashes without a sourceView).
     if let popover = controller.popoverPresentationController {
         popover.sourceView = presenter.view
         popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 0, height: 0)
@@ -20,7 +20,7 @@ func presentShareSheet(_ items: [Any]) {
     presenter.present(controller, animated: true)
 }
 
-/// Görünür en üstteki view controller (Olaf kendi penceresinde olduğundan onu da kapsar).
+/// The visible topmost view controller (also covers Olaf's own window since it has one).
 @MainActor
 private func topViewController() -> UIViewController? {
     let windows = UIApplication.shared.connectedScenes

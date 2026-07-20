@@ -13,7 +13,7 @@ final class DecodingErrorTests: XCTestCase {
         let json = #"{"name":"a","accounts":[{"iban":"x"},{}]}"#
         do {
             _ = try JSONDecoder().decode(User.self, from: Data(json.utf8))
-            XCTFail("decode başarısız olmalıydı")
+            XCTFail("decode should have failed")
         } catch {
             let described = DecodingErrorDescriber.describe(error)
             XCTAssertEqual(described.path, "accounts[1].iban")
@@ -25,29 +25,29 @@ final class DecodingErrorTests: XCTestCase {
         let json = #"{"name":123,"accounts":[]}"#
         do {
             _ = try JSONDecoder().decode(User.self, from: Data(json.utf8))
-            XCTFail("decode başarısız olmalıydı")
+            XCTFail("decode should have failed")
         } catch {
             let described = DecodingErrorDescriber.describe(error)
             XCTAssertEqual(described.path, "name")
-            XCTAssertTrue(described.detail.contains("Tip uyuşmazlığı"))
+            XCTAssertTrue(described.detail.contains("Type mismatch"))
         }
     }
 
     func testDataCorrupted() {
         do {
             _ = try JSONDecoder().decode(User.self, from: Data("not-json".utf8))
-            XCTFail("decode başarısız olmalıydı")
+            XCTFail("decode should have failed")
         } catch {
             let described = DecodingErrorDescriber.describe(error)
-            XCTAssertTrue(described.detail.contains("Bozuk veri"))
+            XCTAssertTrue(described.detail.contains("Corrupted data"))
         }
     }
 
     func testNonDecodingErrorFallsBackToDescription() {
-        let error = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "başka hata"])
+        let error = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "some other error"])
         let described = DecodingErrorDescriber.describe(error)
         XCTAssertNil(described.path)
-        XCTAssertEqual(described.detail, "başka hata")
+        XCTAssertEqual(described.detail, "some other error")
     }
 
     func testOlafDecodingReturnsValueOnSuccessAndRethrows() throws {
@@ -56,7 +56,7 @@ final class DecodingErrorTests: XCTestCase {
         XCTAssertEqual(user.accounts.first?.iban, "x")
 
         XCTAssertThrowsError(try OlafDecoding.decode(User.self, from: Data("{}".utf8))) { error in
-            XCTAssertTrue(error is DecodingError)   // hata aynen fırlatılır
+            XCTAssertTrue(error is DecodingError)   // the error is rethrown as-is
         }
     }
 }

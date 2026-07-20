@@ -1,11 +1,10 @@
 import Foundation
 
-/// Görünen network kayıtlarını **Postman Collection v2.1** belgesine dönüştürür — Postman'e
-/// "Import" ile doğrudan alınıp istekler yeniden çalıştırılabilir.
+/// Converts the visible network entries into a **Postman Collection v2.1** document — can be
+/// brought directly into Postman via "Import" and the requests re-run.
 ///
-/// Aynı `method + URL` ikilisi bir kez eklenir (ilk görülen kazanır) → tekrarlanan çağrılar
-/// koleksiyonu şişirmez. Header/gövde değerleri **ham**dır (`Authorization` dahil) — paylaşmadan
-/// önce gözden geçirin.
+/// The same `method + URL` pair is added once (first seen wins) → repeated calls don't bloat the
+/// collection. Header/body values are **raw** (including `Authorization`) — review before sharing.
 enum PostmanExporter {
 
     static func collection(from entries: [LogEntry], name: String = "Olaf Export") -> String? {
@@ -59,7 +58,7 @@ enum PostmanExporter {
         ]
     }
 
-    /// Postman'in yapısal URL nesnesi (`raw` + parçalar).
+    /// Postman's structured URL object (`raw` + parts).
     private static func urlObject(_ url: String) -> [String: Any] {
         guard let components = URLComponents(string: url) else { return ["raw": url] }
         var object: [String: Any] = ["raw": url]

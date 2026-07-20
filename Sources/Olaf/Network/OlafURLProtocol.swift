@@ -1,30 +1,30 @@
 import Foundation
 
-/// İstek/yanıtları yakalayıp Olaf'a loglayan `URLProtocol`. Gerçek isteği, tüm yakalamaların
-/// paylaştığı (yakalanmayan) proxy session (`OlafProxySession`) üzerinden yürütür ve sonucu
-/// istemciye iletir.
+/// `URLProtocol` that captures requests/responses and logs them to Olaf. Runs the actual request
+/// through the (uncaptured) proxy session shared by all captures (`OlafProxySession`) and forwards
+/// the result to the client.
 final class OlafURLProtocol: URLProtocol {
 
     private static let handledKey = "com.olaf.network.handled"
 
     private var proxyTask: URLSessionDataTask?
-    /// Yalnız gövde yakalama açıkken (`capturesBodies`) doldurulur; kapalıyken büyük indirmeleri
-    /// gereksiz yere RAM'de tutmamak için boş kalır (sayım `responseByteCount`'tan gelir).
+    /// Only populated while body capture is on (`capturesBodies`); stays empty when it's off so we
+    /// don't needlessly hold large downloads in RAM (the count comes from `responseByteCount` instead).
     private var responseData = Data()
     private var responseByteCount = 0
     private var capturesBodies = true
     private var capturedResponse: URLResponse?
-    /// İstek gövdesi: `URLSession` `httpBody`'yi `httpBodyStream`'e çevirdiğinden protokolde
-    /// `request.httpBody` çoğu zaman `nil`'dir; gövde `startLoading`'de buraya yakalanır.
+    /// Request body: since `URLSession` converts `httpBody` to `httpBodyStream`, `request.httpBody`
+    /// is usually `nil` inside the protocol; the body is captured here in `startLoading`.
     private var capturedRequestBody: Data?
     private var startDate = Date()
-    /// "Aktif istekler" kaydının kimliği; tamamlanınca (başarı/hata/iptal) düşürülür.
+    /// ID of the "active requests" entry; dropped once completed (success/error/cancel).
     private var pendingID: UUID?
-    /// Proxy task'ın zamanlama metrikleri (`didFinishCollecting` — `didComplete`'ten önce gelir).
+    /// The proxy task's timing metrics (`didFinishCollecting` — arrives before `didComplete`).
     private var capturedMetrics: URLSessionTaskMetrics?
 
-    /// `stopLoading` sonrası istemciye çağrı yapılmaz (URL loading sistemi protokolü bıraktı).
-    /// `stopLoading` istemci kuyruğundan, proxy callback'leri delegate kuyruğundan gelir → kilit.
+    /// No client calls are made after `stopLoading` (the URL loading system has released the protocol).
+    /// `stopLoading` comes from the client queue, proxy callbacks come from the delegate queue → lock.
     private let stateLock = NSLock()
     private var _stopped = false
     private var isStopped: Bool {
@@ -35,13 +35,13 @@ final class OlafURLProtocol: URLProtocol {
     // MARK: - URLProtocol
 
     override class func canInit(with request: URLRequest) -> Bool {
-        // Sonsuz döngüyü önle: bizim başlattığımız isteği tekrar yakalama.
+        // Prevent an infinite loop: don't recapture a request we ourselves started.
         if URLProtocol.property(forKey: handledKey, in: request) != nil { return false }
         guard let scheme = request.url?.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else { return false }
-        // Mock'lanan istekler, capture filtreleri dışında kalsa bile yakalanır (mock önceliklidir).
+        // Mocked requests are captured even if they fall outside the capture filters (mock takes priority).
         if OlafNetwork.mock(for: request) != nil { return true }
-        // baseURL allow/deny filtresi: filtre dışı istekler yakalanmaz (olduğu gibi geçer).
+        // baseURL allow/deny filter: requests outside the filter aren't captured (pass through as-is).
         return OlafNetwork.current.shouldCapture(request.url)
     }
 
@@ -57,10 +57,11 @@ final class OlafURLProtocol: URLProtocol {
         }
         URLProtocol.setProperty(true, forKey: Self.handledKey, in: mutable)
 
-        // İstek gövdesini yakala. `URLSession`, `httpBody`'yi protokol görmeden `httpBodyStream`'e
-        // çevirdiği için çoğu POST/PUT'ta `httpBody == nil`'dir. Stream'i burada boşaltıp hem yakalar
-        // hem de proxy isteğine `httpBody` olarak geri koyarız (stream tek sefer okunur; geri koymazsak
-        // gövde sunucuya gitmez). Yalnız gövde yakalama açıkken yapılır; kapalıyken stream'e dokunmayız.
+        // Capture the request body. `URLSession` converts `httpBody` to `httpBodyStream` before the
+        // protocol sees it, so `httpBody == nil` in most POST/PUT requests. We drain the stream here,
+        // both capturing it and putting it back as the proxy request's `httpBody` (the stream can only
+        // be read once; if we don't put it back, the body never reaches the server). Only done while
+        // body capture is on; we don't touch the stream when it's off.
         if capturesBodies {
             if let body = request.httpBody {
                 capturedRequestBody = body
@@ -78,7 +79,7 @@ final class OlafURLProtocol: URLProtocol {
             url: request.url?.absoluteString ?? "-"
         )
 
-        // Mock eşleşiyorsa ağa hiç çıkma: yanıt (gecikmeli) buradan üretilir.
+        // If a mock matches, never hit the network: the (possibly delayed) response is produced here.
         if let mock = OlafNetwork.mock(for: request) {
             startMockDelivery(mock)
             return
@@ -89,11 +90,11 @@ final class OlafURLProtocol: URLProtocol {
 
     override func stopLoading() {
         isStopped = true
-        // Tamamlanmış task'ta cancel no-op'tur; yarıda kesilen task `didCompleteWithError(cancelled)`
-        // üretir → `.info` seviyesinde "iptal" olarak loglanır (handler orada düşürülür).
+        // Cancel is a no-op on an already-completed task; a task cut short mid-flight produces
+        // `didCompleteWithError(cancelled)` → logged as "cancelled" at `.info` level (the handler drops it there).
         proxyTask?.cancel()
         proxyTask = nil
-        // Henüz teslim edilmemiş mock varsa iptal et ve bekleyen kaydını düşür.
+        // If a mock hasn't been delivered yet, cancel it and drop the pending entry.
         if let item = mockWorkItem {
             item.cancel()
             mockWorkItem = nil
@@ -103,7 +104,7 @@ final class OlafURLProtocol: URLProtocol {
         }
     }
 
-    // MARK: - Mock teslimatı
+    // MARK: - Mock delivery
 
     private var mockWorkItem: DispatchWorkItem?
 
@@ -168,7 +169,7 @@ final class OlafURLProtocol: URLProtocol {
         }
     }
 
-    // MARK: - Proxy callback'leri (OlafProxySession delegate kuyruğundan yönlendirilir)
+    // MARK: - Proxy callbacks (forwarded from OlafProxySession's delegate queue)
 
     func proxyDidReceive(_ response: URLResponse) {
         capturedResponse = response
@@ -178,7 +179,7 @@ final class OlafURLProtocol: URLProtocol {
 
     func proxyDidReceive(_ data: Data) {
         responseByteCount += data.count
-        // Gövde yakalama kapalıysa veriyi biriktirme (yalnız byte say) → büyük indirmelerde RAM tasarrufu.
+        // If body capture is off, don't accumulate the data (only count bytes) → saves RAM on large downloads.
         if capturesBodies { responseData.append(data) }
         guard !isStopped else { return }
         client?.urlProtocol(self, didLoad: data)
@@ -205,13 +206,13 @@ final class OlafURLProtocol: URLProtocol {
             }
         }
 
-        // Ağır kısım (JSON pretty-print + loglama) paylaşılan delegate kuyruğunu bekletmesin diye
-        // Sendable bir anlık görüntüyle ayrı kuyruğa taşınır. Bu noktadan sonra task için başka
-        // callback gelmez → alanlar sabittir, kopyalamak güvenlidir.
+        // The heavy part (JSON pretty-print + logging) is moved to a separate queue via a Sendable
+        // snapshot, so it doesn't hold up the shared delegate queue. No further callbacks arrive for
+        // this task past this point → the fields are fixed, so copying them is safe.
         let nsError = error as NSError?
         let cancelled = nsError.map { $0.domain == NSURLErrorDomain && $0.code == NSURLErrorCancelled } ?? false
 
-        // Görsel önizleme: image/* yanıtlar sınır altındaysa base64 saklanır (detayda gösterilir).
+        // Image preview: image/* responses under the size limit are stored as base64 (shown in the detail view).
         var imageBase64: String?
         let responseContentType = (capturedResponse as? HTTPURLResponse)?
             .value(forHTTPHeaderField: "Content-Type")?.lowercased()
@@ -244,9 +245,9 @@ final class OlafURLProtocol: URLProtocol {
         }
     }
 
-    // MARK: - Loglama
+    // MARK: - Logging
 
-    /// Tamamlanan bir yakalamanın Sendable anlık görüntüsü (log kuyruğuna taşınır).
+    /// Sendable snapshot of a completed capture (moved onto the log queue).
     private struct CaptureCompletion: Sendable {
         let method: String
         let url: String
@@ -265,8 +266,8 @@ final class OlafURLProtocol: URLProtocol {
         let mocked: Bool
     }
 
-    /// Task metriklerinden zamanlama kırılımı çıkarır. Redirect'li isteklerde SON transaction
-    /// (nihai kaynak) esas alınır. Yeniden kullanılan bağlantıda DNS/connect/TLS boş kalır.
+    /// Derives the timing breakdown from task metrics. For redirected requests, the LAST transaction
+    /// (the final source) is used. DNS/connect/TLS are empty for a reused connection.
     private static func timing(from metrics: URLSessionTaskMetrics?) -> NetworkTimingMetrics? {
         guard let transaction = metrics?.transactionMetrics.last else { return nil }
         func ms(_ start: Date?, _ end: Date?) -> Int? {
@@ -322,7 +323,7 @@ final class OlafURLProtocol: URLProtocol {
 
     private static func bodyString(from data: Data?, limit: Int) -> String? {
         guard let data, !data.isEmpty, limit > 0 else { return nil }
-        // JSON ise yakalama anında pretty-print ederek sakla → viewer'da girintili görünür.
+        // If it's JSON, pretty-print and store it at capture time → renders indented in the viewer.
         if let object = try? JSONSerialization.jsonObject(with: data),
            let pretty = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]),
            let text = String(data: pretty, encoding: .utf8) {
@@ -332,8 +333,9 @@ final class OlafURLProtocol: URLProtocol {
         return text.count > limit ? String(text.prefix(limit)) + "…" : text
     }
 
-    /// `httpBodyStream`'i tamamen okuyup `Data`'ya çevirir. Stream tek sefer okunabildiğinden,
-    /// dönen veri proxy isteğine `httpBody` olarak geri konmalıdır (yoksa gövde sunucuya gitmez).
+    /// Reads `httpBodyStream` fully and converts it to `Data`. Since the stream can only be read
+    /// once, the returned data must be put back as the proxy request's `httpBody` (otherwise the
+    /// body never reaches the server).
     private static func drainStream(_ stream: InputStream) -> Data {
         stream.open()
         defer { stream.close() }
@@ -342,42 +344,43 @@ final class OlafURLProtocol: URLProtocol {
         var buffer = [UInt8](repeating: 0, count: bufferSize)
         while stream.hasBytesAvailable {
             let read = stream.read(&buffer, maxLength: bufferSize)
-            if read <= 0 { break } // 0 = bitti, <0 = hata
+            if read <= 0 { break } // 0 = done, <0 = error
             data.append(buffer, count: read)
         }
         return data
     }
 }
 
-// MARK: - Paylaşılan proxy session
+// MARK: - Shared proxy session
 
-/// Tüm yakalamaların paylaştığı TEK proxy session + task → protokol yönlendiricisi.
+/// The SINGLE proxy session shared by all captures, plus the task → protocol router.
 ///
-/// Neden tek session? İstek başına session kurmak her yakalanan isteğe yeni TCP+TLS handshake
-/// ödetir ve HTTP/2 bağlantı havuzunu kullanılamaz kılar. Tek session bağlantıları yeniden kullanır.
+/// Why a single session? Setting up a session per request would force a fresh TCP+TLS handshake
+/// on every captured request and make the HTTP/2 connection pool unusable. A single session reuses connections.
 ///
-/// Config `.default` tabanlıdır → paylaşılan `HTTPCookieStorage` korunur (ephemeral'da çerezler
-/// isteklere eklenmez ve `Set-Cookie` saklanmazdı → cookie tabanlı oturumlar capture altında
-/// bozulurdu). Cache kapalıdır: yanıt saklama politikası istemci tarafında kalır.
+/// The config is based on `.default` → the shared `HTTPCookieStorage` is preserved (with ephemeral,
+/// cookies wouldn't be attached to requests and `Set-Cookie` wouldn't be stored → cookie-based
+/// sessions would break under capture). Cache is disabled: the response caching policy stays on the client side.
 final class OlafProxySession: NSObject, @unchecked Sendable {
 
     static let shared = OlafProxySession()
 
-    /// Ağır log hazırlığı (JSON pretty-print) için ayrı kuyruk — delegate kuyruğunu bekletmez.
+    /// Separate queue for heavy log prep (JSON pretty-print) — doesn't hold up the delegate queue.
     static let logQueue = DispatchQueue(label: "com.olaf.network.log", qos: .utility)
 
     private let lock = NSLock()
     private var handlers: [ObjectIdentifier: OlafURLProtocol] = [:]
     private var session: URLSession?
-    /// Session'ın kurulduğu andaki `chainedProtocolClasses` imzası; değişirse session yeniden kurulur.
+    /// The `chainedProtocolClasses` signature at the time the session was built; the session is
+    /// rebuilt if it changes.
     private var builtChainSignature: [ObjectIdentifier] = []
 
     private override init() { super.init() }
 
-    // MARK: - Task yaşam döngüsü
+    // MARK: - Task lifecycle
 
-    /// Proxy task'ı oluşturup başlatır ve handler'ı task'a bağlar. Handler, task tamamlanana
-    /// (`didCompleteWithError`) dek güçlü tutulur; orada düşürülür.
+    /// Creates and starts the proxy task, binding the handler to the task. The handler is held
+    /// strongly until the task completes (`didCompleteWithError`), where it is dropped.
     func startTask(with request: URLRequest, handler: OlafURLProtocol) -> URLSessionDataTask {
         lock.lock()
         let session = currentSessionLocked()
@@ -390,9 +393,9 @@ final class OlafProxySession: NSObject, @unchecked Sendable {
         return task
     }
 
-    /// Aktif session'ı döndürür; zincir değiştiyse (veya ilk kullanımsa) yeniden kurar.
-    /// Eski session `finishTasksAndInvalidate` ile in-flight task'larını bitirip kapanır
-    /// (callback'ler task kimliğiyle yönlendirildiğinden eski task'lar etkilenmez).
+    /// Returns the active session; rebuilds it if the chain changed (or this is the first use).
+    /// The old session finishes its in-flight tasks and closes via `finishTasksAndInvalidate`
+    /// (since callbacks are routed by task identity, old tasks are unaffected).
     private func currentSessionLocked() -> URLSession {
         let signature = OlafNetwork.chainedProtocolClasses.map(ObjectIdentifier.init)
         if let session, signature == builtChainSignature { return session }
@@ -408,9 +411,9 @@ final class OlafProxySession: NSObject, @unchecked Sendable {
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.urlCache = nil
         let selfID = ObjectIdentifier(OlafURLProtocol.self)
-        // Swizzle, `.default` config'e Olaf'ı enjekte etmiş olabilir → proxy'den çıkar (handledKey
-        // zaten döngüyü keser ama gereksiz canInit turu da olmasın). Zincirlenen protokoller
-        // (başka capture araçları) proxy trafiğini de görsün diye başa eklenir.
+        // The swizzle may have injected Olaf into the `.default` config → strip it out of the
+        // proxy (handledKey already breaks the loop, but let's avoid an unnecessary canInit pass
+        // too). Chained protocols (other capture tools) are prepended so they also see proxy traffic.
         let chained = OlafNetwork.chainedProtocolClasses.filter { ObjectIdentifier($0) != selfID }
         let existing = (config.protocolClasses ?? []).filter { ObjectIdentifier($0) != selfID }
         config.protocolClasses = chained + existing
@@ -428,7 +431,7 @@ final class OlafProxySession: NSObject, @unchecked Sendable {
     }
 }
 
-// MARK: - URLSessionDataDelegate (task → handler yönlendirme)
+// MARK: - URLSessionDataDelegate (task → handler routing)
 
 extension OlafProxySession: URLSessionDataDelegate {
 
@@ -457,14 +460,15 @@ extension OlafProxySession: URLSessionDataDelegate {
         completionHandler(request)
     }
 
-    /// Sunucu trust challenge'ı. **Varsayılan**: sistem doğrulaması (`.performDefaultHandling`) →
-    /// proxy session host'un cert pinning'ini/OS trust zincirini ezmez; geçersiz/pinlenmemiş sertifika
-    /// reddedilir.
+    /// Server trust challenge. **Default**: system validation (`.performDefaultHandling`) →
+    /// the proxy session doesn't override the host's cert pinning/OS trust chain; an invalid/unpinned
+    /// certificate is rejected.
     ///
-    /// **Opt-in (yalnız non-prod)**: `allowsArbitraryServerTrustForCapture == true` ise server-trust
-    /// challenge'ında sunucunun sunduğu trust koşulsuz kabul edilir. Host kendi özel CA'sına / iç test
-    /// gateway'ine güveniyorsa (capture proxy'si host'un trust delegate'ini PAYLAŞMAZ → default doğrulama
-    /// TLS -9807 verir), bu bayrak capture'ın o trafiği geçirmesini sağlar. Olaf zaten `#if !PROD`'da derlenir.
+    /// **Opt-in (non-prod only)**: if `allowsArbitraryServerTrustForCapture == true`, the trust offered
+    /// by the server is unconditionally accepted on the server-trust challenge. If the host trusts its
+    /// own custom CA / internal test gateway (the capture proxy does NOT share the host's trust delegate
+    /// → default validation gives TLS -9807), this flag lets capture pass that traffic through. Olaf is
+    /// already compiled under `#if !PROD`.
     func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,

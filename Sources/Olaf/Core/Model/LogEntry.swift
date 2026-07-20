@@ -1,7 +1,7 @@
 import Foundation
 
-/// Tek bir log kaydı. `message` ve `metadata` çağrı yerinden geldiği **ham** haliyle saklanır
-/// (maskeleme/filtreleme yapılmaz — tüm veri olduğu gibi tutulur).
+/// A single log entry. `message` and `metadata` are stored **raw**, exactly as they came from
+/// the call site (no masking/filtering is applied — all data is kept as-is).
 public struct LogEntry: Identifiable, Sendable, Codable, Hashable {
     public let id: UUID
     public let date: Date
@@ -13,8 +13,8 @@ public struct LogEntry: Identifiable, Sendable, Codable, Hashable {
     public let line: Int
     public let function: String
     public let thread: String
-    /// Bu kaydın ait olduğu uygulama oturumu (her `Olaf.start()` yeni bir kimlik üretir).
-    /// Geçmiş görünümünde oturumlara göre gruplamak için kullanılır.
+    /// The app session this entry belongs to (each `Olaf.start()` generates a new identifier).
+    /// Used to group entries by session in the history view.
     public let sessionID: String
 
     public init(
@@ -43,7 +43,7 @@ public struct LogEntry: Identifiable, Sendable, Codable, Hashable {
         self.sessionID = sessionID
     }
 
-    // Toleranslı decode: `sessionID` içermeyen eski (pre-0.9) NDJSON kayıtları da okunabilsin.
+    // Lenient decoding: allows old (pre-0.9) NDJSON entries without a `sessionID` to be read too.
     private enum CodingKeys: String, CodingKey {
         case id, date, level, category, message, metadata, file, line, function, thread, sessionID
     }
@@ -63,7 +63,7 @@ public struct LogEntry: Identifiable, Sendable, Codable, Hashable {
         sessionID = try c.decodeIfPresent(String.self, forKey: .sessionID) ?? ""
     }
 
-    /// `#fileID` "Module/Sub/File.swift" verir; viewer'da yalnız dosya adını göstermek için.
+    /// `#fileID` returns "Module/Sub/File.swift"; used to show only the file name in the viewer.
     public var fileName: String {
         (file as NSString).lastPathComponent
     }

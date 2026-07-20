@@ -1,87 +1,87 @@
-# Olaf — AI Agent Entegrasyon Talimatı
+# Olaf — AI Agent Integration Instructions
 
-Bir AI agent "Olaf'u entegre et" komutu aldığında **bu dosyayı** takip eder. Adımlar mekanik ve sıralıdır.
+When an AI agent receives an "integrate Olaf" command, it follows **this file**. The steps are mechanical and sequential.
 
-## Ön koşullar
-- Hedef: iOS 17+ uygulaması.
-- Olaf paketi: `https://github.com/ersel95/olaf`
-- Tek ürün: `Olaf` (motor + network capture + viewer birlikte gelir).
-- Dış tanılama araçları jenerik `ExternalToolBridge` ile host tarafında eklenebilir (paket hiçbir dış araca bağlı değildir).
+## Prerequisites
+- Target: an iOS 17+ app.
+- Olaf package: `https://github.com/ersel95/olaf`
+- Single product: `Olaf` (engine + network capture + viewer all included).
+- External diagnostics tools can be added on the host side via the generic `ExternalToolBridge` (the package is not tied to any external tool).
 
-## Adımlar
+## Steps
 
-### 1. Paket bağımlılığını ekle
+### 1. Add the package dependency
 Xcode → Add Package → "Choose Package Products":
-- Ana app target'ına (ve gerekiyorsa extension'lara): `Olaf`.
+- To the main app target (and extensions, if needed): `Olaf`.
 
-### 2. Entegrasyon dosyasını kopyala (ZORUNLU)
-`Integration/OlafIntegration.swift` dosyasını host app kaynaklarına kopyala (örn. `Core/Utils/`).
-Tek entegrasyon noktasıdır: `OlafManager` (başlatma + loglama).
-`// ADAPT:` satırlarını uyarla:
-- Gating: `#if !PROD` (önerilen — capture kodu prod binary'sine girmez) veya runtime feature flag.
-- Log kategorilerini projeye göre düzenle.
+### 2. Copy the integration file (REQUIRED)
+Copy `Integration/OlafIntegration.swift` into the host app's sources (e.g. `Core/Utils/`).
+It's the single integration point: `OlafManager` (startup + logging).
+Adapt the `// ADAPT:` lines:
+- Gating: `#if !PROD` (recommended — capture code doesn't end up in the prod binary) or a runtime feature flag.
+- Adjust log categories to match the project.
 
-> Uygulama **`Olaf`'a doğrudan bağlanmaz**; loglar manager üzerinden atılır:
+> The app **does not connect to `Olaf` directly**; logs go through the manager:
 > `OlafManager.shared.info("...", category: .auth)`, `OlafManager.shared.error(error, category: .payment)`.
-> Olaf başlatılmamışsa (PROD) çağrılar no-op'tur.
+> If Olaf hasn't been started (PROD), calls are no-ops.
 
-### 3. Başlatmayı bağla
-App giriş noktasında — **paylaşılan URLSession kurulmadan ÖNCE** (SwiftUI `App.init` veya
-`AppDelegate.didFinishLaunching` başı, session preload'undan önce):
+### 3. Wire up startup
+At the app's entry point — **BEFORE the shared URLSession is set up** (at the start of SwiftUI's
+`App.init` or `AppDelegate.didFinishLaunching`, before any session preloading):
 ```swift
 OlafManager.shared.initialize()
 ```
 
-### 4. Özel Alamofire/URLSession session'ı varsa
-Host kendi `URLSessionConfiguration`'ını kuruyorsa (otomatik swizzle yerine deterministik enjeksiyon):
-session kurulurken tek satır:
+### 4. If there's a custom Alamofire/URLSession session
+If the host sets up its own `URLSessionConfiguration` (deterministic injection instead of automatic swizzling):
+add one line when setting up the session:
 ```swift
 OlafManager.shared.configureNetworkCapture(configuration)
 ```
 
-### 5. Doğrula
-- Derle. Cihazı salla → Olaf viewer açılır.
+### 5. Verify
+- Build. Shake the device → the Olaf viewer opens.
 
-## Loglama (app her zaman manager üzerinden loglar)
-Uygulama kodunda `import Olaf` + `Olaf.x(...)` KULLANMA. Manager'ı kullan:
+## Logging (the app always logs through the manager)
+Do NOT use `import Olaf` + `Olaf.x(...)` in app code. Use the manager instead:
 ```swift
-OlafManager.shared.info("Login başarılı", category: .auth)
+OlafManager.shared.info("Login succeeded", category: .auth)
 OlafManager.shared.error(error, category: .payment)
 ```
-Manager `trace/debug/info/notice/warning/error/critical` + `error(Error)` sağlar; çağıran dosya/satır korunur.
-`print()` çağrılarını kademeli olarak bu metodlara taşı.
+The manager provides `trace/debug/info/notice/warning/error/critical` + `error(Error)`; the calling file/line is preserved.
+Migrate `print()` calls to these methods incrementally.
 
-### Kategorileri genişletme
-Entegrasyon dosyasındaki `extension LogCategory` bloğuna projenin modüllerini ekle:
+### Extending categories
+Add the project's modules to the `extension LogCategory` block in the integration file:
 ```swift
 public extension LogCategory {
     static let cards: LogCategory = "cards"
     static let transfers: LogCategory = "transfers"
 }
 ```
-Dosya `@_exported import Olaf` içerdiğinden çağrı yerleri `import Olaf` yazmadan kullanabilir.
+Since the file contains `@_exported import Olaf`, call sites can use it without writing `import Olaf`.
 
-## Davranış kuralları (agent için)
-- Paketin `Sources/` içeriğini DEĞİŞTİRME; entegrasyon host tarafındadır (yalnız template + ürün seçimi).
-- `initialize(...)` paylaşılan session'dan ÖNCE çağrılmalı; aksi halde ilk istekler yakalanmayabilir.
-- `Olaf.start(...)` / `initialize(...)` yalnız bir kez çağrılır.
-- Gating'i `#if DEBUG`'a bağlama (TestFlight UAT release config). `#if !PROD` veya runtime flag kullan.
+## Behavior rules (for the agent)
+- Do NOT modify the package's `Sources/` contents; integration lives on the host side (only the template + product selection).
+- `initialize(...)` must be called BEFORE the shared session; otherwise the first requests may not be captured.
+- `Olaf.start(...)` / `initialize(...)` must be called only once.
+- Don't tie gating to `#if DEBUG` (TestFlight uses a UAT release config). Use `#if !PROD` or a runtime flag.
 
-## Network loglarını listele — `OlafNetwork`
-**En kolay (networking koduna dokunmadan):** `initialize` içinde zaten çağrılan
+## Listing network logs — `OlafNetwork`
+**Easiest (no changes to networking code):** already called inside `initialize`:
 ```swift
-OlafNetwork.startAutomaticCapture()   // URLSessionConfiguration swizzle + global; SSL kırmaz
+OlafNetwork.startAutomaticCapture()   // URLSessionConfiguration swizzle + global; doesn't break SSL
 ```
-İstek/yanıtlar `.network` kategorisinde ham (maskelemesiz) Olaf'a düşer. Gövde + header **default açık**;
-kısmak için `startAutomaticCapture(OlafNetworkConfiguration(capturesBodies: false))`.
-Kendi session'ına manuel/deterministik enjekte için (adım 4) `configureNetworkCapture(_:)` / `install(into:chainingTo:)`.
+Requests/responses land in Olaf raw (unmasked) in the `.network` category. Body + header capture is **on by default**;
+to reduce it, use `startAutomaticCapture(OlafNetworkConfiguration(capturesBodies: false))`.
+For manual/deterministic injection into your own session (step 4), use `configureNetworkCapture(_:)` / `install(into:chainingTo:)`.
 
-## Genişletme: dış bir tanılama aracı eklemek
-Jenerik geçiş için `ExternalToolBridge`'e uyan bir tip yazıp host'ta kaydet:
+## Extending: adding an external diagnostics tool
+To hand off generically, write a type conforming to `ExternalToolBridge` and register it on the host:
 ```swift
 struct SomeToolBridge: ExternalToolBridge {
     let title = "SomeTool"
-    @MainActor func open() { /* dismiss + show, ya da OlafUI.presentExternal { ... } */ }
+    @MainActor func open() { /* dismiss + show, or OlafUI.presentExternal { ... } */ }
 }
 OlafUI.register(SomeToolBridge())
 ```

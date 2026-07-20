@@ -5,12 +5,12 @@ let package = Package(
     name: "Olaf",
     platforms: [
         .iOS(.v17),
-        .macOS(.v14) // Motor UIKit'siz olduğu için macOS'ta da derlenir/test edilir
+        .macOS(.v14) // The engine is UIKit-free, so it also compiles/tests on macOS
     ],
     products: [
-        // Tek ürün: motor (ring buffer, NDJSON persistans, OSLog köprüsü) + network capture
-        // (URLProtocol) + in-app viewer (shake → liste/detay). Viewer içeriği
-        // `#if canImport(UIKit)` gate'li olduğundan her platformda derlenir.
+        // Single product: engine (ring buffer, NDJSON persistence, OSLog bridge) + network
+        // capture (URLProtocol) + in-app viewer (shake → list/detail). Viewer content is
+        // gated behind `#if canImport(UIKit)`, so it compiles on every platform.
         .library(name: "Olaf", targets: ["Olaf"])
     ],
     targets: [
@@ -18,8 +18,8 @@ let package = Package(
             name: "Olaf",
             resources: [
                 .process("UI/Resources"),
-                // App Store gönderimlerinde SDK privacy manifest'i (veri toplanmaz; yalnız
-                // rotation için dosya-tarihi okuma beyanı).
+                // SDK privacy manifest for App Store submissions (no data collected; only a
+                // file-timestamp read declaration for rotation).
                 .copy("PrivacyInfo.xcprivacy")
             ],
             swiftSettings: [

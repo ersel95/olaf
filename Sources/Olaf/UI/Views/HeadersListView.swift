@@ -1,7 +1,7 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// Header'ları key-value satırları halinde gösteren tam ekran. Değerler seçilebilir.
+/// Full-screen view showing headers as key-value rows. Values are selectable.
 struct HeadersListView: View {
     let title: String
     let headers: [(key: String, value: String)]

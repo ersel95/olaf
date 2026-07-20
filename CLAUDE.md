@@ -1,44 +1,45 @@
-# Olaf — AI Asistan Notları
+# Olaf — AI Assistant Notes
 
-Generic, taşınabilir Swift **network logger** paketi: uygulama + network loglarını cihazda
-görüntüleyip paylaşmayı sağlar. Tamamen **local** (backend yok, hiçbir veri ağ üzerinden gönderilmez).
+A generic, portable Swift **network logger** package: lets you view and share app + network logs
+on-device. Fully **local** (no backend, no data is ever sent over the network).
 
-> Eskiden pakette bulunan bug-reporter/upload mekanizması (hataları backend'e bildirme) bilinçli
-> olarak **kaldırılmıştır** ve ayrı bir projede geliştirilecektir — özet: `docs/bug-reporter-ozet.md`.
-> Olaf'a geri eklenmez.
+> The bug-reporter/upload mechanism (reporting errors to a backend) that used to be in the package
+> has been **deliberately removed** and will be developed in a separate project — summary:
+> `docs/bug-reporter-summary.md`.
+> It will not be added back to Olaf.
 
-## Yapı — TEK ürün, TEK target
-SPM tek ürün sunar: `Olaf`. Host tek ürünü ekler, tek `import Olaf` yeter. Target içi klasörler:
-- **`Sources/Olaf/Core`** — UIKit'siz motor: `Olaf` facade, ring buffer, NDJSON disk persistans
-  (oturum bazlı geçmiş), OSLog köprüsü, start-öncesi log tamponlama. Her platformda derlenir/test edilir.
-- **`Sources/Olaf/UI`** — SwiftUI viewer (shake → liste/detay, filtre, paylaşım). Tüm içerik
-  `#if canImport(UIKit)` gate'li. Jenerik `ExternalToolBridge` + `OlafUI.register(_:)` ile host kendi
-  dış tanılama aracını viewer'a buton olarak ekleyebilir (paket hiçbir dış araca bağlı değildir).
-- **`Sources/Olaf/Network`** — URLProtocol network capture; `.network` kategorisinde, ham (maskelemesiz).
-  - `startAutomaticCapture(config)` — URLSessionConfiguration swizzle ile tüm session'lara otomatik enjekte (host'un networking koduna dokunmadan). Yakalanan istekler TEK paylaşılan proxy session'dan (`OlafProxySession`) geçer: bağlantı havuzu/TLS yeniden kullanılır, paylaşılan `HTTPCookieStorage` korunur. Trust default sistem doğrulamasıdır (`allowsArbitraryServerTrustForCapture` yalnız opt-in).
-  - `OlafNetworkConfiguration`: `capturesBodies/capturesHeaders` (default açık), `includedURLs`/`excludedURLs` (baseURL allow/deny filtresi — `canInit`'te uygulanır, exclude önceliklidir), `maxBodyLength`, `category`.
-  - JSON gövdeler **yakalama anında** pretty-print edilip saklanır; viewer'da `JSONHighlighter` ile syntax renklendirme.
+## Structure — a SINGLE product, a SINGLE target
+SPM offers a single product: `Olaf`. The host adds this one product, and a single `import Olaf` is enough. Folders within the target:
+- **`Sources/Olaf/Core`** — the UIKit-free engine: the `Olaf` facade, ring buffer, NDJSON disk
+  persistence (per-session history), OSLog bridge, pre-start log buffering. Compiles/tests on every platform.
+- **`Sources/Olaf/UI`** — the SwiftUI viewer (shake → list/detail, filter, sharing). All content
+  gated behind `#if canImport(UIKit)`. Via the generic `ExternalToolBridge` + `OlafUI.register(_:)`, the host
+  can add its own external diagnostics tool to the viewer as a button (the package is not tied to any external tool).
+- **`Sources/Olaf/Network`** — URLProtocol network capture; in the `.network` category, raw (unmasked).
+  - `startAutomaticCapture(config)` — automatically injects into all sessions via a URLSessionConfiguration swizzle (without touching the host's networking code). Captured requests go through a SINGLE shared proxy session (`OlafProxySession`): connection pooling/TLS are reused, and the shared `HTTPCookieStorage` is preserved. Trust defaults to system validation (`allowsArbitraryServerTrustForCapture` is opt-in only).
+  - `OlafNetworkConfiguration`: `capturesBodies/capturesHeaders` (on by default), `includedURLs`/`excludedURLs` (a baseURL allow/deny filter — applied in `canInit`, exclude takes priority), `maxBodyLength`, `category`.
+  - JSON bodies are pretty-printed and stored **at capture time**; syntax-highlighted in the viewer via `JSONHighlighter`.
 
 ## Build / test
 ```bash
 swift build && swift test                                          # macOS
-xcodebuild -scheme Olaf -destination 'generic/platform=iOS' build  # iOS doğrulama
+xcodebuild -scheme Olaf -destination 'generic/platform=iOS' build  # iOS verification
 ```
-Her değişiklikte macOS test + iOS build yeşil olmalı.
+Both macOS tests and the iOS build must be green on every change.
 
-## Değişmez kurallar
-- **Tek SPM ürünü/target'ı kalır.** Paket yeniden ürünlere bölünmez; upload/bug-reporter geri eklenmez.
-- **Redaksiyon/maskeleme/filtreleme YOK.** Tüm veri çağrı yerinden geldiği gibi **ham** saklanır ve gösterilir (mesaj, metadata, network gövde/header). Maskeleme bir seçenek olarak bile sunulmaz — `Redactor`/`BankingRedactor`/`redactionEnabled` API'si bilinçli olarak kaldırılmıştır; geri eklenmez. Hassas veri sızıntısı host tarafının sorumluluğundadır (PROD'da capture'ı `#if !PROD` ile gate'leyin).
-- **Paket hiçbir dış araca bağlı DEĞİLDİR.** Dış tanılama aracı geçişi yalnız jenerik `ExternalToolBridge`
-  + `OlafUI.register(_:)` ile host tarafında eklenir; gerekirse `OlafNetwork.install(chainingTo:)` ile
-  başka bir capture aracının URLProtocol'ü paylaşılan session'a zincirlenebilir.
-- **Network capture yalnız non-prod debug.** Proxy varsayılan olarak sistem trust doğrulaması kullanır
-  (pinning/OS trust baypaslanmaz); özel CA'lar için `allowsArbitraryServerTrustForCapture` opt-in'dir.
-  Gövde/header default loglanır → PROD'da çalıştırılmamalı (host runtime flag + `#if !PROD` ile gate'ler).
-- **call-site bilgisi** (file/line/function) log fonksiyonlarında **doğrudan** `#fileID/#line/#function` default'u
-  olmalı — tek struct'a sarmak (LogSource) call-site yakalamayı bozar.
-- Public repo: banka/şirket adı veya iç sınıf adı **eklenmez** (jenerik tut).
+## Immutable rules
+- **A single SPM product/target remains.** The package is not to be split back into multiple products; upload/bug-reporter is not to be added back.
+- **NO redaction/masking/filtering.** All data is stored and displayed **raw**, exactly as it came from the call site (message, metadata, network body/header). Masking is not offered even as an option — the `Redactor`/`BankingRedactor`/`redactionEnabled` API has been deliberately removed; it is not to be added back. Preventing sensitive data leaks is the host's responsibility (gate capture in PROD with `#if !PROD`).
+- **The package is NOT tied to any external tool.** External diagnostics tool handoff is added only on the host side via the generic `ExternalToolBridge`
+  + `OlafUI.register(_:)`; if needed, another capture tool's URLProtocol can be chained onto the shared session via
+  `OlafNetwork.install(chainingTo:)`.
+- **Network capture is for non-prod debug only.** The proxy uses system trust validation by default
+  (pinning/OS trust is not bypassed); `allowsArbitraryServerTrustForCapture` is opt-in for custom CAs.
+  Bodies/headers are logged by default → must not run in PROD (gate via a host runtime flag + `#if !PROD`).
+- **Call-site info** (file/line/function) in logging functions must default **directly** to `#fileID/#line/#function`
+  — wrapping it in a single struct (LogSource) breaks call-site capture.
+- Public repo: bank/company names or internal class names must **not** be added (keep it generic).
 
-## Sürümleme
-SemVer + git tag. Sources değişince tag at (`0.x.0`); yalnız doküman/template değişince tag gerekmez.
-`Integration/OlafIntegration.swift` SPM ürünü DEĞİLDİR (host'a kopyalanan template) — Sources dışında.
+## Versioning
+SemVer + git tag. Tag when Sources change (`0.x.0`); no tag needed for doc/template-only changes.
+`Integration/OlafIntegration.swift` is NOT an SPM product (it's a template copied to the host) — outside of Sources.

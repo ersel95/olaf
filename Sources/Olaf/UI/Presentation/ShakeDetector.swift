@@ -3,18 +3,18 @@ import UIKit
 import ObjectiveC
 
 public extension Notification.Name {
-    /// Cihaz sallandığında gönderilir. `OlafPresenter` bunu dinler.
+    /// Sent when the device is shaken. `OlafPresenter` listens for this.
     static let olafShake = Notification.Name("com.olaf.shake")
 }
 
-/// Sallama algılama: `UIWindow.motionEnded` **runtime swizzle** ile yapılır.
-/// (Salt extension-override SPM statik kütüphanede dead-strip edilip ObjC runtime'a kaydolmayabilir;
-/// swizzle `install()`'dan çağrıldığı için referanslı kalır.)
+/// Shake detection: implemented via **runtime swizzling** of `UIWindow.motionEnded`.
+/// (A plain extension-override could be dead-stripped in an SPM static library and never
+/// register with the ObjC runtime; the swizzle stays referenced because it's called from `install()`.)
 enum ShakeDetector {
 
     private typealias MotionEndedIMP = @convention(c) (AnyObject, Selector, UIEvent.EventSubtype, UIEvent?) -> Void
 
-    /// `UIWindow.motionEnded`'i bir kez swizzle eder; shake'te `.olafShake` post eder, sonra orijinali çağırır.
+    /// Swizzles `UIWindow.motionEnded` once; posts `.olafShake` on shake, then calls the original.
     static func install() {
         let selector = #selector(UIResponder.motionEnded(_:with:))
         guard let method = class_getInstanceMethod(UIWindow.self, selector) else { return }

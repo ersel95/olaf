@@ -15,8 +15,8 @@ jobs:
       - name: macOS build & test
         run: swift test
 
-      # Viewer içeriği UIKit gate'li olduğundan iOS derlemesi ayrıca doğrulanır
-      # (CLAUDE.md kuralı: her değişiklikte macOS test + iOS build yeşil olmalı).
+      # Since viewer content is UIKit-gated, the iOS build is verified separately
+      # (CLAUDE.md rule: macOS test + iOS build must both be green on every change).
       - name: iOS build
         run: |
           xcodebuild -scheme Olaf \

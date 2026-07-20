@@ -1,93 +1,94 @@
 import Foundation
 import Combine
 
-/// Viewer'ın durum sahibi: anlık snapshot + canlı akış birleştirme, seviye/kategori/metin filtresi.
+/// State owner for the viewer: merges the instantaneous snapshot with the live stream, and applies
+/// level/category/text filtering.
 @MainActor
 public final class LogViewerModel: ObservableObject {
 
-    /// Toplanan tüm kayıtlar (snapshot + canlı).
+    /// All collected entries (snapshot + live).
     @Published public private(set) var entries: [LogEntry] = []
 
-    /// Gösterim kapsamı.
+    /// Display scope.
     public enum Scope: String, CaseIterable, Sendable {
-        case session   // bu oturum (bellek ring buffer)
-        case history   // diskteki tüm geçmiş (önceki oturumlar dahil)
+        case session   // this session (in-memory ring buffer)
+        case history   // entire disk history (including previous sessions)
     }
     @Published public var scope: Scope = .session
 
-    /// Filtreler.
+    /// Filters.
     @Published public var searchText: String = ""
-    /// `searchText`'in debounce edilmiş, normalize edilmiş (trim + lowercase) hâli. Her tuş
-    /// vuruşunda değil, kullanıcı yazmayı bıraktıktan sonra güncellenir → her keystroke'ta tüm
-    /// listeyi taramayız. `filteredEntries` bunu kullanır.
+    /// Debounced, normalized (trim + lowercase) form of `searchText`. Updated not on every
+    /// keystroke, but after the user stops typing → we don't scan the whole list on every
+    /// keystroke. `filteredEntries` uses this.
     @Published private var effectiveQuery: String = ""
-    /// Gösterilecek seviyeler (çoklu seçim). Boş = hepsi.
+    /// Levels to display (multi-select). Empty = all.
     @Published public var enabledLevels: Set<LogLevel> = Set(LogLevel.allCases)
     @Published public var selectedCategories: Set<LogCategory> = []
-    /// Network içerik türü filtresi (boş = kapalı). Seçiliyken **yalnız** bu türlerdeki
-    /// network kayıtları gösterilir (network olmayan kayıtlar gizlenir).
+    /// Network content-type filter (empty = off). When selected, **only** network entries of
+    /// these types are shown (non-network entries are hidden).
     @Published public var selectedContentKinds: Set<NetworkContentKind> = []
 
-    /// `true` iken yeni loglar canlı eklenir; `false` (duraklat) iken liste dondurulur.
+    /// `true` while new logs are appended live; `false` (paused) freezes the list.
     @Published public var isFollowing: Bool = true
 
-    /// Sabitlenen kayıt kimlikleri (oturum içi; kalıcı değildir). Sabitler, listenin üstünde
-    /// ayrı bölümde **filtrelerden bağımsız** gösterilir.
+    /// Pinned entry identifiers (per-session; not persisted). Pins are shown in a separate
+    /// section at the top of the list, **independent of filters**.
     @Published public var pinnedIDs: Set<UUID> = []
 
     private var pendingWhilePaused: [LogEntry] = []
     private var streamTask: Task<Void, Never>?
 
-    /// Canlı akış coalescing tamponu: gelen kayıtlar tek tek `entries`'e (her biri bir
-    /// `@Published` yayını → tam SwiftUI diff + `filteredEntries` yeniden hesabı) eklenmek
-    /// yerine burada birikir ve kısa aralıkla **toplu** flush edilir. Yoğun loglamada (network
-    /// capture) ana thread churn'ü ciddi düşer.
+    /// Live-stream coalescing buffer: incoming entries aren't appended to `entries` one at a
+    /// time (each append triggers an `@Published` emission → a full SwiftUI diff + recomputing
+    /// `filteredEntries`); instead they accumulate here and are flushed **in bulk** at a short
+    /// interval. This significantly reduces main-thread churn under heavy logging (network capture).
     private var incoming: [LogEntry] = []
     private var flushScheduled = false
     private static let coalesceInterval: UInt64 = 100_000_000  // 100 ms
 
-    /// Geçmiş (disk) yüklenirken `true`.
+    /// `true` while history (disk) is loading.
     @Published public private(set) var isLoading: Bool = false
 
-    // MARK: - Geçmişte sayfalama
+    // MARK: - History pagination
     //
-    // Geçmiş artık tek seferde değil sayfa sayfa yüklenir (en yeniden geriye). Filtre/arama
-    // yalnız YÜKLENMİŞ kayıtlarda çalışır; kullanıcı kaydırdıkça (veya butona bastıkça)
-    // daha eski sayfalar listenin sonuna eklenir.
+    // History is now loaded page by page (newest to oldest) rather than all at once. Filter/search
+    // only operates on LOADED entries; as the user scrolls (or taps the button), older pages are
+    // appended to the end of the list.
 
-    /// Diskte henüz yüklenmemiş daha eski kayıt var mı?
+    /// Is there an older, not-yet-loaded page on disk?
     @Published public private(set) var hasMoreHistory: Bool = false
-    /// Daha eski bir sayfa yüklenirken `true` (liste altındaki satır spinner gösterir).
+    /// `true` while an older page is loading (the row below the list shows a spinner).
     @Published public private(set) var isLoadingMore: Bool = false
-    /// Bir sonraki (daha eski) sayfanın imleci.
+    /// Cursor for the next (older) page.
     private var historyCursor: String?
-    /// Sayfa başına hedeflenen asgari kayıt sayısı.
+    /// Target minimum entry count per page.
     private static let historyPageSize = 500
 
-    // MARK: - Türetilmiş (memoize edilmiş) durum
+    // MARK: - Derived (memoized) state
     //
-    // Bunlar eskiden computed property idi → her SwiftUI render'ında tüm liste yeniden
-    // taranıyordu (büyük Geçmiş'te takılma). Artık yalnız girdiler değişince bir kez
-    // hesaplanır ve @Published olarak yayınlanır.
+    // These used to be computed properties → the entire list was rescanned on every SwiftUI
+    // render (stutter with large History). Now they are computed once, only when the inputs
+    // change, and published via @Published.
 
-    /// Filtre uygulanmış, en yeni en üstte sıralı kayıtlar.
+    /// Filtered entries, sorted newest first.
     @Published public private(set) var filteredEntries: [LogEntry] = []
 
-    /// Geçmişteki kayıtların oturum grupları — **mevcut oturum hariç** (o "Oturum" sekmesinde).
+    /// Session groups for history entries — **excluding the current session** (shown in the "Session" tab).
     @Published public private(set) var sessionGroups: [LogSession] = []
 
-    /// Mevcut kayıtlarda görülen kategoriler (filtre çubuğu için).
+    /// Categories seen in the current entries (for the filter bar).
     @Published public private(set) var availableCategories: [LogCategory] = []
 
     public init() {
-        // Arama debounce: searchText → (trim+lowercase) → 200ms sessizlik → effectiveQuery.
+        // Search debounce: searchText → (trim+lowercase) → 200ms of silence → effectiveQuery.
         $searchText
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
             .removeDuplicates()
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .assign(to: &$effectiveQuery)
 
-        // Girdilerden türetilen değerler: yalnız girdi değişiminde hesaplanır (render başına değil).
+        // Values derived from inputs: computed only when an input changes (not per render).
         let categorySelection = Publishers.CombineLatest($selectedCategories, $selectedContentKinds)
         Publishers.CombineLatest4($entries, $effectiveQuery, $enabledLevels, categorySelection)
             .map { entries, query, levels, selection in
@@ -110,7 +111,7 @@ public final class LogViewerModel: ObservableObject {
 
     deinit { streamTask?.cancel() }
 
-    // MARK: - Yaşam döngüsü
+    // MARK: - Lifecycle
 
     public func start() {
         reload()
@@ -123,9 +124,9 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
-    /// Kapsama göre kayıtları (yeniden) yükler. Hem oturum (bellek) hem geçmiş (disk) modunda
-    /// okuma **asenkron** yapılır → UI/ana thread bloke olmaz (çekirdek kuyruk yoğun olsa bile).
-    /// Geçmişte yalnız İLK sayfa yüklenir; gerisi `loadOlderHistory()` ile gelir.
+    /// (Re)loads entries according to scope. In both session (memory) and history (disk) mode,
+    /// reading is done **asynchronously** → the UI/main thread never blocks (even under heavy
+    /// core-queue load). In history mode only the FIRST page is loaded; the rest comes via `loadOlderHistory()`.
     public func reload() {
         pendingWhilePaused.removeAll()
         incoming.removeAll()
@@ -152,20 +153,20 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
-    /// Geçmişte bir sonraki (daha eski) sayfayı yükler ve listenin sonuna ekler.
-    /// İdempotent: yükleme sürerken veya imleç yokken çağrılar no-op'tur.
+    /// Loads the next (older) page of history and appends it to the end of the list.
+    /// Idempotent: calls are a no-op while loading, or when there is no cursor.
     public func loadOlderHistory() {
         guard scope == .history, !isLoading, !isLoadingMore, let cursor = historyCursor else { return }
         isLoadingMore = true
         Task { [weak self] in
             let page = await Olaf.loadPersistedPage(before: cursor, minimumEntries: Self.historyPageSize)
             guard let self else { return }
-            // Sayfa bu arada reload ile sıfırlandıysa (kapsam değişimi vb.) sonucu uygulama.
+            // Don't apply the result if the page was reset by a reload in the meantime (scope change, etc).
             guard self.scope == .history, self.historyCursor == cursor else {
                 self.isLoadingMore = false
                 return
             }
-            // `entries` eskiden yeniye tutulur; daha eski sayfa BAŞA eklenir.
+            // `entries` is kept oldest-to-newest; the older page is inserted at the FRONT.
             self.entries.insert(contentsOf: page.entries, at: 0)
             self.historyCursor = page.nextCursor
             self.hasMoreHistory = page.nextCursor != nil
@@ -184,7 +185,7 @@ public final class LogViewerModel: ObservableObject {
         scheduleFlush()
     }
 
-    /// Birikmiş `incoming` kayıtları kısa bir gecikmeyle **bir kerede** flush eder (coalescing).
+    /// Flushes the accumulated `incoming` entries **all at once** after a short delay (coalescing).
     private func scheduleFlush() {
         guard !flushScheduled else { return }
         flushScheduled = true
@@ -193,13 +194,14 @@ public final class LogViewerModel: ObservableObject {
             guard let self else { return }
             self.flushScheduled = false
             guard !self.incoming.isEmpty else { return }
-            // Geçmiş kapsamında canlı kayıtlar listeye karıştırılmaz (mevcut oturum orada zaten
-            // gösterilmez); Oturum'a dönüşte reload() güncel snapshot'ı alır — kayıp olmaz.
+            // Live entries are not mixed into the list while in history scope (the current
+            // session isn't shown there anyway); reload() picks up the latest snapshot when
+            // returning to Session — nothing is lost.
             if self.scope == .history {
                 self.incoming.removeAll(keepingCapacity: true)
                 return
             }
-            // Duraklatılmışsa kayıtlar "devam et"e dek beklesin (pause semantiği korunur).
+            // If paused, entries wait until "resume" (pause semantics preserved).
             if self.isFollowing {
                 self.entries.append(contentsOf: self.incoming)
             } else {
@@ -217,19 +219,19 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
-    // MARK: - Türetme mantığı (saf fonksiyonlar → test edilebilir)
+    // MARK: - Derivation logic (pure functions → testable)
 
-    /// Bir uygulama oturumunun gruplanmış logları.
+    /// Grouped logs for one app session.
     public struct LogSession: Identifiable, Sendable {
         public let id: String        // sessionID
-        public let startDate: Date   // oturumdaki en erken kayıt
-        public let entries: [LogEntry]  // en yeni üstte
+        public let startDate: Date   // earliest entry in the session
+        public let entries: [LogEntry]  // newest first
     }
 
-    /// Seviye/kategori/içerik-türü/arama filtresi — en yeni en üstte.
+    /// Level/category/content-type/search filter — newest first.
     nonisolated static func filter(
         entries: [LogEntry],
-        query: String,   // zaten trim+lowercase (debounce pipeline'ından)
+        query: String,   // already trim+lowercase (from the debounce pipeline)
         levels: Set<LogLevel>,
         categories: Set<LogCategory>,
         contentKinds: Set<NetworkContentKind> = []
@@ -251,8 +253,8 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
-    /// Kayıtları oturuma göre gruplar; `excluding` (mevcut oturum) atlanır.
-    /// Oturumlar en yeniden eskiye sıralanır; içleri en yeni üstte.
+    /// Groups entries by session; `excluding` (the current session) is skipped.
+    /// Sessions are sorted newest to oldest; their contents are newest first.
     nonisolated static func groupSessions(_ entries: [LogEntry], excluding current: String) -> [LogSession] {
         var grouped: [String: [LogEntry]] = [:]
         var order: [String] = []
@@ -269,7 +271,7 @@ public final class LogViewerModel: ObservableObject {
             .sorted { $0.startDate > $1.startDate }
     }
 
-    /// Kayıtlarda görülen kategoriler (ada göre sıralı, tekrarsız).
+    /// Categories seen in the entries (sorted by name, deduplicated).
     nonisolated static func categories(in entries: [LogEntry]) -> [LogCategory] {
         var seen = Set<LogCategory>()
         var ordered: [LogCategory] = []
@@ -280,7 +282,7 @@ public final class LogViewerModel: ObservableObject {
         return ordered.sorted { $0.rawValue < $1.rawValue }
     }
 
-    // MARK: - Aksiyonlar
+    // MARK: - Actions
 
     public func toggleCategory(_ category: LogCategory) {
         if selectedCategories.contains(category) {
@@ -306,7 +308,7 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
-    /// Sabitlenmiş kayıtlar (en yeni üstte) — filtrelerden bağımsız, yüklü kayıtlar içinden.
+    /// Pinned entries (newest first) — independent of filters, from among the loaded entries.
     public var pinnedEntries: [LogEntry] {
         Self.pinned(in: entries, ids: pinnedIDs)
     }
@@ -316,7 +318,7 @@ public final class LogViewerModel: ObservableObject {
         return entries.reversed().filter { ids.contains($0.id) }
     }
 
-    /// Seçilen kayıtları (çoklu seçim) okunur `.log` dosyasına yazar — kronolojik sırayla.
+    /// Writes the selected entries (multi-select) to a readable `.log` file — in chronological order.
     public func exportFileURL(for ids: Set<UUID>) async -> URL? {
         let chosen = Array(filteredEntries.filter { ids.contains($0.id) }.reversed())
         guard !chosen.isEmpty else { return nil }
@@ -331,7 +333,7 @@ public final class LogViewerModel: ObservableObject {
         }
     }
 
-    /// Varsayılan dışı bir filtre uygulanmış mı? (funnel rozetinde gösterilir)
+    /// Is a non-default filter applied? (shown in the funnel badge)
     public var isFiltering: Bool {
         enabledLevels.count != LogLevel.allCases.count
             || !selectedCategories.isEmpty
@@ -352,21 +354,21 @@ public final class LogViewerModel: ObservableObject {
         pinnedIDs.removeAll()
     }
 
-    /// O an **ekranda görünen** (kapsam + seviye/kategori/arama filtreleri uygulanmış) kayıtları
-    /// paylaşılabilir bir dosyaya yazar. Hiçbir filtre seçili değilse bu, tüm görünür listeyle
-    /// eşittir. Kronolojik (eski → yeni) yazılır; `filteredEntries` en-yeni-üstte sıralı.
+    /// Writes the entries **currently visible on screen** (scope + level/category/search filters
+    /// applied) to a shareable file. If no filter is selected, this equals the entire visible
+    /// list. Written chronologically (oldest → newest); `filteredEntries` is sorted newest first.
     public func exportFileURL() async -> URL? {
         let visible = Array(filteredEntries.reversed())
         return await Olaf.exportFileURL(entries: visible)
     }
 
-    /// Görünen kayıtları **ham NDJSON** olarak dışa aktarır (jq/backend analizi için).
+    /// Exports the visible entries as **raw NDJSON** (for jq/backend analysis).
     public func exportNDJSONFileURL() async -> URL? {
         let visible = Array(filteredEntries.reversed())
         return await Olaf.exportNDJSONFileURL(entries: visible)
     }
 
-    /// Görünen **network** kayıtlarını HAR 1.2 dosyasına yazar (Charles/Proxyman/DevTools açar).
+    /// Writes the visible **network** entries to a HAR 1.2 file (opens in Charles/Proxyman/DevTools).
     public func exportHARFileURL() async -> URL? {
         let visible = Array(filteredEntries.reversed())
         return await Task.detached(priority: .utility) {
@@ -375,8 +377,8 @@ public final class LogViewerModel: ObservableObject {
         }.value
     }
 
-    /// Görünen **network** kayıtlarını Postman Collection v2.1 dosyasına yazar
-    /// (aynı method+URL bir kez; Postman → Import ile yeniden çalıştırılabilir).
+    /// Writes the visible **network** entries to a Postman Collection v2.1 file
+    /// (same method+URL once; can be re-run via Postman → Import).
     public func exportPostmanFileURL() async -> URL? {
         let visible = Array(filteredEntries.reversed())
         return await Task.detached(priority: .utility) {
@@ -385,7 +387,7 @@ public final class LogViewerModel: ObservableObject {
         }.value
     }
 
-    /// Kayıtlı dış araçlar (geçiş butonları).
+    /// Registered external tools (switch-to buttons).
     public var externalTools: [any ExternalToolBridge] {
         ExternalToolRegistry.shared.all
     }

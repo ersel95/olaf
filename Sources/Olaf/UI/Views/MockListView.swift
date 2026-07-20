@@ -1,8 +1,8 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// Aktif mock'ların listesi: görüntüle, tek tek (kaydırarak) veya toptan kaldır.
-/// Yeni mock, bir network kaydının detayındaki **"Mock'a çevir"** ile eklenir.
+/// List of active mocks: view, remove individually (by swiping), or remove all at once.
+/// New mocks are added via **"Convert to Mock"** in a network entry's detail view.
 struct MockListView: View {
 
     @Environment(\.dismiss) private var dismiss
@@ -13,9 +13,9 @@ struct MockListView: View {
             Group {
                 if mocks.isEmpty {
                     ContentUnavailableView(
-                        "Mock yok",
+                        "No mocks",
                         systemImage: "arrow.triangle.2.circlepath",
-                        description: Text("Bir network kaydının detayından \"Mock'a çevir\" ile ekleyin; eşleşen istekler ağa çıkmadan o yanıtı alır.")
+                        description: Text("Add one from a network entry's detail view via \"Convert to Mock\"; matching requests get that response without hitting the network.")
                     )
                 } else {
                     List {
@@ -25,24 +25,24 @@ struct MockListView: View {
                             }
                             .onDelete(perform: delete)
                         } footer: {
-                            Text("Birden çok mock eşleşirse ilk eklenen kazanır. Mock'lar uygulama yeniden başlayınca sıfırlanır.")
+                            Text("If multiple mocks match, the first one added wins. Mocks reset on app restart.")
                         }
                     }
                     .listStyle(.insetGrouped)
                 }
             }
-            .navigationTitle("Mock'lar")
+            .navigationTitle("Mocks")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Tümünü kaldır", role: .destructive) {
+                    Button("Remove All", role: .destructive) {
                         OlafNetwork.removeAllMocks()
                         mocks = []
                     }
                     .disabled(mocks.isEmpty)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Bitti") { dismiss() }
+                    Button("Done") { dismiss() }
                 }
             }
             .onAppear { mocks = OlafNetwork.activeMocks }
@@ -52,7 +52,7 @@ struct MockListView: View {
     private func row(_ mock: OlafMockResponse) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
-                MethodBadge(method: mock.method ?? "TÜMÜ")
+                MethodBadge(method: mock.method ?? "ALL")
                 Text(mock.urlContains)
                     .font(.callout.monospaced())
                     .lineLimit(1)
@@ -60,7 +60,7 @@ struct MockListView: View {
             }
             HStack(spacing: 8) {
                 if let errorCode = mock.transportError {
-                    Text("Taşıma hatası (\(errorCode.rawValue))")
+                    Text("Transport error (\(errorCode.rawValue))")
                         .foregroundStyle(.red)
                 } else {
                     Text("→ \(mock.statusCode)")
@@ -69,7 +69,7 @@ struct MockListView: View {
                     }
                 }
                 if mock.delaySeconds > 0 {
-                    Text("· \(String(format: "%.1f", mock.delaySeconds)) sn gecikme")
+                    Text("· \(String(format: "%.1f", mock.delaySeconds))s delay")
                 }
             }
             .font(.caption2)

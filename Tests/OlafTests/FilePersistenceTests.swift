@@ -43,7 +43,7 @@ final class FilePersistenceTests: XCTestCase {
             let first = try XCTUnwrap(FilePersistence(directory: directory, maxFileSize: 1_048_576, maxFileCount: 5))
             first.write(makeEntry("session-1"))
         }
-        // Yeni instance = yeni "oturum"; eski kayıt diskte kalmalı.
+        // New instance = new "session"; the old entry should remain on disk.
         let second = try XCTUnwrap(FilePersistence(directory: directory, maxFileSize: 1_048_576, maxFileCount: 5))
         second.write(makeEntry("session-2"))
 
@@ -51,17 +51,17 @@ final class FilePersistenceTests: XCTestCase {
     }
 
     func testRotationKeepsRecentAndPrunesOld() throws {
-        // Küçük dosya boyutu → her yazımda rotate; maxFileCount=3 → eskiler silinir.
+        // Small file size → rotates on every write; maxFileCount=3 → old files are deleted.
         let persistence = try XCTUnwrap(FilePersistence(directory: directory, maxFileSize: 4096, maxFileCount: 3))
         for i in 1...10 {
-            // 4096 byte'ı aşacak büyük mesaj → garanti rotation.
+            // A message large enough to exceed 4096 bytes → guarantees rotation.
             persistence.write(makeEntry(String(repeating: "x", count: 5000) + "#\(i)"))
         }
         let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
             .filter { $0.hasSuffix(".ndjson") }
-        // current + en fazla (maxFileCount-1) rotated = 3 dosya tavanı.
+        // current + at most (maxFileCount-1) rotated = a ceiling of 3 files.
         XCTAssertLessThanOrEqual(files.count, 3)
-        // Diskte en az son yazılan kayıt bulunmalı.
+        // At least the most recently written entry should be present on disk.
         XCTAssertTrue(persistence.loadEntries().contains { $0.message.contains("#10") })
     }
 
@@ -73,7 +73,7 @@ final class FilePersistenceTests: XCTestCase {
         let text = try String(contentsOf: url, encoding: .utf8)
         XCTAssertTrue(text.contains("[ERROR]"))
         XCTAssertTrue(text.contains("readable line"))
-        XCTAssertFalse(text.contains("\"message\"")) // JSON değil, düz metin
+        XCTAssertFalse(text.contains("\"message\"")) // not JSON, plain text
     }
 
     func testClearRemovesAllEntries() throws {

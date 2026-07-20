@@ -1,24 +1,24 @@
 import Foundation
 
-/// Görünen network kayıtlarından hesaplanan özet istatistikler (saf hesap — test edilebilir).
-/// Viewer'daki "İstatistikler" ekranı bunu, o an görünen (filtreli) liste üzerinden üretir.
+/// Summary statistics computed from the currently visible network records (pure computation — testable).
+/// The viewer's "Statistics" screen produces this from the currently visible (filtered) list.
 struct NetworkStats {
 
     let totalRequests: Int
-    let failureCount: Int            // 4xx/5xx veya taşıma hatası (iptal hariç)
+    let failureCount: Int            // 4xx/5xx or transport error (excluding cancelled)
     let cancelledCount: Int
     let averageDurationMs: Int?
     let medianDurationMs: Int?
     let p95DurationMs: Int?
     let totalRequestBytes: Int
     let totalResponseBytes: Int
-    /// HTTP metotları — çoktan aza.
+    /// HTTP methods — descending.
     let methodCounts: [(name: String, count: Int)]
-    /// Durum sınıfları ("2xx".."5xx", "Hata", "İptal") — sabit sırayla, sıfırlar atlanır.
+    /// Status classes ("2xx".."5xx", "Error", "Cancelled") — fixed order, zeros omitted.
     let statusClassCounts: [(name: String, count: Int)]
-    /// En çok istek yapılan host'lar — ilk 5.
+    /// Hosts with the most requests — top 5.
     let hostCounts: [(name: String, count: Int)]
-    /// En yavaş istekler — ilk 5 (path + süre).
+    /// Slowest requests — top 5 (path + duration).
     let slowest: [(path: String, durationMs: Int)]
 
     var failurePercent: Int {
@@ -76,19 +76,19 @@ struct NetworkStats {
         )
     }
 
-    // MARK: - Sınıflandırma
+    // MARK: - Classification
 
-    private static let statusOrder = ["2xx", "3xx", "4xx", "5xx", "Hata", "İptal"]
+    private static let statusOrder = ["2xx", "3xx", "4xx", "5xx", "Error", "Cancelled"]
 
     private static func statusClass(of info: NetworkLogInfo) -> String {
-        if info.cancelled { return "İptal" }
-        guard let status = info.statusCode else { return "Hata" }
+        if info.cancelled { return "Cancelled" }
+        guard let status = info.statusCode else { return "Error" }
         switch status {
         case 200..<300: return "2xx"
         case 300..<400: return "3xx"
         case 400..<500: return "4xx"
         case 500...: return "5xx"
-        default: return "Hata"
+        default: return "Error"
         }
     }
 }

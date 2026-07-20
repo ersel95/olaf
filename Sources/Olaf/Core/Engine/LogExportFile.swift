@@ -1,16 +1,16 @@
 import Foundation
 
-/// Logları paylaşılabilir geçici `.log` dosyasına yazan ortak yardımcı.
+/// Shared helper that writes logs to a shareable temporary `.log` file.
 ///
-/// Hem tam geçmiş export'u (`FilePersistence.consolidatedTextURL`) hem de viewer'daki
-/// **filtreli** export (`LogStore.exportFileURL(entries:)`) buradan geçer; böylece tmp temizleme
-/// ve dosya adlandırma tek yerde kalır.
+/// Both the full-history export (`FilePersistence.consolidatedTextURL`) and the viewer's
+/// **filtered** export (`LogStore.exportFileURL(entries:)`) go through here; this keeps tmp
+/// cleanup and file naming in one place.
 enum LogExportFile {
 
     static let prefix = "olaf-export-"
 
-    /// Verilen metni tmp'de paylaşılabilir bir dosyaya yazar (`.log` veya `.ndjson`); önce eski
-    /// export'ları temizler (hassas log tmp'de süresiz birikmesin). Başarısızlıkta `nil`.
+    /// Writes the given text to a shareable file in tmp (`.log` or `.ndjson`); first purges old
+    /// exports (so sensitive logs don't accumulate indefinitely in tmp). Returns `nil` on failure.
     static func write(_ text: String, fileExtension: String = "log", fileManager: FileManager = .default) -> URL? {
         purgeOld(fileManager: fileManager)
         let url = fileManager.temporaryDirectory
@@ -23,7 +23,7 @@ enum LogExportFile {
         }
     }
 
-    /// tmp'deki eski `olaf-export-*` dosyalarını (.log/.ndjson) siler (yeni export'tan önce çağrılır).
+    /// Deletes old `olaf-export-*` files (.log/.ndjson) from tmp (called before a new export).
     static func purgeOld(fileManager: FileManager = .default) {
         let tmp = fileManager.temporaryDirectory
         let contents = (try? fileManager.contentsOfDirectory(at: tmp, includingPropertiesForKeys: nil)) ?? []

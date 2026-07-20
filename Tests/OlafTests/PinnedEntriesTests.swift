@@ -16,7 +16,7 @@ final class PinnedEntriesTests: XCTestCase {
         let c = makeEntry("c")
 
         let pinned = LogViewerModel.pinned(in: [a, b, c], ids: [a.id, c.id, UUID()])
-        XCTAssertEqual(pinned.map(\.message), ["c", "a"])   // en yeni üstte, bilinmeyen id yok sayılır
+        XCTAssertEqual(pinned.map(\.message), ["c", "a"])   // newest first, unknown ids are ignored
     }
 
     func testEmptyIDsShortCircuits() {

@@ -33,32 +33,32 @@ final class NetworkStatsTests: XCTestCase {
             networkEntry(method: "POST", url: "https://b.com/3", status: 500, durationMs: 500),
             networkEntry(method: "GET", url: "https://a.com/4", status: nil, durationMs: 50, error: "timeout"),
             networkEntry(method: "GET", url: "https://a.com/5", status: nil, durationMs: 10, cancelled: true),
-            // Network olmayan kayıt sayılmaz:
+            // A non-network record doesn't count:
             LogEntry(date: Date(), level: .info, category: .general, message: "app",
                      metadata: [:], file: "F.swift", line: 1, function: "f()", thread: "main")
         ]
 
         let stats = NetworkStats.compute(from: entries)
         XCTAssertEqual(stats.totalRequests, 5)
-        XCTAssertEqual(stats.failureCount, 3)          // 404 + 500 + timeout (iptal hariç)
+        XCTAssertEqual(stats.failureCount, 3)          // 404 + 500 + timeout (excluding cancelled)
         XCTAssertEqual(stats.cancelledCount, 1)
         XCTAssertEqual(stats.failurePercent, 60)
         XCTAssertEqual(stats.averageDurationMs, (100 + 300 + 500 + 50 + 10) / 5)
         XCTAssertEqual(stats.totalRequestBytes, 50)
         XCTAssertEqual(stats.totalResponseBytes, 100)
 
-        // Metotlar çoktan aza.
+        // Methods descending.
         XCTAssertEqual(stats.methodCounts.first?.name, "GET")
         XCTAssertEqual(stats.methodCounts.first?.count, 4)
 
-        // Durum sınıfları sabit sırada, sıfırlar atlanır.
-        XCTAssertEqual(stats.statusClassCounts.map(\.name), ["2xx", "4xx", "5xx", "Hata", "İptal"])
+        // Status classes in fixed order, zeros omitted.
+        XCTAssertEqual(stats.statusClassCounts.map(\.name), ["2xx", "4xx", "5xx", "Error", "Cancelled"])
 
-        // Host'lar çoktan aza.
+        // Hosts descending.
         XCTAssertEqual(stats.hostCounts.first?.name, "a.com")
         XCTAssertEqual(stats.hostCounts.first?.count, 4)
 
-        // En yavaş ilk sırada.
+        // Slowest first.
         XCTAssertEqual(stats.slowest.first?.durationMs, 500)
         XCTAssertEqual(stats.slowest.first?.path, "/3")
     }

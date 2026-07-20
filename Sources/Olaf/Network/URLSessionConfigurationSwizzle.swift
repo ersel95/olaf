@@ -1,10 +1,10 @@
 import Foundation
 import ObjectiveC
 
-/// `URLSessionConfiguration.default` / `.ephemeral` getter'larını swizzle ederek, uygulamada
-/// oluşturulan TÜM session config'lerine `OlafURLProtocol`'ü otomatik enjekte eder.
-/// Böylece host'un networking koduna (BaseService vb.) **hiç dokunmadan** capture aktifleşir
-/// (tek-satır, sıfır-dokunuş kurulum yaklaşımı).
+/// Swizzles the `URLSessionConfiguration.default` / `.ephemeral` getters to automatically inject
+/// `OlafURLProtocol` into EVERY session config created in the app.
+/// This activates capture **without touching** the host's networking code (BaseService etc.) at all
+/// (a one-line, zero-touch setup approach).
 extension URLSessionConfiguration {
 
     private static let olafSwizzleOnce: Void = {
@@ -18,14 +18,14 @@ extension URLSessionConfiguration {
         swap(NSSelectorFromString("ephemeralSessionConfiguration"), #selector(olaf_ephemeralSessionConfiguration))
     }()
 
-    /// Swizzle'ı bir kez etkinleştirir (idempotent).
+    /// Activates the swizzle once (idempotent).
     static func olafEnableAutomaticInjection() {
         _ = olafSwizzleOnce
     }
 
-    // Exchange sonrası bu metod orijinal `defaultSessionConfiguration`'a karşılık gelir.
+    // After the exchange, this method corresponds to the original `defaultSessionConfiguration`.
     @objc class func olaf_defaultSessionConfiguration() -> URLSessionConfiguration {
-        let configuration = olaf_defaultSessionConfiguration() // artık orijinal impl
+        let configuration = olaf_defaultSessionConfiguration() // now the original impl
         configuration.olafInjectProtocol()
         return configuration
     }

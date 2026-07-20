@@ -1,7 +1,7 @@
 import Foundation
 
-/// Yanıtın `Content-Type`'ına göre kaba içerik sınıfı — viewer'daki "İçerik türü" filtresi
-/// (Netfox tarzı: JSON/XML/HTML/Görsel/Metin/Diğer).
+/// Coarse content class based on the response's `Content-Type` — used by the viewer's "Content type"
+/// filter (Netfox-style: JSON/XML/HTML/Image/Text/Other).
 public enum NetworkContentKind: String, CaseIterable, Hashable, Sendable {
     case json, xml, html, image, text, other
 
@@ -10,14 +10,14 @@ public enum NetworkContentKind: String, CaseIterable, Hashable, Sendable {
         case .json: return "JSON"
         case .xml: return "XML"
         case .html: return "HTML"
-        case .image: return "Görsel"
-        case .text: return "Metin"
-        case .other: return "Diğer"
+        case .image: return "Image"
+        case .text: return "Text"
+        case .other: return "Other"
         }
     }
 
-    /// Bir kaydın içerik sınıfı; network kaydı değilse `nil`.
-    /// Yanıt header'ı yakalanmamışsa (veya Content-Type yoksa) `.other` sayılır.
+    /// A record's content class; `nil` if it's not a network record.
+    /// Counted as `.other` if the response header wasn't captured (or there's no Content-Type).
     static func of(_ entry: LogEntry) -> NetworkContentKind? {
         guard entry.category == .network else { return nil }
         let contentType = entry.metadata

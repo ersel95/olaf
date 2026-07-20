@@ -2,8 +2,8 @@
 import SwiftUI
 import UIKit
 
-/// Tek kaydın detayı: renkli status başlığı + gruplu List + alt ekranlara
-/// navigation (header'lar, gövde, cURL, metrikler). `.network` dışı kayıtlar seviye + mesaj + metadata.
+/// Detail for a single entry: colored status header + grouped List + navigation to sub-screens
+/// (headers, body, cURL, metrics). Non-`.network` entries show level + message + metadata.
 struct LogDetailView: View {
     let entry: LogEntry
 
@@ -34,35 +34,35 @@ struct LogDetailView: View {
         .copyToast($didCopy)
     }
 
-    /// Paylaşım menüsü: network için Basit/Tam/cURL, log için tam metin; ayrıca kopyala.
+    /// Share menu: Simple/Full/cURL for network, full text for log; also copy.
     @ViewBuilder
     private var shareMenu: some View {
         Menu {
             if let info = network {
                 Button {
                     share(ShareFormatter.simpleNetworkLog(entry: entry, info: info))
-                } label: { Label("Basit log", systemImage: "doc.text") }
+                } label: { Label("Simple log", systemImage: "doc.text") }
                 Button {
                     share(ShareFormatter.fullNetworkLog(entry: entry, info: info))
-                } label: { Label("Tam log (gövdelerle)", systemImage: "doc.richtext") }
+                } label: { Label("Full log (with bodies)", systemImage: "doc.richtext") }
                 Button {
                     share(CurlBuilder.curl(from: info))
                 } label: { Label("cURL", systemImage: "terminal") }
             } else {
                 Button {
                     share(ShareFormatter.logDetail(entry: entry))
-                } label: { Label("Logu paylaş", systemImage: "doc.text") }
+                } label: { Label("Share log", systemImage: "doc.text") }
             }
             Divider()
             Button {
                 let text = network.map { ShareFormatter.fullNetworkLog(entry: entry, info: $0) }
                     ?? ShareFormatter.logDetail(entry: entry)
                 olafCopy(text, showing: $didCopy)
-            } label: { Label("Panoya kopyala", systemImage: "doc.on.doc") }
+            } label: { Label("Copy to clipboard", systemImage: "doc.on.doc") }
         } label: {
             Image(systemName: "square.and.arrow.up")
         }
-        .accessibilityLabel("Paylaş")
+        .accessibilityLabel("Share")
     }
 
     private func share(_ text: String) {
@@ -81,19 +81,19 @@ struct LogDetailView: View {
             .listRowBackground(Color.clear)
         }
 
-        Section("Özet") {
-            if let method = info.method { kv("Metot", method, mono: true) }
+        Section("Summary") {
+            if let method = info.method { kv("Method", method, mono: true) }
             kv("URL", info.url ?? "-", mono: true)
-            if let status = info.statusCode { kv("Durum", String(status)) }
-            if info.cancelled { kv("Durum", "İptal edildi") }
-            if info.mocked { kv("Kaynak", "Mock (ağa çıkılmadı)") }
-            if let ms = info.durationMs { kv("Süre", "\(ms) ms") }
-            if let b = info.requestBytes { kv("İstek boyutu", Formatting.byteCount(b)) }
-            if let b = info.responseBytes { kv("Yanıt boyutu", Formatting.byteCount(b)) }
+            if let status = info.statusCode { kv("Status", String(status)) }
+            if info.cancelled { kv("Status", "Cancelled") }
+            if info.mocked { kv("Source", "Mock (no network call)") }
+            if let ms = info.durationMs { kv("Duration", "\(ms) ms") }
+            if let b = info.requestBytes { kv("Request size", Formatting.byteCount(b)) }
+            if let b = info.responseBytes { kv("Response size", Formatting.byteCount(b)) }
         }
 
         if let error = info.error {
-            Section("Hata") {
+            Section("Error") {
                 Text(error)
                     .font(.callout)
                     .foregroundStyle(.red)
@@ -101,45 +101,45 @@ struct LogDetailView: View {
                 Button {
                     olafCopy(error, showing: $didCopy)
                 } label: {
-                    Label("Hatayı kopyala", systemImage: "doc.on.doc")
+                    Label("Copy error", systemImage: "doc.on.doc")
                 }
             }
         }
 
-        Section("İstek") {
+        Section("Request") {
             NavigationLink {
-                HeadersListView(title: "İstek Header'ları", headers: info.requestHeaders)
+                HeadersListView(title: "Request Headers", headers: info.requestHeaders)
             } label: {
-                rowLabel("Header'lar", count: info.requestHeaders.count, systemImage: "arrow.up.circle")
+                rowLabel("Headers", count: info.requestHeaders.count, systemImage: "arrow.up.circle")
             }
             .disabled(info.requestHeaders.isEmpty)
 
             if let body = info.requestBody, !body.isEmpty {
                 NavigationLink {
-                    TextViewerView(title: "İstek Gövdesi", rawText: body)
+                    TextViewerView(title: "Request Body", rawText: body)
                 } label: {
-                    rowLabel("Gövdeyi görüntüle", systemImage: "doc.plaintext")
+                    rowLabel("View body", systemImage: "doc.plaintext")
                 }
             }
         }
 
-        Section("Yanıt") {
+        Section("Response") {
             NavigationLink {
-                HeadersListView(title: "Yanıt Header'ları", headers: info.responseHeaders)
+                HeadersListView(title: "Response Headers", headers: info.responseHeaders)
             } label: {
-                rowLabel("Header'lar", count: info.responseHeaders.count, systemImage: "arrow.down.circle")
+                rowLabel("Headers", count: info.responseHeaders.count, systemImage: "arrow.down.circle")
             }
             .disabled(info.responseHeaders.isEmpty)
 
             if let body = info.responseBody, !body.isEmpty {
                 NavigationLink {
-                    TextViewerView(title: "Yanıt Gövdesi", rawText: body)
+                    TextViewerView(title: "Response Body", rawText: body)
                 } label: {
-                    rowLabel("Gövdeyi görüntüle", systemImage: "doc.plaintext")
+                    rowLabel("View body", systemImage: "doc.plaintext")
                 }
             }
 
-            // image/* yanıtlar (sınır altındaysa) doğrudan önizlenir.
+            // image/* responses (if under the size limit) are previewed directly.
             if let imageData = info.responseImageData, let image = UIImage(data: imageData) {
                 HStack {
                     Spacer()
@@ -163,28 +163,28 @@ struct LogDetailView: View {
             Button {
                 isMockEditorPresented = true
             } label: {
-                rowLabel("Mock'a çevir", systemImage: "arrow.triangle.2.circlepath")
+                rowLabel("Convert to Mock", systemImage: "arrow.triangle.2.circlepath")
             }
         } footer: {
-            Text("Mock'a çevir: bu yanıtı düzenleyip kaydedin; eşleşen sonraki istekler ağa çıkmadan sizin yanıtınızı alır.")
+            Text("Convert to Mock: edit and save this response; matching subsequent requests get your response without hitting the network.")
         }
 
         if info.hasTimings {
-            Section("Zamanlama") {
+            Section("Timing") {
                 if let v = info.dnsMs { kv("DNS", "\(v) ms") }
-                if let v = info.connectMs { kv("Bağlantı (TCP)", "\(v) ms") }
+                if let v = info.connectMs { kv("Connect (TCP)", "\(v) ms") }
                 if let v = info.tlsMs { kv("TLS", "\(v) ms") }
-                if let v = info.ttfbMs { kv("İlk byte (TTFB)", "\(v) ms") }
-                if let p = info.protocolName { kv("Protokol", p, mono: true) }
+                if let v = info.ttfbMs { kv("First byte (TTFB)", "\(v) ms") }
+                if let p = info.protocolName { kv("Protocol", p, mono: true) }
                 if let reused = info.reusedConnection {
-                    kv("Bağlantı yeniden kullanıldı", reused ? "Evet" : "Hayır")
+                    kv("Connection reused", reused ? "Yes" : "No")
                 }
             }
         }
 
-        Section("Metrikler") {
+        Section("Metrics") {
             kv("Thread", entry.thread)
-            kv("Zaman", entry.date.formatted(date: .numeric, time: .standard))
+            kv("Time", entry.date.formatted(date: .numeric, time: .standard))
         }
     }
 
@@ -198,14 +198,14 @@ struct LogDetailView: View {
                 .listRowBackground(Color.clear)
         }
 
-        Section("Mesaj") {
+        Section("Message") {
             Text(entry.message).font(.callout.monospaced()).textSelection(.enabled)
         }
 
         if let decodingDetail = entry.metadata["decoding.detail"] {
-            Section("Decode Hatası") {
-                if let path = entry.metadata["decoding.path"] { kv("Alan", path, mono: true) }
-                if let type = entry.metadata["decoding.type"] { kv("Tip", type, mono: true) }
+            Section("Decoding Error") {
+                if let path = entry.metadata["decoding.path"] { kv("Field", path, mono: true) }
+                if let type = entry.metadata["decoding.type"] { kv("Type", type, mono: true) }
                 if let url = entry.metadata["url"] { kv("URL", url, mono: true) }
                 Text(decodingDetail)
                     .font(.callout)
@@ -213,9 +213,9 @@ struct LogDetailView: View {
                     .textSelection(.enabled)
                 if let body = entry.metadata["responseBody"], !body.isEmpty {
                     NavigationLink {
-                        TextViewerView(title: "Yanıt Gövdesi", rawText: body)
+                        TextViewerView(title: "Response Body", rawText: body)
                     } label: {
-                        rowLabel("Gövdeyi görüntüle", systemImage: "doc.plaintext")
+                        rowLabel("View body", systemImage: "doc.plaintext")
                     }
                 }
             }
@@ -229,17 +229,17 @@ struct LogDetailView: View {
             }
         }
 
-        Section("Kaynak") {
-            kv("Dosya", "\(entry.fileName):\(entry.line)", mono: true)
-            kv("Fonksiyon", entry.function, mono: true)
+        Section("Source") {
+            kv("File", "\(entry.fileName):\(entry.line)", mono: true)
+            kv("Function", entry.function, mono: true)
             kv("Thread", entry.thread)
-            kv("Zaman", entry.date.formatted(date: .numeric, time: .standard))
+            kv("Time", entry.date.formatted(date: .numeric, time: .standard))
         }
     }
 
-    // MARK: - Yardımcılar
+    // MARK: - Helpers
 
-    /// "Decode Hatası" bölümünde zaten gösterilen anahtarlar Metadata listesinde tekrarlanmaz.
+    /// Keys already shown in the "Decoding Error" section are not repeated in the Metadata list.
     private var genericMetadata: [(key: String, value: String)] {
         let hasDecodingSection = entry.metadata["decoding.detail"] != nil
         return entry.metadata
@@ -276,12 +276,12 @@ struct LogDetailView: View {
     }
 }
 
-// MARK: - Banner'lar
+// MARK: - Banners
 
-/// Network status başlığı (tam-genişlik renkli banner).
+/// Network status header (full-width colored banner).
 private struct StatusBanner: View {
     let info: NetworkLogInfo
-    /// Sağdaki kopyala butonuna basıldığında tam URL'i panoya kopyalar.
+    /// Copies the full URL to the clipboard when the copy button on the right is tapped.
     var onCopyURL: () -> Void
 
     var body: some View {
@@ -302,7 +302,7 @@ private struct StatusBanner: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("URL'i kopyala")
+            .accessibilityLabel("Copy URL")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -311,7 +311,7 @@ private struct StatusBanner: View {
     }
 }
 
-/// Log seviyesi başlığı.
+/// Log level header.
 private struct LevelBanner: View {
     let level: LogLevel
     let category: LogCategory

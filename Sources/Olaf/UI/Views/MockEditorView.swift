@@ -1,9 +1,9 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// Yakalanmış bir network kaydını **düzenlenebilir mock'a** çevirir: status/gövde/gecikme
-/// değiştirilir ya da taşıma hatası seçilir; kaydedilince eşleşen sonraki istekler ağa
-/// çıkmadan bu yanıtı alır (`OlafNetwork.addMock`).
+/// Converts a captured network entry into an **editable mock**: status/body/delay can be
+/// changed, or a transport error can be chosen; once saved, matching subsequent requests get
+/// this response without hitting the network (`OlafNetwork.addMock`).
 struct MockEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
@@ -23,7 +23,7 @@ struct MockEditorView: View {
         case response, transportError
     }
 
-    /// Sık kullanılan taşıma hataları (mock `.failure` senaryoları).
+    /// Commonly used transport errors (mock `.failure` scenarios).
     private enum TransportErrorChoice: String, CaseIterable, Identifiable {
         case notConnected, timedOut, connectionLost, cannotFindHost
 
@@ -31,10 +31,10 @@ struct MockEditorView: View {
 
         var title: String {
             switch self {
-            case .notConnected: return "İnternet yok"
-            case .timedOut: return "Zaman aşımı"
-            case .connectionLost: return "Bağlantı koptu"
-            case .cannotFindHost: return "Host bulunamadı"
+            case .notConnected: return "No internet"
+            case .timedOut: return "Timed out"
+            case .connectionLost: return "Connection lost"
+            case .cannotFindHost: return "Host not found"
             }
         }
 
@@ -63,49 +63,49 @@ struct MockEditorView: View {
                 responseSection
                 simulationSection
             }
-            .navigationTitle("Mock'a Çevir")
+            .navigationTitle("Convert to Mock")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Vazgeç") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Kaydet") { save() }
+                    Button("Save") { save() }
                         .disabled(!canSave)
                 }
             }
         }
     }
 
-    // MARK: - Bölümler
+    // MARK: - Sections
 
     private var matchSection: some View {
         Section {
-            TextField("URL parçası", text: $urlContains)
+            TextField("URL fragment", text: $urlContains)
                 .font(.callout.monospaced())
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
             if let method = sourceMethod {
-                Toggle("Yalnız \(method.uppercased()) istekleri", isOn: $limitToMethod)
+                Toggle("Only \(method.uppercased()) requests", isOn: $limitToMethod)
             }
         } header: {
-            Text("Eşleşme")
+            Text("Match")
         } footer: {
-            Text("URL'i bu parçayı içeren sonraki istekler ağa çıkmadan mock yanıtı alır.")
+            Text("Subsequent requests whose URL contains this fragment get the mock response without hitting the network.")
         }
     }
 
     private var responseSection: some View {
         Section {
-            Picker("Tür", selection: $mode) {
-                Text("Yanıt").tag(Mode.response)
-                Text("Taşıma hatası").tag(Mode.transportError)
+            Picker("Type", selection: $mode) {
+                Text("Response").tag(Mode.response)
+                Text("Transport error").tag(Mode.transportError)
             }
             .pickerStyle(.segmented)
 
             switch mode {
             case .response:
-                LabeledContent("Durum kodu") {
+                LabeledContent("Status code") {
                     TextField("200", text: $statusText)
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.trailing)
@@ -117,37 +117,37 @@ struct MockEditorView: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
             case .transportError:
-                Picker("Hata", selection: $errorChoice) {
+                Picker("Error", selection: $errorChoice) {
                     ForEach(TransportErrorChoice.allCases) { choice in
                         Text(choice.title).tag(choice)
                     }
                 }
             }
         } header: {
-            Text("Yanıt")
+            Text("Response")
         } footer: {
             if mode == .response {
-                Text("Gövdeyi dilediğiniz gibi düzenleyin; yakalanan yanıt header'ları mock'a taşınır.")
+                Text("Edit the body as you like; the captured response headers are carried over to the mock.")
             } else {
-                Text("HTTP yanıtı yerine seçilen taşıma hatası fırlatılır (offline/timeout senaryoları).")
+                Text("The selected transport error is thrown instead of an HTTP response (offline/timeout scenarios).")
             }
         }
     }
 
     private var simulationSection: some View {
         Section {
-            LabeledContent("Gecikme (sn)") {
+            LabeledContent("Delay (sec)") {
                 TextField("0", text: $delayText)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 90)
             }
         } footer: {
-            Text("Yanıt bu kadar saniye geciktirilir (yavaş ağ simülasyonu); bu sürede istek \"Aktif istekler\" barında görünür.")
+            Text("The response is delayed by this many seconds (slow network simulation); during this time the request appears in the \"Active requests\" bar.")
         }
     }
 
-    // MARK: - Kaydet
+    // MARK: - Save
 
     private var canSave: Bool {
         let pattern = urlContains.trimmingCharacters(in: .whitespacesAndNewlines)

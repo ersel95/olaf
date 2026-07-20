@@ -1,8 +1,8 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// Görünen (filtreli) network kayıtlarının özet istatistikleri: hata oranı, süre dağılımı,
-/// metot/durum kırılımı, en yavaş istekler ve host'lar.
+/// Summary statistics for the visible (filtered) network entries: error rate, duration
+/// distribution, method/status breakdown, slowest requests, and hosts.
 struct NetworkStatsView: View {
 
     let entries: [LogEntry]
@@ -15,19 +15,19 @@ struct NetworkStatsView: View {
             Group {
                 if stats.totalRequests == 0 {
                     ContentUnavailableView(
-                        "Network kaydı yok",
+                        "No network entries",
                         systemImage: "chart.bar",
-                        description: Text("Görünen listede istatistik çıkarılacak network isteği bulunamadı.")
+                        description: Text("No network requests were found in the visible list to compute statistics from.")
                     )
                 } else {
                     statsList
                 }
             }
-            .navigationTitle("İstatistikler")
+            .navigationTitle("Statistics")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Bitti") { dismiss() }
+                    Button("Done") { dismiss() }
                 }
             }
         }
@@ -36,21 +36,21 @@ struct NetworkStatsView: View {
     private var statsList: some View {
         let stats = self.stats
         return List {
-            Section("Özet") {
-                LabeledContent("Toplam istek", value: "\(stats.totalRequests)")
-                LabeledContent("Hata", value: "\(stats.failureCount) (%\(stats.failurePercent))")
+            Section("Summary") {
+                LabeledContent("Total requests", value: "\(stats.totalRequests)")
+                LabeledContent("Errors", value: "\(stats.failureCount) (%\(stats.failurePercent))")
                 if stats.cancelledCount > 0 {
-                    LabeledContent("İptal", value: "\(stats.cancelledCount)")
+                    LabeledContent("Cancelled", value: "\(stats.cancelledCount)")
                 }
-                if let ms = stats.averageDurationMs { LabeledContent("Ortalama süre", value: "\(ms) ms") }
-                if let ms = stats.medianDurationMs { LabeledContent("Medyan süre", value: "\(ms) ms") }
-                if let ms = stats.p95DurationMs { LabeledContent("p95 süre", value: "\(ms) ms") }
-                LabeledContent("İstek boyutu", value: Formatting.byteCount(stats.totalRequestBytes))
-                LabeledContent("Yanıt boyutu", value: Formatting.byteCount(stats.totalResponseBytes))
+                if let ms = stats.averageDurationMs { LabeledContent("Average duration", value: "\(ms) ms") }
+                if let ms = stats.medianDurationMs { LabeledContent("Median duration", value: "\(ms) ms") }
+                if let ms = stats.p95DurationMs { LabeledContent("p95 duration", value: "\(ms) ms") }
+                LabeledContent("Request size", value: Formatting.byteCount(stats.totalRequestBytes))
+                LabeledContent("Response size", value: Formatting.byteCount(stats.totalResponseBytes))
             }
 
             if !stats.statusClassCounts.isEmpty {
-                Section("Durum dağılımı") {
+                Section("Status distribution") {
                     ForEach(stats.statusClassCounts, id: \.name) { item in
                         barRow(name: item.name, count: item.count,
                                maxCount: stats.totalRequests, color: statusColor(item.name))
@@ -59,7 +59,7 @@ struct NetworkStatsView: View {
             }
 
             if !stats.methodCounts.isEmpty {
-                Section("Metotlar") {
+                Section("Methods") {
                     ForEach(stats.methodCounts, id: \.name) { item in
                         barRow(name: item.name, count: item.count,
                                maxCount: stats.methodCounts.first?.count ?? 1, color: .accentColor)
@@ -68,7 +68,7 @@ struct NetworkStatsView: View {
             }
 
             if !stats.slowest.isEmpty {
-                Section("En yavaş istekler") {
+                Section("Slowest requests") {
                     ForEach(Array(stats.slowest.enumerated()), id: \.offset) { _, item in
                         LabeledContent {
                             Text("\(item.durationMs) ms").monospacedDigit()
@@ -83,7 +83,7 @@ struct NetworkStatsView: View {
             }
 
             if !stats.hostCounts.isEmpty {
-                Section("Host'lar") {
+                Section("Hosts") {
                     ForEach(stats.hostCounts, id: \.name) { item in
                         barRow(name: item.name, count: item.count,
                                maxCount: stats.hostCounts.first?.count ?? 1, color: .teal)
@@ -94,7 +94,7 @@ struct NetworkStatsView: View {
         .listStyle(.insetGrouped)
     }
 
-    // MARK: - Yardımcılar
+    // MARK: - Helpers
 
     private func barRow(name: String, count: Int, maxCount: Int, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -124,7 +124,7 @@ struct NetworkStatsView: View {
         case "2xx": return .green
         case "3xx": return .teal
         case "4xx": return .orange
-        case "5xx", "Hata": return .red
+        case "5xx", "Error": return .red
         default: return .gray
         }
     }

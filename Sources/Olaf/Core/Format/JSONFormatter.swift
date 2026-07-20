@@ -1,6 +1,6 @@
 import Foundation
 
-/// Her kaydı tek satır JSON'a (NDJSON) dönüştürür. Export ve gelecekteki remote-sink için.
+/// Converts each entry into single-line JSON (NDJSON). For export and future remote sinks.
 public struct JSONLogFormatter: LogFormatter {
 
     private let encoder: JSONEncoder

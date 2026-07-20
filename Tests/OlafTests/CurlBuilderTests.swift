@@ -29,7 +29,7 @@ final class CurlBuilderTests: XCTestCase {
             "url": "https://a.com",
             "reqH.X-Note": "it's here"
         ]))
-        // Tek tırnak `'\''` ile kaçırılmalı; aksi halde kopyalanan komut shell'de kırılır.
+        // A single quote must be escaped as `'\''`; otherwise the copied command breaks in the shell.
         XCTAssertTrue(curl.contains(#"'X-Note: it'\''s here'"#))
     }
 

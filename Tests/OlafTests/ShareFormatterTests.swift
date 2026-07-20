@@ -28,18 +28,18 @@ final class ShareFormatterTests: XCTestCase {
         let (entry, info) = networkEntry()
         let text = ShareFormatter.simpleNetworkLog(entry: entry, info: info)
         XCTAssertTrue(text.contains("POST https://api.example.com/x"))
-        XCTAssertTrue(text.contains("Durum: 200"))
+        XCTAssertTrue(text.contains("Status: 200"))
         XCTAssertTrue(text.contains("Accept: application/json"))
-        XCTAssertFalse(text.contains("\"ok\":true")) // gövde simple'da yok
+        XCTAssertFalse(text.contains("\"ok\":true")) // body not present in simple
     }
 
     func testFullLogIncludesBodies() {
         let (entry, info) = networkEntry()
         let text = ShareFormatter.fullNetworkLog(entry: entry, info: info)
-        XCTAssertTrue(text.contains("İstek Gövdesi"))
+        XCTAssertTrue(text.contains("Request Body"))
         XCTAssertTrue(text.contains("\"a\":1"))
         XCTAssertTrue(text.contains("\"ok\":true"))
-        // Tam log artık cURL bloğunu da içerir.
+        // Full log now also includes the cURL block.
         XCTAssertTrue(text.contains("-- cURL --"))
         XCTAssertTrue(text.contains("curl -X POST"))
     }
@@ -56,11 +56,11 @@ final class ShareFormatterTests: XCTestCase {
     func testLogDetailForNonNetwork() {
         let entry = LogEntry(
             date: Date(timeIntervalSince1970: 0),
-            level: .warning, category: .auth, message: "uyarı",
+            level: .warning, category: .auth, message: "warning",
             metadata: ["k": "v"], file: "A.swift", line: 9, function: "g()", thread: "main"
         )
         let text = ShareFormatter.logDetail(entry: entry)
-        XCTAssertTrue(text.contains("[WARNING] [auth] uyarı"))
+        XCTAssertTrue(text.contains("[WARNING] [auth] warning"))
         XCTAssertTrue(text.contains("A.swift:9"))
         XCTAssertTrue(text.contains("k: v"))
     }

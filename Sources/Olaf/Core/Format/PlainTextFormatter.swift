@@ -1,7 +1,7 @@
 import Foundation
 
-/// İnsan-okur tek satır biçim:
-/// `HH:mm:ss.SSS [LEVEL] [category] mesaj {k=v} (Dosya.swift:line)`
+/// Human-readable single-line format:
+/// `HH:mm:ss.SSS [LEVEL] [category] message {k=v} (File.swift:line)`
 public struct PlainTextFormatter: LogFormatter {
 
     public var includesMetadata: Bool
@@ -33,7 +33,7 @@ public struct PlainTextFormatter: LogFormatter {
         return line
     }
 
-    /// Sabit, locale-bağımsız zaman biçimi (sıralama ve okuma tutarlılığı için).
+    /// Fixed, locale-independent time format (for consistent sorting and readability).
     public static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

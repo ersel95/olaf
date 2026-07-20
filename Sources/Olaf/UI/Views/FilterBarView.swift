@@ -1,7 +1,7 @@
 #if canImport(UIKit)
 import SwiftUI
 
-/// Kategori chip'leri ile yatay filtre çubuğu. Seçim yoksa "tümü" gösterilir.
+/// Horizontal filter bar with category chips. Shows "all" when nothing is selected.
 struct FilterBarView: View {
     @ObservedObject var model: LogViewerModel
 
