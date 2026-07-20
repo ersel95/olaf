@@ -48,9 +48,11 @@ final class OlafPresenter {
         window.makeKeyAndVisible()
         self.window = window
 
-        let host = UIHostingController(
+        let host = OlafKeyHostingController(
             rootView: OlafViewerView(onClose: { [weak self] in self?.dismiss() })
         )
+        // Esc (donanım klavyesi — simülatörde Mac klavyesi) viewer'ı kapatır.
+        host.onEscape = { [weak self] in self?.dismiss() }
         host.modalPresentationStyle = .fullScreen
         container.present(host, animated: true)
     }
@@ -82,7 +84,9 @@ final class OlafPresenter {
         var top = root
         while let presented = top.presentedViewController { top = presented }
 
-        let host = UIHostingController(rootView: rootView)
+        let host = OlafKeyHostingController(rootView: rootView)
+        // Esc dış aracı kapatır → Olaf viewer'a geri dönülür (viewer'ın kendi Esc'i onu kapatır).
+        host.onEscape = { [weak host] in host?.dismiss(animated: true) }
         host.modalPresentationStyle = .fullScreen
         top.present(host, animated: true)
     }
@@ -92,6 +96,30 @@ final class OlafPresenter {
             .compactMap { $0 as? UIWindowScene }
             .first { $0.activationState == .foregroundActive }
             ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+    }
+}
+
+/// Esc (donanım klavyesi — simülatörde geliştiricinin Mac klavyesi) ile kapatma destekli
+/// hosting controller. `keyCommands` responder zincirinden toplandığı için SwiftUI focus
+/// gerektirmez; Olaf penceresi key olduğu sürece çalışır.
+@MainActor
+private final class OlafKeyHostingController<Content: View>: UIHostingController<Content> {
+
+    var onEscape: (() -> Void)?
+
+    override var keyCommands: [UIKeyCommand]? {
+        let escape = UIKeyCommand(
+            input: UIKeyCommand.inputEscape,
+            modifierFlags: [],
+            action: #selector(handleEscape)
+        )
+        // Sistem davranışları (örn. focus sistemi) Esc'i yutmasın.
+        escape.wantsPriorityOverSystemBehavior = true
+        return [escape]
+    }
+
+    @objc private func handleEscape() {
+        onEscape?()
     }
 }
 #endif

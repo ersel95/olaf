@@ -141,6 +141,16 @@ final class LogStore: @unchecked Sendable {
         }
     }
 
+    /// Diskteki geçmişten bir SAYFA okur (en yeniden geriye; bkz. `FilePersistence.loadEntriesPage`).
+    func loadPersistedPage(before cursor: String?, minimumEntries: Int) async -> PersistedLogPage {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                let page = persistence?.loadEntriesPage(before: cursor, minimumEntries: minimumEntries)
+                continuation.resume(returning: page ?? PersistedLogPage(entries: [], nextCursor: nil))
+            }
+        }
+    }
+
     /// Diskteki kayıtları birleştirip paylaşılabilir .log dosyası üretir (asenkron, bloke etmez).
     func exportFileURL() async -> URL? {
         await withCheckedContinuation { continuation in

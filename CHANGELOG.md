@@ -3,6 +3,15 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
 (0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
 
+## [0.35.0] — 2026-07-20
+### Eklendi
+- **Geçmişte sayfalama**: `Olaf.loadPersistedPage(before:minimumEntries:)` — geçmiş artık tek
+  seferde değil, en yeniden geriye dosya-sınırlı imleçle sayfa sayfa yüklenir. Viewer'da sonsuz
+  kaydırma + "Daha eskileri yükle" satırı; arama/filtrelerin yüklenen kayıtlarda çalıştığı
+  bilgi notu. Sayfalar arasında rotation olsa bile kayıt tekrarı oluşmaz.
+- **Esc ile kapatma**: donanım klavyesi (simülatörde Mac klavyesi) Esc'i viewer'ı kapatır;
+  `presentExternal` ile açılan dış araçta Esc önce aracı kapatıp viewer'a döner.
+
 ## [0.34.0] — 2026-07-20
 ### Eklendi
 - `PrivacyInfo.xcprivacy` — SDK privacy manifest'i (veri toplanmaz, tracking yok; yalnız

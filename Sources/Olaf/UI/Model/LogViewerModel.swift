@@ -42,6 +42,21 @@ public final class LogViewerModel: ObservableObject {
     /// Geçmiş (disk) yüklenirken `true`.
     @Published public private(set) var isLoading: Bool = false
 
+    // MARK: - Geçmişte sayfalama
+    //
+    // Geçmiş artık tek seferde değil sayfa sayfa yüklenir (en yeniden geriye). Filtre/arama
+    // yalnız YÜKLENMİŞ kayıtlarda çalışır; kullanıcı kaydırdıkça (veya butona bastıkça)
+    // daha eski sayfalar listenin sonuna eklenir.
+
+    /// Diskte henüz yüklenmemiş daha eski kayıt var mı?
+    @Published public private(set) var hasMoreHistory: Bool = false
+    /// Daha eski bir sayfa yüklenirken `true` (liste altındaki satır spinner gösterir).
+    @Published public private(set) var isLoadingMore: Bool = false
+    /// Bir sonraki (daha eski) sayfanın imleci.
+    private var historyCursor: String?
+    /// Sayfa başına hedeflenen asgari kayıt sayısı.
+    private static let historyPageSize = 500
+
     // MARK: - Türetilmiş (memoize edilmiş) durum
     //
     // Bunlar eskiden computed property idi → her SwiftUI render'ında tüm liste yeniden
@@ -99,9 +114,13 @@ public final class LogViewerModel: ObservableObject {
 
     /// Kapsama göre kayıtları (yeniden) yükler. Hem oturum (bellek) hem geçmiş (disk) modunda
     /// okuma **asenkron** yapılır → UI/ana thread bloke olmaz (çekirdek kuyruk yoğun olsa bile).
+    /// Geçmişte yalnız İLK sayfa yüklenir; gerisi `loadOlderHistory()` ile gelir.
     public func reload() {
         pendingWhilePaused.removeAll()
         incoming.removeAll()
+        historyCursor = nil
+        hasMoreHistory = false
+        isLoadingMore = false
         switch scope {
         case .session:
             Task { [weak self] in
@@ -112,11 +131,34 @@ public final class LogViewerModel: ObservableObject {
         case .history:
             isLoading = true
             Task { [weak self] in
-                let loaded = await Olaf.loadPersistedEntries()
+                let page = await Olaf.loadPersistedPage(minimumEntries: Self.historyPageSize)
                 guard let self else { return }
-                self.entries = loaded
+                self.entries = page.entries
+                self.historyCursor = page.nextCursor
+                self.hasMoreHistory = page.nextCursor != nil
                 self.isLoading = false
             }
+        }
+    }
+
+    /// Geçmişte bir sonraki (daha eski) sayfayı yükler ve listenin sonuna ekler.
+    /// İdempotent: yükleme sürerken veya imleç yokken çağrılar no-op'tur.
+    public func loadOlderHistory() {
+        guard scope == .history, !isLoading, !isLoadingMore, let cursor = historyCursor else { return }
+        isLoadingMore = true
+        Task { [weak self] in
+            let page = await Olaf.loadPersistedPage(before: cursor, minimumEntries: Self.historyPageSize)
+            guard let self else { return }
+            // Sayfa bu arada reload ile sıfırlandıysa (kapsam değişimi vb.) sonucu uygulama.
+            guard self.scope == .history, self.historyCursor == cursor else {
+                self.isLoadingMore = false
+                return
+            }
+            // `entries` eskiden yeniye tutulur; daha eski sayfa BAŞA eklenir.
+            self.entries.insert(contentsOf: page.entries, at: 0)
+            self.historyCursor = page.nextCursor
+            self.hasMoreHistory = page.nextCursor != nil
+            self.isLoadingMore = false
         }
     }
 

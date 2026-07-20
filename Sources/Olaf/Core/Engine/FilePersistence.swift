@@ -77,17 +77,61 @@ final class FilePersistence: @unchecked Sendable {
     /// Diskteki tüm kayıtları (eskiden yeniye) ayrıştırıp döndürür. Bozuk satırlar atlanır.
     func loadEntries() -> [LogEntry] {
         try? handle?.synchronize()
-        var result: [LogEntry] = []
-        for file in rotatedFilesSortedAscending() + [activeFileURL] {
-            // NDJSON'u Data olarak okuyup `\n` (0x0A) üzerinden böl → her satırı String'e çevirip
-            // tekrar UTF-8'e encode etme (çift dönüşüm) maliyetinden kaçınılır.
-            guard let data = try? Data(contentsOf: file) else { continue }
-            for lineData in data.split(separator: 0x0A, omittingEmptySubsequences: true) {
-                guard let entry = try? decoder.decode(LogEntry.self, from: lineData) else { continue }
-                result.append(entry)
+        return (rotatedFilesSortedAscending() + [activeFileURL]).flatMap(decodeFile)
+    }
+
+    /// Diskteki geçmişi **sayfalı** okur — en yeni dosyalardan geriye doğru. Sayfa birimi dosyadır:
+    /// `minimumEntries`'e ulaşana (veya dosyalar bitene) dek bütün dosyalar eklenir; dosyalar
+    /// bölünmez (bir dosya en fazla `maxFileSize` olduğundan sayfa boyutu sınırlıdır).
+    ///
+    /// İmleç, bir SONRAKİ sayfanın başlayacağı dosyanın adıdır (bu sayfa üretilirken sabitlenir).
+    /// Böylece sayfalar arasında aktif dosya rotate olsa bile kayıt tekrarı oluşmaz: yeni rotate
+    /// edilen dosyalar imleçten daha yeni kaldığından kapsam dışıdır. İmleç dosyası bu arada
+    /// silinmişse (prune) sözlüksel olarak daha eski ilk dosyaya düşülür (dosya adları sabit
+    /// genişlik zaman damgalı → sözlüksel sıra kronolojiktir).
+    func loadEntriesPage(before cursorFileName: String?, minimumEntries: Int) -> PersistedLogPage {
+        try? handle?.synchronize()
+        // En yeniden en eskiye: aktif dosya + rotated'ler (tersten).
+        let files = [activeFileURL] + rotatedFilesSortedAscending().reversed()
+
+        let startIndex: Int
+        if let cursorFileName {
+            if let exact = files.firstIndex(where: { $0.lastPathComponent == cursorFileName }) {
+                startIndex = exact
+            } else {
+                startIndex = files.firstIndex(where: {
+                    $0.lastPathComponent != activeFileName && $0.lastPathComponent < cursorFileName
+                }) ?? files.count
             }
+        } else {
+            startIndex = 0
         }
-        return result
+
+        var consumed: [[LogEntry]] = []
+        var total = 0
+        var index = startIndex
+        while index < files.count, total < max(1, minimumEntries) {
+            let decoded = decodeFile(files[index])
+            consumed.append(decoded)
+            total += decoded.count
+            index += 1
+        }
+
+        return PersistedLogPage(
+            // Dosyalar en yeniden eskiye tüketildi; sayfa içeriği eskiden yeniye döner.
+            entries: consumed.reversed().flatMap { $0 },
+            nextCursor: index < files.count ? files[index].lastPathComponent : nil
+        )
+    }
+
+    /// Tek bir NDJSON dosyasını ayrıştırır (eskiden yeniye). Bozuk satırlar atlanır.
+    /// Data'yı `\n` (0x0A) üzerinden bölmek, satırları String'e çevirip tekrar UTF-8'e encode
+    /// etme (çift dönüşüm) maliyetinden kaçınır.
+    private func decodeFile(_ file: URL) -> [LogEntry] {
+        guard let data = try? Data(contentsOf: file) else { return [] }
+        return data.split(separator: 0x0A, omittingEmptySubsequences: true).compactMap {
+            try? decoder.decode(LogEntry.self, from: $0)
+        }
     }
 
     // MARK: - Temizleme & export

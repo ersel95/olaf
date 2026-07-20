@@ -18,7 +18,7 @@
 |---|---|---|
 | **0 — İskelet** | SPM, model'ler | ✅ |
 | **1 — Core motor** | Ring buffer, NDJSON disk persistans + oturumlar arası geçmiş, OSLog köprüsü, facade | ✅ |
-| **2 — Viewer (OlafUI)** | Shake → SwiftUI düz metin viewer, **Oturum/Geçmiş** kapsamı, filtre/arama/paylaşım, canlı akış | ✅ |
+| **2 — Viewer (OlafUI)** | Shake → SwiftUI düz metin viewer, **Oturum/Geçmiş** kapsamı (geçmiş sayfalı — sonsuz kaydırma), filtre/arama/paylaşım, canlı akış, simülatörde **Esc ile kapatma** | ✅ |
 | **3 — Araç köprüleri** | Jenerik `ExternalToolBridge` + `presentExternal`; host kendi dış tanılama aracını viewer'a buton olarak ekleyebilir, shake sahipliği devri (app tarafı: `INTEGRATION.md` / `AGENTS.md`) | ✅ |
 | **N — Network capture (OlafNetwork)** | Opsiyonel URLProtocol; istek/yanıt `.network` kategorisinde, ham → app+network tek listede | ✅ |
 | **5 — UX & paylaşım** | Detay görünümü (status banner, pretty-JSON gövde), paylaşım (Basit/Tam log + cURL), kopyalama toast, start öncesi log tamponlama, oturum bazlı geçmiş | ✅ |
@@ -27,7 +27,7 @@
 ## Kurulum (SPM)
 
 ```swift
-.package(url: "https://github.com/ersel95/olaf.git", from: "0.34.0")
+.package(url: "https://github.com/ersel95/olaf.git", from: "0.35.0")
 ```
 Tek ürün: `Olaf` — motor (`Olaf` facade) + network capture (`OlafNetwork`) + viewer (`OlafUI`) birlikte gelir.
 

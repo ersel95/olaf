@@ -167,9 +167,23 @@ public enum Olaf {
 
     /// Diskteki tüm kayıtlar — **önceki oturumlar dahil** (ring buffer kapasitesinden bağımsız).
     /// Ağır dosya I/O arka planda yapılır; çağıran (ör. ana thread) bloke olmaz.
+    /// Büyük geçmişlerde tamamını belleğe almamak için `loadPersistedPage(before:minimumEntries:)`
+    /// ile sayfalı okuma tercih edin (viewer bunu kullanır).
     public static func loadPersistedEntries() async -> [LogEntry] {
         guard let store = runtime.store else { return [] }
         return await store.loadPersisted()
+    }
+
+    /// Diskteki geçmişi **sayfalı** okur — en yeniden geriye doğru. İlk sayfa için `before: nil`;
+    /// sonraki (daha eski) sayfa için önceki sayfanın `nextCursor`'ını verin. `nextCursor == nil`
+    /// geçmişin sonu demektir. Sayfa, en az `minimumEntries` kayıt içerene dek bütün NDJSON
+    /// dosyalarından oluşur (dosyalar bölünmez).
+    public static func loadPersistedPage(
+        before cursor: String? = nil,
+        minimumEntries: Int = 500
+    ) async -> PersistedLogPage {
+        guard let store = runtime.store else { return PersistedLogPage(entries: [], nextCursor: nil) }
+        return await store.loadPersistedPage(before: cursor, minimumEntries: minimumEntries)
     }
 
     /// Yeni kayıtları canlı yayınlayan akış.

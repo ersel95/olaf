@@ -79,11 +79,11 @@ public struct OlafViewerView: View {
         }
     }
 
-    /// Geçmiş — önceki oturumlara göre gruplanmış (her oturum bir bölüm).
+    /// Geçmiş — önceki oturumlara göre gruplanmış (her oturum bir bölüm), sayfalı.
     @ViewBuilder
     private var historyList: some View {
         let sessions = model.sessionGroups
-        if sessions.isEmpty {
+        if sessions.isEmpty && !model.hasMoreHistory {
             ContentUnavailableView("Geçmiş oturum yok", systemImage: "clock.arrow.circlepath", description: Text("Önceki oturumlardan log bulunamadı."))
                 .frame(maxHeight: .infinity)
         } else {
@@ -97,9 +97,37 @@ public struct OlafViewerView: View {
                         sessionHeader(session)
                     }
                 }
+                if model.hasMoreHistory {
+                    loadMoreSection
+                }
             }
             .listStyle(.insetGrouped)
             .navigationDestination(for: LogEntry.self) { LogDetailView(entry: $0) }
+        }
+    }
+
+    /// Liste sonunda görününce otomatik daha eski sayfayı yükler (sonsuz kaydırma);
+    /// buton, otomatik tetikleme kaçarsa el ile devam imkânı verir.
+    private var loadMoreSection: some View {
+        Section {
+            Button {
+                model.loadOlderHistory()
+            } label: {
+                HStack {
+                    Spacer()
+                    if model.isLoadingMore {
+                        ProgressView()
+                    } else {
+                        Label("Daha eskileri yükle", systemImage: "arrow.down.circle")
+                    }
+                    Spacer()
+                }
+            }
+            .disabled(model.isLoadingMore)
+            .onAppear { model.loadOlderHistory() }
+        } footer: {
+            Text("Arama ve filtreler yalnız yüklenen kayıtlarda çalışır.")
+                .font(.caption2)
         }
     }
 
