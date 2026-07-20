@@ -173,9 +173,28 @@ struct LogDetailView: View {
             Text(entry.message).font(.callout.monospaced()).textSelection(.enabled)
         }
 
-        if !entry.metadata.isEmpty {
+        if let decodingDetail = entry.metadata["decoding.detail"] {
+            Section("Decode Hatası") {
+                if let path = entry.metadata["decoding.path"] { kv("Alan", path, mono: true) }
+                if let type = entry.metadata["decoding.type"] { kv("Tip", type, mono: true) }
+                if let url = entry.metadata["url"] { kv("URL", url, mono: true) }
+                Text(decodingDetail)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                if let body = entry.metadata["responseBody"], !body.isEmpty {
+                    NavigationLink {
+                        TextViewerView(title: "Yanıt Gövdesi", rawText: body)
+                    } label: {
+                        rowLabel("Gövdeyi görüntüle", systemImage: "doc.plaintext")
+                    }
+                }
+            }
+        }
+
+        if !genericMetadata.isEmpty {
             Section("Metadata") {
-                ForEach(entry.metadata.sorted { $0.key < $1.key }, id: \.key) { key, value in
+                ForEach(genericMetadata, id: \.key) { key, value in
                     kv(key, value, mono: true)
                 }
             }
@@ -190,6 +209,18 @@ struct LogDetailView: View {
     }
 
     // MARK: - Yardımcılar
+
+    /// "Decode Hatası" bölümünde zaten gösterilen anahtarlar Metadata listesinde tekrarlanmaz.
+    private var genericMetadata: [(key: String, value: String)] {
+        let hasDecodingSection = entry.metadata["decoding.detail"] != nil
+        return entry.metadata
+            .filter { key, _ in
+                guard hasDecodingSection else { return true }
+                return !key.hasPrefix("decoding.") && key != "responseBody" && key != "url"
+            }
+            .sorted { $0.key < $1.key }
+            .map { (key: $0.key, value: $0.value) }
+    }
 
     @ViewBuilder
     private func kv(_ key: String, _ value: String, mono: Bool = false) -> some View {

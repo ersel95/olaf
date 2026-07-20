@@ -30,4 +30,6 @@ public struct LogCategory: RawRepresentable, Hashable, Sendable, Codable, Expres
     public static let navigation: LogCategory = "navigation"
     /// Sistemin OSLog deposundan içe aktarılan kayıtlar (`Olaf.importOSLogEntries`).
     public static let oslog: LogCategory = "oslog"
+    /// Codable decode hataları (`Olaf.logDecodingError` / `OlafDecoding.decode`).
+    public static let decoding: LogCategory = "decoding"
 }

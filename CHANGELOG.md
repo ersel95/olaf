@@ -3,6 +3,13 @@
 Biçim [Keep a Changelog](https://keepachangelog.com/tr/) esinlidir; sürümleme SemVer'dir
 (0.x — API henüz stabil değildir). Daha eski sürümler için git tag geçmişine bakın.
 
+## [0.39.0] — 2026-07-20
+### Eklendi
+- **Decode hatası yakalama**: `OlafDecoding.decode(_:from:url:)` (JSONDecoder sarmalayıcısı,
+  hatayı aynen fırlatır) ve `Olaf.logDecodingError(_:url:data:typeName:)` — hatalı alanın tam
+  yolu (`user.accounts[0].iban`) çıkarılır, ham gövdeyle birlikte `.decoding` kategorisine
+  loglanır; detay ekranında "Decode Hatası" bölümü.
+
 ## [0.38.0] — 2026-07-20
 ### Eklendi
 - **Postman Collection export** (⋯ → Paylaş → "Postman Collection"): görünen network
