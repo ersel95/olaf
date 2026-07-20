@@ -101,8 +101,16 @@ dahil) maskelenmeden saklanır. `includedURLs`/`excludedURLs` ile **baseURL filt
 önceliklidir; filtre dışı istekler hiç yakalanmaz.
 
 - **JSON gövdeler** otomatik **pretty-print + syntax renklendirme** ile gösterilir (detay → "Gövdeyi görüntüle").
+- **Aktif istekler**: devam eden (henüz yanıt almamış) istekler viewer'ın üstünde geçen süresiyle canlı görünür — asılı kalan çağrıyı anında yakalarsınız.
+- **Zamanlama kırılımı**: her istekte DNS / TCP / TLS / TTFB süreleri, protokol (h2/h3) ve bağlantının yeniden kullanılıp kullanılmadığı detay ekranındaki "Zamanlama" bölümünde ("API mi yavaş, ağ mı?").
 - Belirli bir config'e manuel enjeksiyon için `install(into:)` (gelişmiş) de var.
-- **Yalnız non-prod debug** içindir (trust kabulü + gövde loglama) — PROD'da çalıştırmayın.
+- **Yalnız non-prod debug** içindir (gövde/header loglama) — PROD'da çalıştırmayın.
+
+#### Bilinen sınırlar (URLProtocol tabanlı yakalamanın doğası)
+- **WebSocket** (`URLSessionWebSocketTask`) ve **background session** trafiği yakalanmaz (URLSession bu trafiği URLProtocol'e yönlendirmez).
+- `uploadTask(fromFile:)` / upload stream gövdeleri yakalanmaz; `httpBody`/`httpBodyStream` gövdeleri yakalanır (stream tamamen RAM'e okunur — çok büyük upload'larda `capturesBodies: false` önerilir).
+- Host session'ın **session-seviyesi ayarları** (`waitsForConnectivity`, `allowsCellularAccess` vb.) proxy'ye taşınmaz; isteğin kendi `timeoutInterval`'ı korunur. Çerezler paylaşılan `HTTPCookieStorage` üzerinden korunur.
+- Host **özel cert pinning** uyguluyorsa proxy o trafiği geçiremeyebilir (proxy host'un trust delegate'ini paylaşmaz; sistem doğrulaması uygulanır — güvenli ve bilinçli davranış).
 
 - **Adım adım entegrasyon:** [`INTEGRATION.md`](INTEGRATION.md)
 - **AI agent için makine-takipli talimat:** [`AGENTS.md`](AGENTS.md)

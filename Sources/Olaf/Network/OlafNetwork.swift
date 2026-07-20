@@ -83,6 +83,12 @@ public enum OlafNetwork {
     /// Manuel enjeksiyon için protokol sınıfı.
     public static var protocolClass: AnyClass { OlafURLProtocol.self }
 
+    /// Şu an devam eden (henüz tamamlanmamış) yakalamalar — en eski üstte.
+    /// Viewer "Aktif istekler" bölümü bunu periyodik okur; asılı kalan istekler burada görünür.
+    public static var pendingRequests: [PendingNetworkRequest] {
+        PendingRequestRegistry.shared.snapshot
+    }
+
     // Dahili erişim (URLProtocol config'i okur).
     static var current: OlafNetworkConfiguration { box.value }
 

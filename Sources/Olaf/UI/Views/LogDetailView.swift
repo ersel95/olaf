@@ -140,6 +140,19 @@ struct LogDetailView: View {
             }
         }
 
+        if info.hasTimings {
+            Section("Zamanlama") {
+                if let v = info.dnsMs { kv("DNS", "\(v) ms") }
+                if let v = info.connectMs { kv("Bağlantı (TCP)", "\(v) ms") }
+                if let v = info.tlsMs { kv("TLS", "\(v) ms") }
+                if let v = info.ttfbMs { kv("İlk byte (TTFB)", "\(v) ms") }
+                if let p = info.protocolName { kv("Protokol", p, mono: true) }
+                if let reused = info.reusedConnection {
+                    kv("Bağlantı yeniden kullanıldı", reused ? "Evet" : "Hayır")
+                }
+            }
+        }
+
         Section("Metrikler") {
             kv("Thread", entry.thread)
             kv("Zaman", entry.date.formatted(date: .numeric, time: .standard))

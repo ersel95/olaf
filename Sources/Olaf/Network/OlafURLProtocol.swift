@@ -18,6 +18,10 @@ final class OlafURLProtocol: URLProtocol {
     /// `request.httpBody` çoğu zaman `nil`'dir; gövde `startLoading`'de buraya yakalanır.
     private var capturedRequestBody: Data?
     private var startDate = Date()
+    /// "Aktif istekler" kaydının kimliği; tamamlanınca (başarı/hata/iptal) düşürülür.
+    private var pendingID: UUID?
+    /// Proxy task'ın zamanlama metrikleri (`didFinishCollecting` — `didComplete`'ten önce gelir).
+    private var capturedMetrics: URLSessionTaskMetrics?
 
     /// `stopLoading` sonrası istemciye çağrı yapılmaz (URL loading sistemi protokolü bıraktı).
     /// `stopLoading` istemci kuyruğundan, proxy callback'leri delegate kuyruğundan gelir → kilit.
@@ -67,6 +71,10 @@ final class OlafURLProtocol: URLProtocol {
             }
         }
 
+        pendingID = PendingRequestRegistry.shared.register(
+            method: request.httpMethod ?? "GET",
+            url: request.url?.absoluteString ?? "-"
+        )
         proxyTask = OlafProxySession.shared.startTask(with: mutable as URLRequest, handler: self)
     }
 
@@ -99,7 +107,14 @@ final class OlafURLProtocol: URLProtocol {
         client?.urlProtocol(self, wasRedirectedTo: newRequest, redirectResponse: response)
     }
 
+    func proxyDidCollect(_ metrics: URLSessionTaskMetrics) {
+        capturedMetrics = metrics
+    }
+
     func proxyDidComplete(error: Error?) {
+        if let pendingID {
+            PendingRequestRegistry.shared.unregister(pendingID)
+        }
         if !isStopped {
             if let error {
                 client?.urlProtocol(self, didFailWithError: error)
@@ -125,7 +140,8 @@ final class OlafURLProtocol: URLProtocol {
             requestBody: capturedRequestBody ?? request.httpBody,
             responseBody: responseData,
             requestHeaders: request.allHTTPHeaderFields,
-            responseHeaders: (capturedResponse as? HTTPURLResponse)?.allHeaderFields as? [String: String]
+            responseHeaders: (capturedResponse as? HTTPURLResponse)?.allHeaderFields as? [String: String],
+            timing: Self.timing(from: capturedMetrics)
         )
         OlafProxySession.logQueue.async {
             Self.log(completion)
@@ -148,6 +164,25 @@ final class OlafURLProtocol: URLProtocol {
         let responseBody: Data?
         let requestHeaders: [String: String]?
         let responseHeaders: [String: String]?
+        let timing: NetworkTimingMetrics?
+    }
+
+    /// Task metriklerinden zamanlama kırılımı çıkarır. Redirect'li isteklerde SON transaction
+    /// (nihai kaynak) esas alınır. Yeniden kullanılan bağlantıda DNS/connect/TLS boş kalır.
+    private static func timing(from metrics: URLSessionTaskMetrics?) -> NetworkTimingMetrics? {
+        guard let transaction = metrics?.transactionMetrics.last else { return nil }
+        func ms(_ start: Date?, _ end: Date?) -> Int? {
+            guard let start, let end else { return nil }
+            return Int(end.timeIntervalSince(start) * 1000)
+        }
+        return NetworkTimingMetrics(
+            dnsMs: ms(transaction.domainLookupStartDate, transaction.domainLookupEndDate),
+            connectMs: ms(transaction.connectStartDate, transaction.connectEndDate),
+            tlsMs: ms(transaction.secureConnectionStartDate, transaction.secureConnectionEndDate),
+            ttfbMs: ms(transaction.requestStartDate, transaction.responseStartDate),
+            protocolName: transaction.networkProtocolName,
+            reusedConnection: transaction.isReusedConnection
+        )
     }
 
     private static func log(_ completion: CaptureCompletion) {
@@ -163,7 +198,8 @@ final class OlafURLProtocol: URLProtocol {
             error: completion.errorDescription,
             requestBody: nil,
             responseBody: nil,
-            cancelled: completion.cancelled
+            cancelled: completion.cancelled,
+            timing: completion.timing
         )
 
         if config.capturesBodies {
@@ -341,6 +377,10 @@ extension OlafProxySession: URLSessionDataDelegate {
             return
         }
         completionHandler(.performDefaultHandling, nil)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        handler(for: task)?.proxyDidCollect(metrics)
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

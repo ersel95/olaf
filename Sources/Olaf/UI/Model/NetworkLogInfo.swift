@@ -17,6 +17,20 @@ struct NetworkLogInfo {
     let requestHeaders: [(key: String, value: String)]
     let responseHeaders: [(key: String, value: String)]
 
+    // Zamanlama kırılımı (`t.` öneki — NetworkLogComposer ile hizalı; toplanamadıysa nil).
+    let dnsMs: Int?
+    let connectMs: Int?
+    let tlsMs: Int?
+    let ttfbMs: Int?
+    let protocolName: String?
+    let reusedConnection: Bool?
+
+    /// Detayda "Zamanlama" bölümü gösterilecek mi?
+    var hasTimings: Bool {
+        dnsMs != nil || connectMs != nil || tlsMs != nil || ttfbMs != nil
+            || protocolName != nil || reusedConnection != nil
+    }
+
     init?(entry: LogEntry) {
         guard entry.category == .network else { return nil }
         let m = entry.metadata
@@ -38,6 +52,12 @@ struct NetworkLogInfo {
             .filter { $0.key.hasPrefix("respH.") }
             .map { (String($0.key.dropFirst(6)), $0.value) }
             .sorted { $0.0 < $1.0 }
+        dnsMs = m["t.dnsMs"].flatMap(Int.init)
+        connectMs = m["t.connectMs"].flatMap(Int.init)
+        tlsMs = m["t.tlsMs"].flatMap(Int.init)
+        ttfbMs = m["t.ttfbMs"].flatMap(Int.init)
+        protocolName = m["t.protocol"]
+        reusedConnection = m["t.reused"].map { $0 == "true" }
     }
 
     /// URL'in path (+ query) kısmı; satırda kısa gösterim için.

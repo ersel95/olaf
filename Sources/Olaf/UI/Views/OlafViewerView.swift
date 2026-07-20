@@ -18,6 +18,9 @@ public struct OlafViewerView: View {
             VStack(spacing: 0) {
                 scopePicker
                 FilterBarView(model: model)
+                if model.scope == .session {
+                    PendingRequestsBar()
+                }
                 Divider()
                 logList
             }
