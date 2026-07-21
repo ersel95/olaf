@@ -74,6 +74,10 @@ public final class LogViewerModel: ObservableObject {
     /// Filtered entries, sorted newest first.
     @Published public private(set) var filteredEntries: [LogEntry] = []
 
+    /// Decode errors folded under their network entry (list shows a badge on the
+    /// network row instead of one row per decode error; detail lists them all).
+    @Published private(set) var decodeIndex: DecodeAttachmentIndex = .empty
+
     /// Session groups for history entries — **excluding the current session** (shown in the "Session" tab).
     @Published public private(set) var sessionGroups: [LogSession] = []
 
@@ -89,15 +93,22 @@ public final class LogViewerModel: ObservableObject {
             .assign(to: &$effectiveQuery)
 
         // Values derived from inputs: computed only when an input changes (not per render).
+        // The decode index is built in the same pass as the filter so the two published
+        // values can never disagree (a row hidden by one but not badged by the other).
         let categorySelection = Publishers.CombineLatest($selectedCategories, $selectedContentKinds)
-        Publishers.CombineLatest4($entries, $effectiveQuery, $enabledLevels, categorySelection)
-            .map { entries, query, levels, selection in
-                Self.filter(
+        let derived = Publishers.CombineLatest4($entries, $effectiveQuery, $enabledLevels, categorySelection)
+            .map { entries, query, levels, selection -> (filtered: [LogEntry], index: DecodeAttachmentIndex) in
+                let index = DecodeAttachmentIndex.build(from: entries)
+                let filtered = Self.filter(
                     entries: entries, query: query, levels: levels,
-                    categories: selection.0, contentKinds: selection.1
+                    categories: selection.0, contentKinds: selection.1,
+                    decodeIndex: index
                 )
+                return (filtered, index)
             }
-            .assign(to: &$filteredEntries)
+            .share()
+        derived.map(\.filtered).assign(to: &$filteredEntries)
+        derived.map(\.index).assign(to: &$decodeIndex)
 
         $filteredEntries
             .map { Self.groupSessions($0, excluding: Olaf.currentSessionID) }
@@ -229,27 +240,43 @@ public final class LogViewerModel: ObservableObject {
     }
 
     /// Level/category/content-type/search filter — newest first.
+    ///
+    /// Decode entries attached to a network entry are never listed as rows; their
+    /// network entry answers for them instead: it matches the `.decoding` category
+    /// chip, the `.error` level filter, and search queries that hit an attached
+    /// entry — so folding never makes a decode failure unfindable.
     nonisolated static func filter(
         entries: [LogEntry],
         query: String,   // already trim+lowercase (from the debounce pipeline)
         levels: Set<LogLevel>,
         categories: Set<LogCategory>,
-        contentKinds: Set<NetworkContentKind> = []
+        contentKinds: Set<NetworkContentKind> = [],
+        decodeIndex: DecodeAttachmentIndex = .empty
     ) -> [LogEntry] {
         entries.reversed().filter { entry in
-            if !levels.isEmpty, !levels.contains(entry.level) { return false }
-            if !categories.isEmpty, !categories.contains(entry.category) { return false }
+            if decodeIndex.attachedIDs.contains(entry.id) { return false }
+            let attachedErrors = decodeIndex.errors(for: entry)
+            if !levels.isEmpty, !levels.contains(entry.level) {
+                guard !attachedErrors.isEmpty, levels.contains(.error) else { return false }
+            }
+            if !categories.isEmpty, !categories.contains(entry.category) {
+                guard !attachedErrors.isEmpty, categories.contains(.decoding) else { return false }
+            }
             if !contentKinds.isEmpty {
                 guard let kind = NetworkContentKind.of(entry), contentKinds.contains(kind) else {
                     return false
                 }
             }
             guard !query.isEmpty else { return true }
-            if entry.message.lowercased().contains(query) { return true }
-            if entry.category.rawValue.lowercased().contains(query) { return true }
-            return entry.metadata.contains { key, value in
-                key.lowercased().contains(query) || value.lowercased().contains(query)
-            }
+            return matchesQuery(entry, query) || attachedErrors.contains { matchesQuery($0, query) }
+        }
+    }
+
+    nonisolated private static func matchesQuery(_ entry: LogEntry, _ query: String) -> Bool {
+        if entry.message.lowercased().contains(query) { return true }
+        if entry.category.rawValue.lowercased().contains(query) { return true }
+        return entry.metadata.contains { key, value in
+            key.lowercased().contains(query) || value.lowercased().contains(query)
         }
     }
 

@@ -88,14 +88,16 @@ public struct OlafViewerView: View {
                 }
                 Section {
                     ForEach(entries) { entry in
-                        NavigationLink(value: entry) { LogRowView(entry: entry) }
+                        NavigationLink(value: entry) { logRow(entry) }
                             .contextMenu { pinButton(entry) }
                     }
                 }
             }
             .listStyle(.plain)
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
-            .navigationDestination(for: LogEntry.self) { LogDetailView(entry: $0) }
+            .navigationDestination(for: LogEntry.self) { entry in
+                LogDetailView(entry: entry, decodeErrors: model.decodeIndex.errors(for: entry))
+            }
             .safeAreaInset(edge: .bottom) {
                 if isSelecting { selectionBar }
             }
@@ -106,13 +108,18 @@ public struct OlafViewerView: View {
     private var pinnedSection: some View {
         Section {
             ForEach(model.pinnedEntries) { entry in
-                NavigationLink(value: entry) { LogRowView(entry: entry) }
+                NavigationLink(value: entry) { logRow(entry) }
                     .contextMenu { pinButton(entry) }
             }
         } header: {
             Label("Pinned", systemImage: "pin.fill")
                 .font(.caption)
         }
+    }
+
+    /// Row with the folded decode-error badge (count comes from the shared index).
+    private func logRow(_ entry: LogEntry) -> some View {
+        LogRowView(entry: entry, decodeErrorCount: model.decodeIndex.errors(for: entry).count)
     }
 
     private func pinButton(_ entry: LogEntry) -> some View {
@@ -166,7 +173,7 @@ public struct OlafViewerView: View {
                 ForEach(sessions) { session in
                     Section {
                         ForEach(session.entries) { entry in
-                            NavigationLink(value: entry) { LogRowView(entry: entry) }
+                            NavigationLink(value: entry) { logRow(entry) }
                         }
                     } header: {
                         sessionHeader(session)
@@ -177,7 +184,9 @@ public struct OlafViewerView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationDestination(for: LogEntry.self) { LogDetailView(entry: $0) }
+            .navigationDestination(for: LogEntry.self) { entry in
+                LogDetailView(entry: entry, decodeErrors: model.decodeIndex.errors(for: entry))
+            }
         }
     }
 

@@ -5,10 +5,13 @@ import SwiftUI
 /// render as a level-colored log row.
 struct LogRowView: View {
     let entry: LogEntry
+    /// Decode errors folded under this network entry (badge only; details live
+    /// in the network detail screen). Always 0 for non-network entries.
+    var decodeErrorCount: Int = 0
 
     var body: some View {
         if let network = NetworkLogInfo(entry: entry) {
-            NetworkRow(info: network, date: entry.date)
+            NetworkRow(info: network, date: entry.date, decodeErrorCount: decodeErrorCount)
         } else {
             LogMessageRow(entry: entry)
         }
@@ -20,6 +23,7 @@ struct LogRowView: View {
 private struct NetworkRow: View {
     let info: NetworkLogInfo
     let date: Date
+    var decodeErrorCount: Int = 0
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -32,6 +36,9 @@ private struct NetworkRow: View {
                         .font(.subheadline.monospaced())
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    if decodeErrorCount > 0 {
+                        DecodeBadge(count: decodeErrorCount)
+                    }
                 }
                 HStack(spacing: 8) {
                     if !info.host.isEmpty {

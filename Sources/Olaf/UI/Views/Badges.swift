@@ -46,6 +46,22 @@ struct MethodBadge: View {
     }
 }
 
+/// Badge on a network row whose response decoded with errors (the decode
+/// entries themselves are folded into the network detail, not listed as rows).
+struct DecodeBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text(count > 1 ? "DECODE ×\(count)" : "DECODE")
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(Color.orange, in: Capsule())
+            .accessibilityLabel("\(count) decoding errors")
+    }
+}
+
 /// Colored dot on the left for the log level.
 struct LevelDot: View {
     let level: LogLevel

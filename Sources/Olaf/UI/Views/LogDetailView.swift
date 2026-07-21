@@ -6,6 +6,9 @@ import UIKit
 /// (headers, body, cURL, metrics). Non-`.network` entries show level + message + metadata.
 struct LogDetailView: View {
     let entry: LogEntry
+    /// Decode errors folded under this network entry (badge on the list row;
+    /// full list rendered here). Empty for non-network entries.
+    var decodeErrors: [LogEntry] = []
 
     @State private var didCopy = false
     @State private var isMockEditorPresented = false
@@ -13,6 +16,7 @@ struct LogDetailView: View {
     // Collapsible network sections: Summary starts collapsed, the rest start expanded.
     @State private var isSummaryExpanded = false
     @State private var isErrorExpanded = true
+    @State private var isDecodingExpanded = true
     @State private var isRequestExpanded = true
     @State private var isResponseExpanded = true
     @State private var isTimingExpanded = true
@@ -110,6 +114,18 @@ struct LogDetailView: View {
                     olafCopy(error, showing: $didCopy)
                 } label: {
                     Label("Copy error", systemImage: "doc.on.doc")
+                }
+            }
+        }
+
+        if !decodeErrors.isEmpty {
+            collapsibleSection("Decoding Errors (\(decodeErrors.count))", isExpanded: $isDecodingExpanded) {
+                ForEach(decodeErrors) { error in
+                    NavigationLink {
+                        LogDetailView(entry: error)
+                    } label: {
+                        DecodeErrorRow(entry: error)
+                    }
                 }
             }
         }
@@ -315,6 +331,49 @@ struct LogDetailView: View {
                 Text("\(count)").foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+// MARK: - Decode error row
+
+/// Compact summary of one folded decode error: failing field path + short detail.
+/// Reads both the rich channel keys (`decoding.*`) and the `RequiredField`
+/// context keys (`key` / `path` / `kind`), whichever the entry carries.
+private struct DecodeErrorRow: View {
+    let entry: LogEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(fieldPath)
+                .font(.callout.monospaced())
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+        }
+        .padding(.vertical, 1)
+    }
+
+    private var fieldPath: String {
+        if let path = entry.metadata["decoding.path"] { return path }
+        let key = entry.metadata["key"]
+        let path = entry.metadata["path"]
+        switch (path, key) {
+        case (let path?, let key?) where path != "root": return "\(path) -> \(key)"
+        case (_, let key?): return key
+        case (let path?, _): return path
+        default: return entry.message
+        }
+    }
+
+    private var detail: String {
+        entry.metadata["decoding.detail"]
+            ?? entry.metadata["kind"].map { kind in
+                kind == "RequiredField.missing" ? "Required field missing" : kind
+            }
+            ?? entry.message
     }
 }
 
