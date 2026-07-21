@@ -114,7 +114,8 @@ enum HARExporter {
         }
     }
 
-    private static let timestampFormatter: ISO8601DateFormatter = {
+    /// `ISO8601DateFormatter` is documented as thread-safe; it just lacks a `Sendable` annotation.
+    nonisolated(unsafe) private static let timestampFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter

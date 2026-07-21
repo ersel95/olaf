@@ -38,6 +38,10 @@ struct NetworkLogInfo {
     init?(entry: LogEntry) {
         guard entry.category == .network else { return nil }
         let m = entry.metadata
+        // Only entries produced by the capture pipeline parse as network rows (the composer always
+        // writes "url"). Message-only entries the host logs into the `.network` category fall back
+        // to the standard message row — otherwise they'd render as blank network rows.
+        guard m["url"] != nil else { return nil }
         method = m["method"]
         url = m["url"]
         statusCode = m["status"].flatMap(Int.init)

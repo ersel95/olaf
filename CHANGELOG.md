@@ -3,6 +3,17 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.46.0] — 2026-07-21
+### Fixed
+- **Blank network rows**: entries logged into the `.network` category without capture metadata
+  (e.g. a host error bridge writing message-only entries) rendered as empty network rows — gray
+  `•••` pill, default "GET" badge, no URL, and the actual message hidden. `NetworkLogInfo` now
+  requires the `url` metadata key (always written by the capture pipeline); everything else falls
+  back to the standard message row, so host-logged entries stay readable.
+- **Zero-warning build**: `HARExporter.timestampFormatter` marked `nonisolated(unsafe)`
+  (`ISO8601DateFormatter` is documented as thread-safe) — silences the Swift 6 concurrency
+  warning in the iOS build.
+
 ## [0.45.0] — 2026-07-21
 ### Changed
 - **Collapsible header rows**: on the Request/Response Headers screens each row is now a

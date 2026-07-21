@@ -65,11 +65,20 @@ final class NetworkLogInfoTests: XCTestCase {
     }
 
     func testFailureDetection() {
-        let notFound = NetworkLogInfo(entry: networkEntry(metadata: ["status": "404"]))
+        let notFound = NetworkLogInfo(entry: networkEntry(metadata: ["url": "https://a.com", "status": "404"]))
         XCTAssertEqual(notFound?.isFailure, true)
-        let failed = NetworkLogInfo(entry: networkEntry(metadata: ["error": "timeout"]))
+        let failed = NetworkLogInfo(entry: networkEntry(metadata: ["url": "https://a.com", "error": "timeout"]))
         XCTAssertEqual(failed?.isFailure, true)
-        let ok = NetworkLogInfo(entry: networkEntry(metadata: ["status": "200"]))
+        let ok = NetworkLogInfo(entry: networkEntry(metadata: ["url": "https://a.com", "status": "200"]))
         XCTAssertEqual(ok?.isFailure, false)
+    }
+
+    func testNetworkCategoryWithoutURLMetadataReturnsNil() {
+        // A host may log message-only entries into the `.network` category (e.g. an error bridge).
+        // Those must NOT parse as network rows — they'd render blank (no URL/status/duration).
+        let info = NetworkLogInfo(entry: networkEntry(metadata: [
+            "errorType": "RequiredFieldError", "errorDetail": "missingRequiredField(\"iban\")"
+        ]))
+        XCTAssertNil(info)
     }
 }
