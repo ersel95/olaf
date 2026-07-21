@@ -70,7 +70,7 @@ https://github.com/ersel95/olaf.git
 or in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/ersel95/olaf.git", from: "0.44.0")
+.package(url: "https://github.com/ersel95/olaf.git", from: "0.45.0")
 ```
 
 Single product: `Olaf` — engine + network capture + viewer, one `import Olaf`.

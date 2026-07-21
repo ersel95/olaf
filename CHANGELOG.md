@@ -3,6 +3,15 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.45.0] — 2026-07-21
+### Changed
+- **Collapsible header rows**: on the Request/Response Headers screens each row is now a
+  disclosure — collapsed by default with a single-line value preview, expanded to the full
+  selectable value.
+- **Collapsible detail sections**: the titled sections of the network detail view (Summary,
+  Error, Request, Response, Timing, Metrics) can be collapsed/expanded by tapping the section
+  header. Summary starts collapsed; all other sections start expanded.
+
 ## [0.44.0] — 2026-07-20
 ### Changed
 - **Full English localization**: all Turkish content — code comments, viewer UI strings, log

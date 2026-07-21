@@ -10,6 +10,14 @@ struct LogDetailView: View {
     @State private var didCopy = false
     @State private var isMockEditorPresented = false
 
+    // Collapsible network sections: Summary starts collapsed, the rest start expanded.
+    @State private var isSummaryExpanded = false
+    @State private var isErrorExpanded = true
+    @State private var isRequestExpanded = true
+    @State private var isResponseExpanded = true
+    @State private var isTimingExpanded = true
+    @State private var isMetricsExpanded = true
+
     private var network: NetworkLogInfo? { NetworkLogInfo(entry: entry) }
 
     var body: some View {
@@ -81,7 +89,7 @@ struct LogDetailView: View {
             .listRowBackground(Color.clear)
         }
 
-        Section("Summary") {
+        collapsibleSection("Summary", isExpanded: $isSummaryExpanded) {
             if let method = info.method { kv("Method", method, mono: true) }
             kv("URL", info.url ?? "-", mono: true)
             if let status = info.statusCode { kv("Status", String(status)) }
@@ -93,7 +101,7 @@ struct LogDetailView: View {
         }
 
         if let error = info.error {
-            Section("Error") {
+            collapsibleSection("Error", isExpanded: $isErrorExpanded) {
                 Text(error)
                     .font(.callout)
                     .foregroundStyle(.red)
@@ -106,7 +114,7 @@ struct LogDetailView: View {
             }
         }
 
-        Section("Request") {
+        collapsibleSection("Request", isExpanded: $isRequestExpanded) {
             NavigationLink {
                 HeadersListView(title: "Request Headers", headers: info.requestHeaders)
             } label: {
@@ -123,7 +131,7 @@ struct LogDetailView: View {
             }
         }
 
-        Section("Response") {
+        collapsibleSection("Response", isExpanded: $isResponseExpanded) {
             NavigationLink {
                 HeadersListView(title: "Response Headers", headers: info.responseHeaders)
             } label: {
@@ -170,7 +178,7 @@ struct LogDetailView: View {
         }
 
         if info.hasTimings {
-            Section("Timing") {
+            collapsibleSection("Timing", isExpanded: $isTimingExpanded) {
                 if let v = info.dnsMs { kv("DNS", "\(v) ms") }
                 if let v = info.connectMs { kv("Connect (TCP)", "\(v) ms") }
                 if let v = info.tlsMs { kv("TLS", "\(v) ms") }
@@ -182,7 +190,7 @@ struct LogDetailView: View {
             }
         }
 
-        Section("Metrics") {
+        collapsibleSection("Metrics", isExpanded: $isMetricsExpanded) {
             kv("Thread", entry.thread)
             kv("Time", entry.date.formatted(date: .numeric, time: .standard))
         }
@@ -238,6 +246,40 @@ struct LogDetailView: View {
     }
 
     // MARK: - Helpers
+
+    /// Section with a tappable header that expands/collapses its content.
+    /// `Section(isExpanded:)` only collapses in the sidebar list style, so the
+    /// chevron + conditional content are done by hand for `.insetGrouped`.
+    @ViewBuilder
+    private func collapsibleSection<Content: View>(
+        _ title: String,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        Section {
+            if isExpanded.wrappedValue {
+                content()
+            }
+        } header: {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.wrappedValue.toggle()
+                }
+            } label: {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(title)
+            .accessibilityValue(isExpanded.wrappedValue ? "Expanded" : "Collapsed")
+        }
+    }
 
     /// Keys already shown in the "Decoding Error" section are not repeated in the Metadata list.
     private var genericMetadata: [(key: String, value: String)] {
