@@ -38,6 +38,7 @@ public final class LogViewerModel: ObservableObject {
 
     private var pendingWhilePaused: [LogEntry] = []
     private var streamTask: Task<Void, Never>?
+    private var cancellables = Set<AnyCancellable>()
 
     /// Live-stream coalescing buffer: incoming entries aren't appended to `entries` one at a
     /// time (each append triggers an `@Published` emission → a full SwiftUI diff + recomputing
@@ -118,6 +119,20 @@ public final class LogViewerModel: ObservableObject {
             .map { Self.categories(in: $0) }
             .removeDuplicates()
             .assign(to: &$availableCategories)
+
+        // Default filter: the viewer opens with the network category preselected — but only
+        // when network entries actually exist, because the chip bar only renders seen
+        // categories: preselecting an unseen one would blank the list behind an invisible,
+        // chipless filter. Applied once, on the first non-empty load, and never over a
+        // selection the user already made.
+        $entries
+            .filter { !$0.isEmpty }
+            .first()
+            .sink { [weak self] entries in
+                guard let self, self.selectedCategories.isEmpty else { return }
+                self.selectedCategories = Self.defaultCategorySelection(for: entries)
+            }
+            .store(in: &cancellables)
     }
 
     deinit { streamTask?.cancel() }
@@ -296,6 +311,12 @@ public final class LogViewerModel: ObservableObject {
                 return LogSession(id: id, startDate: start, entries: items)
             }
             .sorted { $0.startDate > $1.startDate }
+    }
+
+    /// Initial category selection for a fresh viewer: `.network` preselected when network
+    /// entries exist, nothing otherwise (all categories shown).
+    nonisolated static func defaultCategorySelection(for entries: [LogEntry]) -> Set<LogCategory> {
+        entries.contains { $0.category == .network } ? [.network] : []
     }
 
     /// Categories seen in the entries (sorted by name, deduplicated).

@@ -65,6 +65,15 @@ final class ViewerDerivationTests: XCTestCase {
         ]
         XCTAssertEqual(LogViewerModel.categories(in: entries), [.auth, .network])
     }
+
+    func testDefaultCategorySelectionPreselectsNetworkOnlyWhenPresent() {
+        let withNetwork = [makeEntry("a", category: .auth), makeEntry("b", category: .network)]
+        XCTAssertEqual(LogViewerModel.defaultCategorySelection(for: withNetwork), [.network])
+
+        // No network entries → no preselection (an unseen category has no chip to untoggle).
+        let withoutNetwork = [makeEntry("a", category: .auth), makeEntry("b", category: .general)]
+        XCTAssertEqual(LogViewerModel.defaultCategorySelection(for: withoutNetwork), [])
+    }
 }
 
 /// NDJSON export — a format identical to the on-disk schema, readable back losslessly.

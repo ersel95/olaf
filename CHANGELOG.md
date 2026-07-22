@@ -3,6 +3,13 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.50.0] — 2026-07-22
+### Changed
+- **Network filter on by default**: the viewer now opens with the `network` category chip
+  preselected — applied once, on the first non-empty load, and only when network entries
+  actually exist (preselecting an unseen category would blank the list behind a chipless,
+  invisible filter). A selection the user already made is never overridden.
+
 ## [0.49.0] — 2026-07-22
 ### Changed
 - **Search keeps JSON blocks whole**: searching in the body/cURL text viewer used to show only
