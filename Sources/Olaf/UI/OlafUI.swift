@@ -34,6 +34,20 @@ public enum OlafUI {
         ExternalToolRegistry.shared.removeAll()
     }
 
+    /// Registers a handler for taps on the Olaf logo in the viewer's navigation bar.
+    ///
+    /// When a handler is set, the logo becomes a button: tapping it closes the viewer and invokes
+    /// the handler **after** the viewer has fully closed, so it is safe to present another
+    /// diagnostics tool from the handler. Useful when Olaf is installed alongside another
+    /// shake-activated tool: shake opens Olaf first, and the logo hands off to the other tool.
+    /// Pass `nil` to remove the handler (the logo becomes a plain image again).
+    @MainActor
+    public static func onLogoTap(_ handler: (() -> Void)?) {
+        #if canImport(UIKit)
+        OlafPresenter.shared.logoTapHandler = handler
+        #endif
+    }
+
     /// Opens the viewer programmatically.
     @MainActor
     public static func present() {

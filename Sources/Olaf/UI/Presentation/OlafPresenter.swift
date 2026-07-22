@@ -12,6 +12,10 @@ final class OlafPresenter {
     private var window: UIWindow?
     private var shakeObserver: NSObjectProtocol?
 
+    /// Handler for taps on the navigation-bar Olaf logo, set via `OlafUI.onLogoTap(_:)`.
+    /// When nil the logo is a plain image. Invoked AFTER the viewer has fully closed.
+    var logoTapHandler: (() -> Void)?
+
     private init() {}
 
     var isPresented: Bool { window != nil }

@@ -3,6 +3,20 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.48.0] — 2026-07-22
+### Added
+- **Logo-tap handoff** (`OlafUI.onLogoTap(_:)`): when the host registers a handler, the Olaf
+  logo in the viewer's navigation bar becomes a button — tapping it closes the viewer and
+  invokes the handler **after** the dismiss animation completes. Designed for hosts that
+  install Olaf alongside another shake-activated diagnostics tool: shake opens Olaf first,
+  and the logo hands off to the other tool safely. Pass `nil` to remove the handler.
+
+## [0.47.0] — 2026-07-21
+### Added
+- **Decoding errors folded into the network row**: decode failures reported via
+  `DecodingErrorReporter` now attach to their originating network request — a `DECODE` badge
+  on the list row and a "Decoding Errors" section in the network detail view.
+
 ## [0.46.0] — 2026-07-21
 ### Fixed
 - **Blank network rows**: entries logged into the `.network` category without capture metadata

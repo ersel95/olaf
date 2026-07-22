@@ -250,3 +250,22 @@ OlafUI.register(SomeToolBridge())
 ```
 For embeddable SwiftUI tools, use `OlafUI.presentExternal { SomeView() }`; for self-presenting UIKit tools, use
 `OlafUI.dismiss()` + the tool's own `show()`.
+
+### Handing off via the navigation-bar logo
+If Olaf is installed alongside **another shake-activated tool**, Olaf's shake window wins and
+opens first. Register a logo-tap handler so the user can hop over to the other tool from
+inside the viewer:
+
+```swift
+Task { @MainActor in
+    OlafUI.onLogoTap {
+        // Runs AFTER the Olaf viewer has fully closed (dismiss animation included),
+        // so presenting the other tool here is safe.
+        SomeOtherTool.show()
+    }
+}
+```
+
+When a handler is registered, the Olaf logo in the navigation bar becomes a button:
+tap → viewer closes → handler runs. Pass `nil` to remove the handler (the logo becomes a
+plain image again).

@@ -41,6 +41,11 @@ public final class OlafManager {
 
         Task { @MainActor in
             OlafUI.install()
+
+            // ADAPT (optional): if another shake-activated tool is installed alongside Olaf,
+            // Olaf opens first on shake. Register a logo-tap handler to hand off: tapping the
+            // navigation-bar logo closes Olaf fully, THEN runs this callback.
+            // OlafUI.onLogoTap { SomeOtherTool.show() }
         }
         #endif
     }

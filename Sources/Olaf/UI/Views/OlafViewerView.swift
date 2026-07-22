@@ -233,12 +233,7 @@ public struct OlafViewerView: View {
             Button("Close") { onClose() }
         }
         ToolbarItem(placement: .principal) {
-            Image("OlafLogo", bundle: .module)
-                .resizable()
-                .scaledToFit()
-                .frame(height: 28)
-                .foregroundStyle(.primary)
-                .accessibilityLabel("Olaf")
+            logoItem
         }
         ToolbarItem(placement: .topBarTrailing) {
             Button {
@@ -271,6 +266,30 @@ public struct OlafViewerView: View {
                     Image(systemName: "ellipsis.circle")
                 }
             }
+        }
+    }
+
+    /// The logo in the navigation bar. If the host registered a handler via `OlafUI.onLogoTap(_:)`,
+    /// it becomes a button: tap → viewer fully closes → handler runs (e.g. hand off to another
+    /// shake-activated tool). Otherwise it stays a plain image.
+    @ViewBuilder
+    private var logoItem: some View {
+        let logo = Image("OlafLogo", bundle: .module)
+            .resizable()
+            .scaledToFit()
+            .frame(height: 28)
+            .foregroundStyle(.primary)
+        if let handler = OlafPresenter.shared.logoTapHandler {
+            Button {
+                OlafPresenter.shared.dismiss(completion: handler)
+            } label: {
+                logo
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Olaf — switch tool")
+        } else {
+            logo
+                .accessibilityLabel("Olaf")
         }
     }
 

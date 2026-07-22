@@ -37,7 +37,7 @@
 - [x] **Decoding-error capture** — logs the exact failing field path (`user.accounts[0].iban`) next to the raw body
 - [x] **Statistics** — error rate, avg/median/p95 durations, status & method distribution, slowest requests
 - [x] **Export anywhere** — `.log`, raw NDJSON, **HAR 1.2** (Charles/Proxyman/DevTools), **Postman Collection v2.1**
-- [x] **Bridges** — swift-log backend template, OSLog import, generic `ExternalToolBridge` for your own tools
+- [x] **Bridges** — swift-log backend template, OSLog import, generic `ExternalToolBridge` for your own tools; `OlafUI.onLogoTap` hands off to another shake-activated tool via the nav-bar logo
 - [x] **History across launches** — NDJSON persistence with rotation, retention, and file protection
 
 ## Quick Start
