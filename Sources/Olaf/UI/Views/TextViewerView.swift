@@ -16,9 +16,10 @@ struct TextViewerView: View {
         Formatting.isJSON(rawText) ? Formatting.prettyJSON(rawText) : rawText
     }
 
-    /// Highlighted if JSON, plain text otherwise.
+    /// Highlighted if JSON, plain text otherwise. Keyed to `display`, not `filtered`:
+    /// a search result may start mid-document (e.g. `"key" : {`) and still deserves colors.
     private var bodyText: Text {
-        Formatting.looksLikeJSON(filtered)
+        Formatting.looksLikeJSON(display)
             ? Text(JSONHighlighter.attributed(filtered))
             : Text(filtered)
     }
@@ -26,6 +27,9 @@ struct TextViewerView: View {
     private var filtered: String {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return display }
+        if Formatting.looksLikeJSON(display) {
+            return Formatting.searchKeepingJSONBlocks(display, query: q) ?? "(no matches)"
+        }
         let lines = display
             .split(separator: "\n", omittingEmptySubsequences: false)
             .filter { $0.range(of: q, options: .caseInsensitive) != nil }

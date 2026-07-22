@@ -3,6 +3,14 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.49.0] — 2026-07-22
+### Changed
+- **Search keeps JSON blocks whole**: searching in the body/cURL text viewer used to show only
+  the matching lines, so a hit on a key whose value is an object rendered as a meaningless
+  `"key" : {` line. When the match opens an object/array, the entire block down to its matching
+  close is now shown; disjoint results are separated with `⋯`, and search results keep JSON
+  syntax highlighting.
+
 ## [0.48.0] — 2026-07-22
 ### Added
 - **Logo-tap handoff** (`OlafUI.onLogoTap(_:)`): when the host registers a handler, the Olaf
