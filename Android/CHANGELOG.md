@@ -4,6 +4,24 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.7.0] — 2026-07-23
+### Added
+- **Timber bridge template** (`Integration/OlafTimberTree.kt`): plant it next to `DebugTree` and
+  every existing `Timber` call — including those from libraries — lands in the viewer, with the
+  Timber tag as the category. The counterpart of the iOS package's swift-log handler, and the
+  reason no call site has to change. Olaf itself keeps no Timber dependency; the tree is a
+  drop-in file.
+- **`OlafDecoding.decode`**: wraps a parse, logs the failure with its field path, and rethrows it
+  untouched. Parser-agnostic — it takes a lambda, so Gson, Moshi and kotlinx.serialization all work
+  without Olaf depending on any of them.
+- **`OlafViewer` composable**: the viewer embeddable in an existing screen (a developer-settings
+  page, say) instead of being presented as its own activity.
+- **DECODE badge** on the list row of a request whose response failed to decode — without it, a
+  folded decode error was only discoverable by opening the detail.
+- **Collapsible header rows**: a long value (`set-cookie`, bearer token) shows a one-line preview
+  and expands on tap, so fifty headers stay navigable.
+- **Copy confirmation** via snackbar, since the platform only shows its own on Android 13+.
+
 ## [0.6.0] — 2026-07-23
 ### Added
 - **JSON syntax highlighting** in bodies and in the cURL block, regex-based rather than

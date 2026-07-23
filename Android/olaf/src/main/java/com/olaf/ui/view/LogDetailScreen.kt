@@ -19,9 +19,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
@@ -57,9 +62,18 @@ internal fun LogDetailScreen(
 ) {
     val context = LocalContext.current
     val network = remember(entry.id) { NetworkLogInfo.from(entry) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     var fullScreenText by remember { mutableStateOf<Pair<String, String>?>(null) }
     var isMockEditorOpen by remember { mutableStateOf(false) }
+
+    // Copy confirmation: the platform only shows one of its own on Android 13+, so the viewer
+    // provides it everywhere the library runs.
+    fun copy(label: String, text: String) {
+        copyToClipboard(context, label, text)
+        coroutineScope.launch { snackbarHostState.showSnackbar("$label copied") }
+    }
 
     fullScreenText?.let { (title, text) ->
         TextViewerScreen(title = title, rawText = text, onBack = { fullScreenText = null })
@@ -87,14 +101,13 @@ internal fun LogDetailScreen(
                     if (network != null) {
                         TextButton(onClick = { isMockEditorOpen = true }) { Text("Mock") }
                     }
-                    IconButton(onClick = {
-                        copyToClipboard(context, "Olaf log", entry.toShareText())
-                    }) {
+                    IconButton(onClick = { copy("Entry", entry.toShareText()) }) {
                         Icon(OlafIcons.Share, contentDescription = "Copy")
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -143,9 +156,7 @@ internal fun LogDetailScreen(
                     Section(title = "cURL", initiallyExpanded = false) {
                         val command = remember(network) { CurlBuilder.curl(network) }
                         CodeBlock(command) { fullScreenText = "cURL" to command }
-                        TextButton(onClick = { copyToClipboard(context, "cURL", command) }) {
-                            Text("Copy cURL")
-                        }
+                        TextButton(onClick = { copy("cURL", command) }) { Text("Copy cURL") }
                     }
                 }
             } else {
@@ -186,7 +197,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.networkSections(
     }
 
     if (info.requestHeaders.isNotEmpty()) {
-        item { Section(title = "Request headers") { info.requestHeaders.forEach { KeyValue(it.first, it.second) } } }
+        item {
+            Section(title = "Request headers (${info.requestHeaders.size})") {
+                info.requestHeaders.forEach { HeaderRow(it.first, it.second) }
+            }
+        }
     }
 
     info.requestBody?.let { body ->
@@ -198,7 +213,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.networkSections(
     }
 
     if (info.responseHeaders.isNotEmpty()) {
-        item { Section(title = "Response headers") { info.responseHeaders.forEach { KeyValue(it.first, it.second) } } }
+        item {
+            Section(title = "Response headers (${info.responseHeaders.size})") {
+                info.responseHeaders.forEach { HeaderRow(it.first, it.second) }
+            }
+        }
     }
 
     info.responseImageBytes?.let { bytes ->
@@ -293,6 +312,42 @@ private fun Section(
     }
     HorizontalDivider()
 }
+
+/**
+ * One header, collapsed to a single-line preview. A `set-cookie` or a bearer token can run for
+ * hundreds of characters, and expanding them all at once buries the rest of the response.
+ */
+@Composable
+private fun HeaderRow(name: String, value: String) {
+    var expanded by remember(name, value) { mutableStateOf(false) }
+    val isLong = value.length > HEADER_PREVIEW_LIMIT
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = isLong) { expanded = !expanded }
+    ) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (expanded || !isLong) {
+            SelectableValue(value)
+        } else {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+private const val HEADER_PREVIEW_LIMIT = 60
 
 @Composable
 private fun KeyValue(key: String, value: String) {

@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
     `maven-publish`
 }
 
@@ -31,10 +32,15 @@ android {
 
 dependencies {
     // OkHttp so the no-op can hand back a real (pass-through) Interceptor, and coroutines so
-    // `Olaf.stream()` keeps its `Flow` signature. Compose is deliberately absent — there is no
-    // viewer here, which is the whole point of the release variant.
+    // `Olaf.stream()` keeps its `Flow` signature.
     api(libs.okhttp)
     implementation(libs.coroutines.core)
+
+    // `compileOnly`: the embeddable `OlafViewer` composable has to keep its signature, but the
+    // release artifact must not drag Compose in — a host that calls it already has Compose, and
+    // one that doesn't never loads the class.
+    compileOnly(platform(libs.compose.bom))
+    compileOnly(libs.compose.runtime)
 }
 
 publishing {

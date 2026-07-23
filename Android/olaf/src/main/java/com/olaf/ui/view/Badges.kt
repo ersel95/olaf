@@ -61,6 +61,24 @@ internal fun MockBadge(modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * Marks a network row whose response failed to decode. The decode entries themselves are folded
+ * into the detail screen rather than listed separately, so this badge is what makes them visible
+ * in the list at all.
+ */
+@Composable
+internal fun DecodeBadge(count: Int, modifier: Modifier = Modifier) {
+    Text(
+        text = if (count > 1) "DECODE ×$count" else "DECODE",
+        color = Color.White,
+        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.labelSmall,
+        modifier = modifier
+            .background(OlafColors.Orange, RoundedCornerShape(50))
+            .padding(horizontal = 6.dp, vertical = 1.dp)
+    )
+}
+
 /** The level dot shown at the leading edge of a plain log row. */
 @Composable
 internal fun LevelDot(level: LogLevel, modifier: Modifier = Modifier) {

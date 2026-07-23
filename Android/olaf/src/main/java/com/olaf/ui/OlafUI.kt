@@ -2,9 +2,23 @@ package com.olaf.ui
 
 import android.app.Application
 import android.content.Context
+import androidx.compose.runtime.Composable
 import com.olaf.ui.bridge.ExternalToolBridge
 import com.olaf.ui.bridge.ExternalToolRegistry
 import com.olaf.ui.presentation.OlafPresenter
+import com.olaf.ui.view.OlafViewerScreen
+
+/**
+ * The viewer as a plain composable, for hosts that would rather embed it — in a developer-settings
+ * screen, say — than have it presented as its own activity.
+ *
+ * [OlafUI.install] and [OlafUI.present] remain the usual path; this is the escape hatch when the
+ * viewer needs to live inside an existing navigation graph.
+ */
+@Composable
+fun OlafViewer(onClose: () -> Unit = {}) {
+    OlafViewerScreen(onClose = onClose)
+}
 
 /**
  * Facade for the viewer: shake-to-open setup, external tool registration and programmatic

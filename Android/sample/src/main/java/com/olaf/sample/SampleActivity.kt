@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.olaf.LogCategory
 import com.olaf.Olaf
+import com.olaf.OlafDecoding
 import com.olaf.network.OlafMockResponse
 import com.olaf.network.OlafNetwork
 import com.olaf.network.installOlaf
@@ -126,6 +127,24 @@ private fun SampleScreen(client: OkHttpClient) {
             },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Remove mocks") }
+
+        OutlinedButton(
+            onClick = {
+                // OlafDecoding logs the failure with its field path, then rethrows untouched.
+                runCatching {
+                    OlafDecoding.decode(
+                        url = "https://postman-echo.com/get",
+                        body = """{"iban": 42}""",
+                        typeName = "Account"
+                    ) {
+                        throw IllegalStateException(
+                            "Expected a string but was NUMBER at path \$.iban"
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Simulate a decoding error") }
 
         OutlinedButton(
             onClick = {

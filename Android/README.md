@@ -40,6 +40,7 @@
 - [x] **Export anywhere** — `.log`, raw NDJSON, **HAR 1.2** (Charles/Proxyman/DevTools),
       **Postman Collection v2.1**
 - [x] **History across launches** — NDJSON persistence with rotation and retention
+- [x] **Timber bridge** — plant one tree and every existing `Timber` call flows into the viewer
 - [x] **Zero footprint in release** — the `olaf-no-op` artifact keeps the API but strips everything
 
 ## Quick start
@@ -49,8 +50,8 @@
 // `./gradlew publishToMavenLocal` and add mavenLocal() to your repositories.
 
 // build.gradle.kts
-debugImplementation("com.github.ersel95.olaf:olaf:0.6.0")
-releaseImplementation("com.github.ersel95.olaf:olaf-no-op:0.6.0")
+debugImplementation("com.github.ersel95.olaf:olaf:0.7.0")
+releaseImplementation("com.github.ersel95.olaf:olaf-no-op:0.7.0")
 ```
 
 ```kotlin

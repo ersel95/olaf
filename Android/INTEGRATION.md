@@ -15,7 +15,7 @@ Olaf ships **two artifacts**, wired the same way Chucker is:
 ```kotlin
 // gradle/libs.versions.toml
 [versions]
-olaf = "0.6.0"
+olaf = "0.7.0"
 
 [libraries]
 olaf = { module = "com.github.ersel95.olaf:olaf", version.ref = "olaf" }
@@ -128,6 +128,20 @@ OlafManager.error(throwable, LogCategory.Payment)
 Migrate `Log.d` / `Timber` calls over incrementally. Call-site information (file, line, function) is
 captured automatically.
 
+### Already using Timber? Bridge it instead of migrating
+
+Copy [`Integration/OlafTimberTree.kt`](Integration/OlafTimberTree.kt) and plant it next to your
+debug tree:
+
+```kotlin
+Timber.plant(Timber.DebugTree())   // Logcat keeps working
+Timber.plant(OlafTimberTree())     // …and the same lines land in the viewer
+```
+
+Every `Timber` call in the app — and in any library that logs through Timber — now shows up in
+Olaf, with the Timber tag as the category. This is the counterpart of the iOS package's swift-log
+handler, and it means no call site has to change at all.
+
 ### Screen breadcrumbs
 
 From your navigation observer:
@@ -142,17 +156,21 @@ OlafManager.trackScreen("paymentSheet", kind = "sheet")
 Wherever you parse a response, report the failure with the body that caused it:
 
 ```kotlin
-try {
+val accounts = OlafDecoding.decode(
+    url = response.request.url.toString(),
+    body = body,
+    typeName = "AccountsResponse"
+) {
     gson.fromJson(body, AccountsResponse::class.java)
-} catch (error: Throwable) {
-    OlafManager.logDecodingError(
-        error,
-        url = response.request.url.toString(),
-        body = body,
-        typeName = "AccountsResponse"
-    )
-    throw error
 }
+```
+
+`OlafDecoding.decode` logs the failure and rethrows it untouched, so behaviour is unchanged — and
+because it takes a lambda it works with Gson, Moshi or kotlinx.serialization alike. Reporting it
+manually works too:
+
+```kotlin
+OlafManager.logDecodingError(error, url = url, body = body, typeName = "AccountsResponse")
 ```
 
 The failing field path (`$.accounts[0].iban`) is lifted out of the Gson/Moshi message, and the entry

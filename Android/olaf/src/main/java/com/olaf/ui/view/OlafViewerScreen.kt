@@ -297,6 +297,7 @@ internal fun OlafViewerScreen(
                     pinnedIds = pinnedIds,
                     isSelecting = isSelecting,
                     selectedIds = selectedIds,
+                    decodeErrorCount = { decodeIndex.errors(it).size },
                     onSelect = { entry ->
                         if (isSelecting) {
                             selectedIds = if (entry.id in selectedIds) {
@@ -388,6 +389,7 @@ private fun SessionList(
     pinnedIds: Set<String>,
     isSelecting: Boolean,
     selectedIds: Set<String>,
+    decodeErrorCount: (LogEntry) -> Int,
     onSelect: (LogEntry) -> Unit,
     onTogglePin: (LogEntry) -> Unit
 ) {
@@ -395,13 +397,13 @@ private fun SessionList(
         if (pinned.isNotEmpty() && !isSelecting) {
             item(key = "pinned-header") { SectionHeader("Pinned") }
             items(pinned, key = { "pinned-${it.id}" }) { entry ->
-                EntryRow(entry, pinnedIds, isSelecting, selectedIds, onSelect, onTogglePin)
+                EntryRow(entry, pinnedIds, isSelecting, selectedIds, decodeErrorCount(entry), onSelect, onTogglePin)
             }
             item(key = "pinned-divider") { HorizontalDivider() }
         }
 
         items(entries, key = { it.id }) { entry ->
-            EntryRow(entry, pinnedIds, isSelecting, selectedIds, onSelect, onTogglePin)
+            EntryRow(entry, pinnedIds, isSelecting, selectedIds, decodeErrorCount(entry), onSelect, onTogglePin)
             HorizontalDivider()
         }
     }
@@ -413,6 +415,7 @@ private fun EntryRow(
     pinnedIds: Set<String>,
     isSelecting: Boolean,
     selectedIds: Set<String>,
+    decodeErrorCount: Int,
     onSelect: (LogEntry) -> Unit,
     onTogglePin: (LogEntry) -> Unit
 ) {
@@ -425,6 +428,7 @@ private fun EntryRow(
         }
         LogRow(
             entry = entry,
+            decodeErrorCount = decodeErrorCount,
             modifier = Modifier
                 .weight(1f)
                 .clickable { onSelect(entry) }

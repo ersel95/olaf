@@ -25,17 +25,27 @@ import com.olaf.ui.util.Formatting
  * as a level-coloured message row.
  */
 @Composable
-internal fun LogRow(entry: LogEntry, modifier: Modifier = Modifier) {
+internal fun LogRow(
+    entry: LogEntry,
+    modifier: Modifier = Modifier,
+    /** Decode failures folded under this row; always 0 for non-network entries. */
+    decodeErrorCount: Int = 0
+) {
     val network = remember(entry.id) { NetworkLogInfo.from(entry) }
     if (network != null) {
-        NetworkRow(info = network, entry = entry, modifier = modifier)
+        NetworkRow(info = network, entry = entry, decodeErrorCount = decodeErrorCount, modifier = modifier)
     } else {
         LogMessageRow(entry = entry, modifier = modifier)
     }
 }
 
 @Composable
-private fun NetworkRow(info: NetworkLogInfo, entry: LogEntry, modifier: Modifier = Modifier) {
+private fun NetworkRow(
+    info: NetworkLogInfo,
+    entry: LogEntry,
+    decodeErrorCount: Int,
+    modifier: Modifier = Modifier
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -58,6 +68,7 @@ private fun NetworkRow(info: NetworkLogInfo, entry: LogEntry, modifier: Modifier
                     overflow = TextOverflow.MiddleEllipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
+                if (decodeErrorCount > 0) DecodeBadge(decodeErrorCount)
                 if (info.mocked) MockBadge()
             }
 
