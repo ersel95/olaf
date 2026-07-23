@@ -22,9 +22,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +58,22 @@ internal fun LogDetailScreen(
     val context = LocalContext.current
     val network = remember(entry.id) { NetworkLogInfo.from(entry) }
 
+    var fullScreenText by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var isMockEditorOpen by remember { mutableStateOf(false) }
+
+    fullScreenText?.let { (title, text) ->
+        TextViewerScreen(title = title, rawText = text, onBack = { fullScreenText = null })
+        return
+    }
+
+    if (isMockEditorOpen && network != null) {
+        MockEditorSheet(
+            info = network,
+            onDismiss = { isMockEditorOpen = false },
+            onSaved = { isMockEditorOpen = false }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -62,6 +84,9 @@ internal fun LogDetailScreen(
                     }
                 },
                 actions = {
+                    if (network != null) {
+                        TextButton(onClick = { isMockEditorOpen = true }) { Text("Mock") }
+                    }
                     IconButton(onClick = {
                         copyToClipboard(context, "Olaf log", entry.toShareText())
                     }) {
@@ -113,11 +138,11 @@ internal fun LogDetailScreen(
             }
 
             if (network != null) {
-                networkSections(network)
+                networkSections(network) { title, text -> fullScreenText = title to text }
                 item {
-                    Section(title = "cURL") {
+                    Section(title = "cURL", initiallyExpanded = false) {
                         val command = remember(network) { CurlBuilder.curl(network) }
-                        CodeBlock(command)
+                        CodeBlock(command) { fullScreenText = "cURL" to command }
                         TextButton(onClick = { copyToClipboard(context, "cURL", command) }) {
                             Text("Copy cURL")
                         }
@@ -130,13 +155,16 @@ internal fun LogDetailScreen(
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.networkSections(info: NetworkLogInfo) {
+private fun androidx.compose.foundation.lazy.LazyListScope.networkSections(
+    info: NetworkLogInfo,
+    onOpenText: (title: String, text: String) -> Unit
+) {
     info.error?.let { error ->
         item { Section(title = "Error") { SelectableValue(error) } }
     }
 
     item {
-        Section(title = "Summary") {
+        Section(title = "Summary", initiallyExpanded = false) {
             KeyValue("Duration", info.durationMs?.let(Formatting::duration) ?: "-")
             KeyValue("Request size", info.requestBytes?.let(Formatting::byteCount) ?: "-")
             KeyValue("Response size", info.responseBytes?.let(Formatting::byteCount) ?: "-")
@@ -162,7 +190,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.networkSections(info:
     }
 
     info.requestBody?.let { body ->
-        item { Section(title = "Request body") { CodeBlock(body) } }
+        item {
+            Section(title = "Request body") {
+                CodeBlock(body) { onOpenText("Request body", body) }
+            }
+        }
     }
 
     if (info.responseHeaders.isNotEmpty()) {
@@ -174,7 +206,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.networkSections(info:
     }
 
     info.responseBody?.let { body ->
-        item { Section(title = "Response body") { CodeBlock(body) } }
+        item {
+            Section(title = "Response body") {
+                CodeBlock(body) { onOpenText("Response body", body) }
+            }
+        }
     }
 }
 
@@ -226,8 +262,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.metadataSection(entry
     }
 }
 
+/**
+ * A collapsible titled block. Tapping the header folds it away, which is what keeps a response
+ * with fifty headers navigable.
+ */
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
+private fun Section(
+    title: String,
+    initiallyExpanded: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    var expanded by remember(title) { mutableStateOf(initiallyExpanded) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -235,12 +281,15 @@ private fun Section(title: String, content: @Composable () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
-            text = title.uppercase(),
+            text = (if (expanded) "▾  " else "▸  ") + title.uppercase(),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
         )
-        content()
+        if (expanded) content()
     }
     HorizontalDivider()
 }
@@ -268,22 +317,37 @@ private fun SelectableValue(value: String) {
     }
 }
 
-/** Bodies are pre-formatted at capture time, so they only need a scrollable monospace block. */
+/**
+ * Bodies are already pretty-printed at capture time, so the inline block only previews them,
+ * syntax-highlighted when the content is JSON. Tapping opens the full-screen viewer, which is
+ * where search and line-wrap control live.
+ */
 @Composable
-private fun CodeBlock(text: String) {
-    androidx.compose.foundation.text.selection.SelectionContainer {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                .padding(10.dp)
-                .horizontalScroll(rememberScrollState())
-        )
+private fun CodeBlock(text: String, onOpen: () -> Unit) {
+    val isJson = remember(text) { Formatting.looksLikeJson(text) }
+    val rendered = remember(text, isJson) {
+        val preview = if (text.length > PREVIEW_LIMIT) text.take(PREVIEW_LIMIT) + "\n…" else text
+        if (isJson) JsonHighlighter.highlight(preview) else AnnotatedString(preview)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        SelectionContainer {
+            Text(
+                text = rendered,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                    .padding(10.dp)
+                    .horizontalScroll(rememberScrollState())
+            )
+        }
+        TextButton(onClick = onOpen) { Text("Open in viewer (search, wrap, copy)") }
     }
 }
+
+private const val PREVIEW_LIMIT = 2000
 
 /** A copyable, single-block representation of the entry. */
 private fun LogEntry.toShareText(): String = buildString {

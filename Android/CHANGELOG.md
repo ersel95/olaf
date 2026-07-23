@@ -4,6 +4,28 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.6.0] — 2026-07-23
+### Added
+- **JSON syntax highlighting** in bodies and in the cURL block, regex-based rather than
+  parser-based so truncated payloads still get coloured.
+- **Full-screen text viewer** for bodies and cURL: search, line-wrap toggle, selection and copy.
+  Searching **keeps JSON blocks whole** — a hit on a key whose value is an object or array pulls in
+  the entire block down to its matching close, since a lone `"accounts": [` line tells the reader
+  nothing; disjoint results are separated with `⋯` and keep their highlighting.
+- **Convert to mock**: turn any captured response into an editable mock on the device — URL
+  fragment, method scoping, status, body, delay, or a transport failure instead. The captured
+  response headers carry over.
+- **Multi-select and share**: pick entries from the session list and export just those.
+- **Logcat import** (`Olaf.importLogcatEntries`): pulls this process's Logcat output — including
+  messages from SDKs that know nothing about Olaf — into the same list and the same export. The
+  counterpart of iOS's OSLog import; Olaf's own mirrored entries are skipped so nothing duplicates.
+- **Collapsible detail sections**, so a response with fifty headers stays navigable. Summary and
+  cURL start collapsed.
+- The Olaf logo now appears in the viewer's app bar (and is the hand-off button when
+  `OlafUI.onLogoTap` is set), replacing the plain text title.
+- 10 further unit tests (101 total) over JSON-block search, bracket depth inside string literals,
+  and Logcat line parsing including the year-boundary case.
+
 ## [0.5.0] — 2026-07-23
 ### Added
 - **`olaf-no-op` artifact**, the release counterpart wired up exactly like Chucker's

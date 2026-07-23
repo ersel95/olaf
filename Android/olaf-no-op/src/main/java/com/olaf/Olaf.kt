@@ -165,6 +165,11 @@ object Olaf {
         category: LogCategory = LogCategory.Decoding
     ) = Unit
 
+    suspend fun importLogcatEntries(
+        sinceMillis: Long = System.currentTimeMillis() - 3_600_000,
+        category: LogCategory = LogCategory.Logcat
+    ): Int = 0
+
     fun trackScreen(name: String, kind: String = "push") = Unit
 
     fun snapshot(): List<LogEntry> = emptyList()

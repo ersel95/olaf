@@ -2,9 +2,12 @@ package com.olaf
 
 import android.content.Context
 import com.olaf.internal.CallSite
+import com.olaf.internal.LogcatImportParser
 import com.olaf.internal.OlafRuntime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Instant
 
@@ -218,6 +221,59 @@ object Olaf {
 
         log(LogLevel.ERROR, message, category, metadata)
     }
+
+    // MARK: - Logcat import
+
+    /**
+     * Imports **this process's** Logcat output into Olaf — including messages from SDKs that know
+     * nothing about Olaf, so they land in the same list and the same export. The Android
+     * counterpart of iOS's OSLog import.
+     *
+     * An app may read its own Logcat buffer without any permission, and other processes' output is
+     * not visible — which is exactly the scope wanted here. Olaf's own mirrored entries are skipped,
+     * or every import would duplicate them.
+     *
+     * @param sinceMillis only entries at or after this wall-clock time are imported.
+     * @return how many entries were imported; `0` if Olaf hasn't been started.
+     */
+    suspend fun importLogcatEntries(
+        sinceMillis: Long = System.currentTimeMillis() - 3_600_000,
+        category: LogCategory = LogCategory.Logcat
+    ): Int = withContext(Dispatchers.IO) {
+        if (!isStarted) return@withContext 0
+
+        val since = Instant.ofEpochMilli(sinceMillis)
+        var imported = 0
+
+        runCatching {
+            // `-d` dumps and exits; `--pid` limits it to us. `threadtime` carries the timestamp,
+            // pid/tid, priority and tag — everything an entry needs.
+            val process = ProcessBuilder(
+                "logcat", "-d", "-v", "threadtime", "--pid=${android.os.Process.myPid()}"
+            ).redirectErrorStream(true).start()
+
+            process.inputStream.bufferedReader().useLines { lines ->
+                lines.forEach { line ->
+                    val parsed = LogcatImportParser.parse(line) ?: return@forEach
+                    if (parsed.timestamp.isBefore(since)) return@forEach
+                    if (parsed.tag.startsWith(LOGCAT_MIRROR_TAG_PREFIX)) return@forEach
+
+                    log(
+                        level = parsed.level,
+                        message = parsed.message,
+                        category = category,
+                        metadata = mapOf("source" to "logcat", "tag" to parsed.tag)
+                    )
+                    imported++
+                }
+            }
+            process.destroy()
+        }
+
+        imported
+    }
+
+    private const val LOGCAT_MIRROR_TAG_PREFIX = "Olaf/"
 
     // MARK: - Navigation tracking
 

@@ -1,6 +1,8 @@
 package com.olaf.ui.view
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -36,12 +41,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.olaf.LogEntry
+import com.olaf.Olaf
+import com.olaf.R
 import com.olaf.ui.bridge.ExternalToolRegistry
 import com.olaf.ui.model.LogViewerModel
 import com.olaf.ui.presentation.OlafPresenter
@@ -85,6 +93,8 @@ internal fun OlafViewerScreen(
     var isMenuOpen by remember { mutableStateOf(false) }
     var isStatsSheetOpen by remember { mutableStateOf(false) }
     var isMockSheetOpen by remember { mutableStateOf(false) }
+    var isSelecting by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(emptySet<String>()) }
 
     LaunchedEffect(Unit) { model.start() }
 
@@ -107,7 +117,14 @@ internal fun OlafViewerScreen(
             TopAppBar(
                 title = { OlafTitle() },
                 navigationIcon = {
-                    TextButton(onClick = onClose) { Text("Close") }
+                    if (isSelecting) {
+                        TextButton(onClick = {
+                            isSelecting = false
+                            selectedIds = emptySet()
+                        }) { Text("Done") }
+                    } else {
+                        TextButton(onClick = onClose) { Text("Close") }
+                    }
                 },
                 actions = {
                     IconButton(onClick = { isFilterSheetOpen = true }) {
@@ -188,7 +205,26 @@ internal fun OlafViewerScreen(
                                     isMockSheetOpen = true
                                 }
                             )
+                            if (scope == LogViewerModel.Scope.SESSION) {
+                                DropdownMenuItem(
+                                    text = { Text("Select") },
+                                    onClick = {
+                                        isMenuOpen = false
+                                        isSelecting = true
+                                    }
+                                )
+                            }
                             HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Import Logcat (1 hour)") },
+                                onClick = {
+                                    isMenuOpen = false
+                                    coroutineScope.launch {
+                                        Olaf.importLogcatEntries()
+                                        model.reload()
+                                    }
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text("Clear") },
                                 onClick = {
@@ -201,7 +237,20 @@ internal fun OlafViewerScreen(
                 }
             )
         },
-        bottomBar = { ExternalToolBar() }
+        bottomBar = {
+            if (isSelecting) {
+                SelectionBar(
+                    count = selectedIds.size,
+                    onShare = {
+                        coroutineScope.launch {
+                            model.exportSelected(selectedIds)?.let { shareFile(context, it) }
+                        }
+                    }
+                )
+            } else {
+                ExternalToolBar()
+            }
+        }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             ScopeSwitch(scope = scope, onSelect = model::setScope)
@@ -246,7 +295,19 @@ internal fun OlafViewerScreen(
                     entries = entries,
                     pinned = pinned,
                     pinnedIds = pinnedIds,
-                    onSelect = { selectedEntry = it },
+                    isSelecting = isSelecting,
+                    selectedIds = selectedIds,
+                    onSelect = { entry ->
+                        if (isSelecting) {
+                            selectedIds = if (entry.id in selectedIds) {
+                                selectedIds - entry.id
+                            } else {
+                                selectedIds + entry.id
+                            }
+                        } else {
+                            selectedEntry = entry
+                        }
+                    },
                     onTogglePin = model::togglePin
                 )
             }
@@ -291,7 +352,12 @@ private fun OlafTitle() {
     } else {
         Modifier
     }
-    Text(text = "Olaf", fontWeight = FontWeight.Bold, modifier = modifier)
+    Image(
+        painter = painterResource(R.drawable.olaf_logo),
+        contentDescription = if (handler != null) "Olaf — switch tool" else "Olaf",
+        contentScale = ContentScale.Fit,
+        modifier = modifier.height(28.dp)
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -320,20 +386,22 @@ private fun SessionList(
     entries: List<LogEntry>,
     pinned: List<LogEntry>,
     pinnedIds: Set<String>,
+    isSelecting: Boolean,
+    selectedIds: Set<String>,
     onSelect: (LogEntry) -> Unit,
     onTogglePin: (LogEntry) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        if (pinned.isNotEmpty()) {
+        if (pinned.isNotEmpty() && !isSelecting) {
             item(key = "pinned-header") { SectionHeader("Pinned") }
             items(pinned, key = { "pinned-${it.id}" }) { entry ->
-                EntryRow(entry, pinnedIds, onSelect, onTogglePin)
+                EntryRow(entry, pinnedIds, isSelecting, selectedIds, onSelect, onTogglePin)
             }
             item(key = "pinned-divider") { HorizontalDivider() }
         }
 
         items(entries, key = { it.id }) { entry ->
-            EntryRow(entry, pinnedIds, onSelect, onTogglePin)
+            EntryRow(entry, pinnedIds, isSelecting, selectedIds, onSelect, onTogglePin)
             HorizontalDivider()
         }
     }
@@ -343,29 +411,59 @@ private fun SessionList(
 private fun EntryRow(
     entry: LogEntry,
     pinnedIds: Set<String>,
+    isSelecting: Boolean,
+    selectedIds: Set<String>,
     onSelect: (LogEntry) -> Unit,
     onTogglePin: (LogEntry) -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
+        if (isSelecting) {
+            Checkbox(
+                checked = entry.id in selectedIds,
+                onCheckedChange = { onSelect(entry) }
+            )
+        }
         LogRow(
             entry = entry,
             modifier = Modifier
                 .weight(1f)
                 .clickable { onSelect(entry) }
         )
-        val isPinned = entry.id in pinnedIds
-        IconButton(onClick = { onTogglePin(entry) }) {
-            Icon(
-                imageVector = OlafIcons.Pin,
-                contentDescription = if (isPinned) "Unpin" else "Pin",
-                // Unpinned rows keep the affordance visible but muted, so a pinned row stands out.
-                tint = if (isPinned) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                }
-            )
+        if (!isSelecting) {
+            val isPinned = entry.id in pinnedIds
+            IconButton(onClick = { onTogglePin(entry) }) {
+                Icon(
+                    imageVector = OlafIcons.Pin,
+                    contentDescription = if (isPinned) "Unpin" else "Pin",
+                    // Unpinned rows keep the affordance visible but muted, so pins stand out.
+                    tint = if (isPinned) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                    }
+                )
+            }
         }
+    }
+}
+
+/** Bottom bar of multi-select mode: how many are picked, and the share action. */
+@Composable
+private fun SelectionBar(count: Int, onShare: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "$count selected",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Button(enabled = count > 0, onClick = onShare) { Text("Share") }
     }
 }
 
