@@ -33,9 +33,11 @@ android {
 }
 
 dependencies {
-    // The sample always uses the real library, in both build types, so the viewer can be
-    // exercised from a release build too.
-    implementation(project(":olaf"))
+    // Wired exactly the way a host app should wire it — and this doubles as the API-compatibility
+    // check: the same sample sources are compiled against both artifacts, so any signature that
+    // drifts between `:olaf` and `:olaf-no-op` breaks `assembleRelease`.
+    debugImplementation(project(":olaf"))
+    releaseImplementation(project(":olaf-no-op"))
 
     implementation(libs.androidx.core.ktx)
     implementation(platform(libs.compose.bom))

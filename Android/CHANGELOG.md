@@ -4,6 +4,20 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.5.0] — 2026-07-23
+### Added
+- **`olaf-no-op` artifact**, the release counterpart wired up exactly like Chucker's
+  (`debugImplementation` / `releaseImplementation`). It mirrors the public API with empty bodies,
+  so host code compiles unchanged while no capture, no viewer and no stored logs reach the
+  production APK; `installOlaf` leaves the client entirely untouched there.
+- **API-drift protection**: the sample compiles against `:olaf` in debug and `:olaf-no-op` in
+  release, so any signature that diverges breaks `:sample:assembleRelease` — in CI, not in
+  someone's production build.
+- **Documentation**: `Android/README.md`, `INTEGRATION.md` (production-grade host setup),
+  `AGENTS.md` (mechanical steps for AI agents), `CLAUDE.md` (rules for this subtree), and the
+  drop-in `Integration/OlafManager.kt` template. The root README and CLAUDE.md now describe the
+  two-platform layout.
+
 ## [0.4.0] — 2026-07-23
 ### Added
 - **HAR 1.2 and Postman Collection v2.1 export** of the visible network entries, alongside the

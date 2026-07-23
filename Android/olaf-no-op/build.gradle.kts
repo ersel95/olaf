@@ -30,8 +30,11 @@ android {
 }
 
 dependencies {
-    // Only OkHttp: the no-op still has to hand back a real (pass-through) Interceptor.
+    // OkHttp so the no-op can hand back a real (pass-through) Interceptor, and coroutines so
+    // `Olaf.stream()` keeps its `Flow` signature. Compose is deliberately absent — there is no
+    // viewer here, which is the whole point of the release variant.
     api(libs.okhttp)
+    implementation(libs.coroutines.core)
 }
 
 publishing {

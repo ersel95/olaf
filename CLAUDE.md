@@ -8,6 +8,13 @@ on-device. Fully **local** (no backend, no data is ever sent over the network).
 > `docs/bug-reporter-summary.md`.
 > It will not be added back to Olaf.
 
+## Repository layout — two platforms, one repo
+The Swift package **stays at the repository root** (`Package.swift`, `Sources/`, `Tests/`): SPM
+resolves `https://github.com/ersel95/olaf.git` against the root, so moving it into a subdirectory
+would break every consumer. The Android port is an independent Gradle build under **`Android/`**,
+which no SPM target references — see [`Android/CLAUDE.md`](Android/CLAUDE.md) for its own rules.
+Android releases are tagged `android-x.y.z`, keeping the two version lines separate.
+
 ## Structure — a SINGLE product, a SINGLE target
 SPM offers a single product: `Olaf`. The host adds this one product, and a single `import Olaf` is enough. Folders within the target:
 - **`Sources/Olaf/Core`** — the UIKit-free engine: the `Olaf` facade, ring buffer, NDJSON disk

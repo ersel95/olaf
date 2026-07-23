@@ -46,3 +46,8 @@ jobs:
 
       - name: Build library + no-op
         run: ./gradlew :olaf:assembleRelease :olaf-no-op:assembleRelease
+
+      # The sample compiles against :olaf in debug and :olaf-no-op in release, so this fails the
+      # moment a public signature drifts between the two artifacts.
+      - name: API compatibility (sample against both artifacts)
+        run: ./gradlew :sample:assembleDebug :sample:assembleRelease

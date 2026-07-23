@@ -23,6 +23,11 @@
 > share. It also does **not** redact anything — data is shown raw, which is exactly why it is
 > a **non-production debug tool** (`#if !PROD`).
 
+> **Android?** The port lives in **[`Android/`](Android/README.md)** — same product decisions, same
+> on-disk schema and metadata keys, expressed in Kotlin and Jetpack Compose. This repository holds
+> both platforms; the Swift package stays at the root, so Swift Package Manager resolution is
+> unaffected.
+
 <!-- TODO: add a demo GIF here — shake → viewer → request detail (docs/demo.gif) -->
 
 ## Features
