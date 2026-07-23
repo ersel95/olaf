@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Compose draws the whole UI, so the XML theme only has to provide a windowless
+         container. Using a platform parent keeps the sample free of the Material
+         Components (View) dependency. -->
+    <style name="Theme.OlafSample" parent="android:Theme.Material.Light.NoActionBar" />
+
+</resources>

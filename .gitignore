@@ -6,4 +6,14 @@ DerivedData/
 .swiftpm/
 *.xcodeproj
 Package.resolved
-Icon
+Icon
+
+# Android (see Android/)
+Android/.gradle/
+Android/build/
+Android/*/build/
+Android/local.properties
+Android/.idea/
+Android/.kotlin/
+*.iml
+Icon?

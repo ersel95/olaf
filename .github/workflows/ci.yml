@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  ios:
     name: macOS test + iOS build
     runs-on: macos-15
     steps:
@@ -22,3 +22,27 @@ jobs:
           xcodebuild -scheme Olaf \
             -destination 'generic/platform=iOS' \
             build CODE_SIGNING_ALLOWED=NO
+
+  android:
+    name: Android unit tests + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Same bar as iOS: unit tests and both publishable artifacts must build clean
+      # (the build is configured with allWarningsAsErrors).
+      - name: Unit tests
+        run: ./gradlew :olaf:testDebugUnitTest
+
+      - name: Build library + no-op
+        run: ./gradlew :olaf:assembleRelease :olaf-no-op:assembleRelease
