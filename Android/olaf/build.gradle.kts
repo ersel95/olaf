@@ -56,7 +56,6 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.json)
     testImplementation(libs.coroutines.test)
-    testImplementation(libs.okhttp.mockwebserver)
 }
 
 publishing {
