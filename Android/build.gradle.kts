@@ -8,9 +8,16 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
 }
 
-// Single source of truth for the published version — mirrored in Android/CHANGELOG.md
-// and used by both publishable modules. iOS keeps its own version line (see /CHANGELOG.md).
-val olafVersion by extra("0.8.0")
+// Published version. Locally it is the constant below (kept in step with Android/CHANGELOG.md);
+// on a release build JitPack and CI pass the git tag through `-Pversion`, so the artifact always
+// carries the tag it was built from and nothing has to be edited at release time.
+// iOS keeps its own version line — see /CHANGELOG.md and /RELEASING.md.
+private val localVersion = "0.8.0"
+val olafVersion by extra(
+    (findProperty("version") as? String)
+        ?.takeIf { it.isNotBlank() && it != "unspecified" }
+        ?: localVersion
+)
 val olafGroup by extra("com.github.ersel95.olaf")
 
 subprojects {

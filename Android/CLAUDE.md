@@ -57,6 +57,9 @@ All three must be green on every change. `allWarningsAsErrors` is on: warnings f
   recorded; OkHttp/Okio frames are skipped so requests are attributed to the calling code.
 
 ## Versioning
-SemVer + git tag `android-x.y.z` (the iOS package keeps its own `x.y.z` line). The version lives in
-`Android/build.gradle.kts` (`olafVersion`) and must match the CHANGELOG entry. Tag when sources
-change; doc-only changes are not tagged.
+SemVer + git tag `android-x.y.z` (the iOS package keeps its own `x.y.z` line). Releasing is
+tag-driven and fully automated — see [/RELEASING.md](../RELEASING.md). The build takes its version
+from `-Pversion` when CI/JitPack passes the tag, and from `localVersion` in
+`Android/build.gradle.kts` otherwise; that constant and the CHANGELOG entry must agree, because the
+release workflow reads its notes from the CHANGELOG and fails when the section is missing.
+Tag when sources change; doc-only changes are not tagged.

@@ -13,9 +13,19 @@ networking code. Roughly 15 minutes.
 Olaf ships **two artifacts**, wired the same way Chucker is:
 
 ```kotlin
-// gradle/libs.versions.toml
+// settings.gradle.kts — JitPack builds the artifacts straight from the git tag
+repositories {
+    google()
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+}
+```
+
+```kotlin
+// gradle/libs.versions.toml — the version is the tag, so it is always clear
+// which commit an artifact came from.
 [versions]
-olaf = "0.8.0"
+olaf = "android-0.8.0"
 
 [libraries]
 olaf = { module = "com.github.ersel95.olaf:olaf", version.ref = "olaf" }
@@ -31,14 +41,14 @@ releaseImplementation(libs.olaf.no.op)
 `olaf-no-op` exposes the **same API with empty bodies**, so your code compiles unchanged while no
 capture code, no viewer and no stored logs reach the production APK.
 
-### Until the artifacts are published
+### Working against an unreleased change
 
 ```bash
 cd <olaf-repo>/Android && ./gradlew publishToMavenLocal
 ```
 
-then add `mavenLocal()` to your `dependencyResolutionManagement { repositories { … } }`. The
-coordinates are the final ones, so switching to a remote repository later changes only that line.
+then add `mavenLocal()` to your repositories and set the version to the local one (`0.8.0`). Same
+coordinates, so going back to a released tag is a one-line change.
 
 ---
 

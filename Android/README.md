@@ -46,12 +46,18 @@
 ## Quick start
 
 ```kotlin
-// settings.gradle.kts — until the artifacts are published, publish locally with
-// `./gradlew publishToMavenLocal` and add mavenLocal() to your repositories.
+// settings.gradle.kts
+repositories {
+    google()
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+}
+```
 
+```kotlin
 // build.gradle.kts
-debugImplementation("com.github.ersel95.olaf:olaf:0.8.0")
-releaseImplementation("com.github.ersel95.olaf:olaf-no-op:0.8.0")
+debugImplementation("com.github.ersel95.olaf:olaf:android-0.8.0")
+releaseImplementation("com.github.ersel95.olaf:olaf-no-op:android-0.8.0")
 ```
 
 ```kotlin

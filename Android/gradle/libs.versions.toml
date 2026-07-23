@@ -1,6 +1,6 @@
 [versions]
-# Aligned with the primary host project (the host app) so the library never forces
-# an upgrade on the app that consumes it.
+# Kept close to what current production apps ship, so the library never forces an
+# upgrade on the app that consumes it.
 agp = "8.12.2"
 kotlin = "2.1.20"
 compose-bom = "2025.09.00"

@@ -158,6 +158,11 @@ xcodebuild -scheme Olaf -destination 'generic/platform=iOS' build  # iOS
 
 91 tests, zero warnings. See the [CHANGELOG](CHANGELOG.md) for release history.
 
+## Releasing
+
+Both platforms ship from this repository on independent, tag-driven version lines
+(`0.51.0` for iOS, `android-0.9.0` for Android) — see **[RELEASING.md](RELEASING.md)**.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
