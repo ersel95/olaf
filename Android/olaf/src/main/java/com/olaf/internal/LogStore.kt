@@ -27,6 +27,7 @@ internal class LogStore(
     private val persistence: FilePersistence?,
     private val exportFormatter: LogFormatter,
     private val logcatMirror: LogcatMirror?,
+    private val notifier: OlafNotifier?,
     private val sessionId: String,
     private val cacheDirectory: File
 ) {
@@ -91,6 +92,7 @@ internal class LogStore(
 
             persistence?.write(entry)
             logcatMirror?.log(entry)
+            notifier?.onEntry(entry)
             _stream.tryEmit(entry)
         }
     }

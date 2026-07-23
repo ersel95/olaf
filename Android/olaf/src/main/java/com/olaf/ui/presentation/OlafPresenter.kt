@@ -5,6 +5,8 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import com.olaf.Olaf
+import com.olaf.internal.OlafNotifier
 import java.lang.ref.WeakReference
 
 /**
@@ -66,9 +68,8 @@ internal object OlafPresenter {
     fun present(context: Context? = null) {
         if (isPresented) return
         val host = context ?: currentActivity?.get() ?: return
-        val intent = Intent(host, OlafViewerActivity::class.java)
-        if (host !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        host.startActivity(intent)
+        // Its own task, so split-screen puts Olaf next to the app rather than over it.
+        host.startActivity(OlafNotifier.viewerLaunchIntent(host))
     }
 
     /** Closes the viewer if it is open. */
@@ -83,6 +84,8 @@ internal object OlafPresenter {
     fun onViewerCreated(activity: Activity) {
         viewerActivity = WeakReference(activity)
         isPresented = true
+        // The captures have been seen; clearing keeps the shade from accumulating stale counts.
+        Olaf.runtime.dismissNotification()
         // The detector follows the viewer too, so a shake closes it again.
         detector?.start(activity)
     }

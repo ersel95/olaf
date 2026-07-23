@@ -22,6 +22,7 @@ internal class OlafRuntime {
     private var enabled = true
     private var sessionId = ""
     private var cacheDirectory: File? = null
+    private var notifier: OlafNotifier? = null
 
     /**
      * Logs emitted BEFORE `start()` are buffered here and flushed on start, so early launch
@@ -57,7 +58,15 @@ internal class OlafRuntime {
 
     /** Idempotent start — the first call wins. */
     fun start(context: Context, configuration: OlafConfiguration) {
-        start(context.applicationContext.cacheDir, configuration)
+        val appContext = context.applicationContext
+        // The notifier needs a Context, so it is built here and handed to the store; the
+        // Context-free `start` below stays usable from tests.
+        notifier = if (configuration.showsNotification) {
+            runCatching { OlafNotifier(appContext) }.getOrNull()
+        } else {
+            null
+        }
+        start(appContext.cacheDir, configuration)
     }
 
     /**
@@ -75,7 +84,8 @@ internal class OlafRuntime {
                 FilePersistence.create(
                     directory = File(cacheDir, LOG_DIRECTORY_NAME),
                     maxFileSize = configuration.effectiveMaxFileSize,
-                    maxFileCount = configuration.effectiveMaxFileCount
+                    maxFileCount = configuration.effectiveMaxFileCount,
+                    retentionMillis = configuration.retentionMillis
                 )
             } else {
                 null
@@ -88,6 +98,7 @@ internal class OlafRuntime {
                 persistence = persistence,
                 exportFormatter = configuration.exportFormatter,
                 logcatMirror = mirror,
+                notifier = notifier,
                 sessionId = sessionId,
                 cacheDirectory = cacheDir
             )
@@ -119,6 +130,11 @@ internal class OlafRuntime {
     fun store(): LogStore? = lock.withLock { store }
 
     fun cacheDirectory(): File? = lock.withLock { cacheDirectory }
+
+    /** Clears the capture notification — the viewer calls this once it is on screen. */
+    fun dismissNotification() {
+        lock.withLock { notifier }?.dismiss()
+    }
 
     val isStarted: Boolean get() = lock.withLock { store != null }
 

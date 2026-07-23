@@ -4,6 +4,31 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.10.0] — 2026-07-23
+### Added
+Closing the gaps found by comparing against Chucker:
+
+- **Capture notification**: captured requests appear in the notification shade with a running
+  count, and tapping opens the viewer. Shaking is awkward on an emulator and impossible with the
+  device on a desk — this is the always-available way in. Low importance, so it never interrupts;
+  silently inert without the notification permission, which the host requests (or doesn't).
+- **Launcher shortcut**: long-pressing the app icon offers "Olaf", with no host code at all.
+- **Its own task**: the viewer no longer shares the host's task, so on tablets and foldables it
+  can sit side by side with the app being debugged instead of replacing it.
+- **`BodyDecoder`**: pluggable decoders for bodies Olaf can't read as text — Protobuf, MessagePack,
+  anything. Tried in order, first non-null wins, and a decoder that throws is skipped rather than
+  breaking the request. Gzip needs none (OkHttp handles it); for Brotli, install OkHttp's
+  `BrotliInterceptor` *after* Olaf's so Olaf observes the decoded body — documented on the
+  interface.
+- **Age-based retention** (`retentionMillis`, default one day) alongside the file-count cap.
+  Both are needed: the count alone lets a quiet week keep month-old logs, the age alone lets a busy
+  hour fill the disk. Whichever bites first wins.
+- 7 further unit tests (108 total) over retention pruning, decoder fallthrough and decoder failure.
+
+### Notes
+- Chucker's `redactHeaders` has no counterpart, deliberately: storing everything raw is the point
+  of the tool, and keeping production safe is what the no-op artifact is for.
+
 ## [0.9.0] — 2026-07-23
 ### Changed
 - **Distribution is now tag-driven.** Artifacts are built from the git tag by JitPack, so there is

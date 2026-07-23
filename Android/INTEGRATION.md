@@ -25,7 +25,7 @@ repositories {
 // gradle/libs.versions.toml — the version is the tag, so it is always clear
 // which commit an artifact came from.
 [versions]
-olaf = "android-0.9.0"
+olaf = "android-0.10.0"
 
 [libraries]
 olaf = { module = "com.github.ersel95.olaf:olaf", version.ref = "olaf" }

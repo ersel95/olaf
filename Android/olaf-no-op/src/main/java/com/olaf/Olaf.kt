@@ -95,8 +95,10 @@ data class OlafConfiguration(
     val persistsToDisk: Boolean = true,
     val maxFileSize: Int = 1_048_576,
     val maxFileCount: Int = 5,
+    val retentionMillis: Long = 24 * 60 * 60 * 1000L,
     val exportFormatter: LogFormatter = PlainTextFormatter(),
     val mirrorsToLogcat: Boolean = true,
+    val showsNotification: Boolean = true,
     val logcatTag: String = "Olaf"
 )
 

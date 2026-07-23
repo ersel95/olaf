@@ -97,7 +97,13 @@ internal class OlafInterceptor : Interceptor {
                 }
                 responseBodyText = "<${buffer.size} bytes ${contentType}>"
             } else {
-                responseBodyText = prettyBody(buffer.clone().readString(charset), config.maxBodyLength)
+                responseBodyText = decodeBody(
+                    bytes = { buffer.clone().readByteArray() },
+                    text = { buffer.clone().readString(charset) },
+                    contentType = contentType?.toString(),
+                    contentEncoding = response.header("Content-Encoding"),
+                    config = config
+                )
             }
         } else {
             responseBytes = body.contentLength().takeIf { it >= 0 } ?: 0
@@ -211,10 +217,39 @@ internal class OlafInterceptor : Interceptor {
             val buffer = Buffer()
             body.writeTo(buffer)
             val charset = body.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
-            prettyBody(buffer.readString(charset), OlafNetwork.configuration.maxBodyLength)
+            decodeBody(
+                bytes = { buffer.clone().readByteArray() },
+                text = { buffer.clone().readString(charset) },
+                contentType = body.contentType()?.toString(),
+                contentEncoding = chain.request().header("Content-Encoding"),
+                config = OlafNetwork.configuration
+            )
         } catch (_: Throwable) {
             null
         }
+    }
+
+    /**
+     * Runs the configured [BodyDecoder]s before falling back to plain text. The body is only
+     * materialised as a ByteArray when a decoder actually exists, so the common path stays on the
+     * cheaper string route.
+     */
+    private fun decodeBody(
+        bytes: () -> ByteArray,
+        text: () -> String,
+        contentType: String?,
+        contentEncoding: String?,
+        config: OlafNetworkConfiguration
+    ): String? {
+        if (config.bodyDecoders.isNotEmpty()) {
+            val raw = bytes()
+            for (decoder in config.bodyDecoders) {
+                // A misbehaving decoder must never take the request down with it.
+                val decoded = runCatching { decoder.decode(raw, contentType, contentEncoding) }.getOrNull()
+                if (decoded != null) return prettyBody(decoded, config.maxBodyLength)
+            }
+        }
+        return prettyBody(text(), config.maxBodyLength)
     }
 
     private fun prettyBody(raw: String, limit: Int): String? {

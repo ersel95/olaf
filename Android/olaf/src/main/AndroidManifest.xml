@@ -1,14 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Android 13+ needs this for the capture notification. Requesting it at runtime is the
+         host's call; without the grant Olaf simply stays quiet. The permission never reaches a
+         production APK, because release builds link the no-op artifact. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application>
 
-        <!-- The viewer lives in its own activity, so the host's back stack, navigation graph and
-             lifecycle stay untouched — the counterpart of iOS presenting it in a separate window. -->
+        <!-- The viewer lives in its own activity AND its own task: the host's back stack and
+             navigation graph stay untouched, and on tablets or foldables Olaf can sit side by side
+             with the app being debugged instead of replacing it. -->
         <activity
             android:name="com.olaf.ui.presentation.OlafViewerActivity"
             android:exported="false"
             android:label="Olaf"
             android:theme="@style/Theme.Olaf.Viewer"
+            android:taskAffinity="com.olaf.viewer"
+            android:launchMode="singleTask"
+            android:resizeableActivity="true"
+            android:excludeFromRecents="false"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
 
         <!-- Serves only the export directory, and only for an explicit share action. The authority

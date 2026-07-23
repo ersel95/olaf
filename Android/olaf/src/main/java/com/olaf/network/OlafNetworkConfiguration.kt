@@ -36,7 +36,13 @@ data class OlafNetworkConfiguration(
      * Requests containing one of these URL fragments are skipped entirely.
      * E.g. to hide SDK noise: `listOf("firebaseio", "crashlytics", "googleapis")`.
      */
-    val excludedUrls: List<String> = emptyList()
+    val excludedUrls: List<String> = emptyList(),
+
+    /**
+     * Decoders for bodies Olaf can't read as text — Protobuf and friends. Tried in order; the
+     * first non-null result wins. See [BodyDecoder], which also covers compressed bodies.
+     */
+    val bodyDecoders: List<BodyDecoder> = emptyList()
 ) {
 
     private val normalizedIncluded = includedUrls.map { it.lowercase() }

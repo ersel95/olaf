@@ -23,13 +23,19 @@ data class OlafNetworkConfiguration(
     val maxImageBodyBytes: Int = 262_144,
     val category: LogCategory = LogCategory.Network,
     val includedUrls: List<String> = emptyList(),
-    val excludedUrls: List<String> = emptyList()
+    val excludedUrls: List<String> = emptyList(),
+    val bodyDecoders: List<BodyDecoder> = emptyList()
 ) {
     fun shouldCapture(url: String?): Boolean = false
 
     companion object {
         val Default = OlafNetworkConfiguration()
     }
+}
+
+/** No-op stand-in — never invoked, because nothing is captured. */
+fun interface BodyDecoder {
+    fun decode(bytes: ByteArray, contentType: String?, contentEncoding: String?): String?
 }
 
 /** No-op stand-in. */

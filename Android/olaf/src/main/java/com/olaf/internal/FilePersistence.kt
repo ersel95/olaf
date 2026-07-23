@@ -21,7 +21,9 @@ import java.io.OutputStream
 internal class FilePersistence private constructor(
     private val directory: File,
     private val maxFileSize: Int,
-    private val maxFileCount: Int
+    private val maxFileCount: Int,
+    private val retentionMillis: Long,
+    private val clock: () -> Long
 ) {
 
     private var stream: OutputStream? = null
@@ -157,9 +159,23 @@ internal class FilePersistence private constructor(
         pruneOldFiles()
     }
 
-    /** Deletes the oldest rotated files beyond [maxFileCount] (the active file counts too). */
+    /**
+     * Enforces both retention limits on rotated files (the active file is never pruned):
+     * anything older than [retentionMillis], and anything beyond [maxFileCount].
+     *
+     * Both are needed. The count alone lets a quiet week keep month-old logs around; the age alone
+     * lets a busy hour fill the disk. Whichever limit bites first wins.
+     */
     private fun pruneOldFiles() {
-        val rotated = rotatedFilesSortedAscending()
+        var rotated = rotatedFilesSortedAscending()
+
+        if (retentionMillis > 0) {
+            val cutoff = clock() - retentionMillis
+            val (expired, kept) = rotated.partition { it.lastModified() < cutoff }
+            expired.forEach { it.delete() }
+            rotated = kept
+        }
+
         val allowedRotated = maxOf(0, maxFileCount - 1)
         if (rotated.size <= allowedRotated) return
         rotated.take(rotated.size - allowedRotated).forEach { it.delete() }
@@ -195,9 +211,15 @@ internal class FilePersistence private constructor(
         private const val ROTATED_NAME_FORMAT = "$ROTATED_PREFIX%010d-%06d.$FILE_EXTENSION"
 
         /** Returns `null` when the directory can't be prepared — persistence is then skipped. */
-        fun create(directory: File, maxFileSize: Int, maxFileCount: Int): FilePersistence? = try {
+        fun create(
+            directory: File,
+            maxFileSize: Int,
+            maxFileCount: Int,
+            retentionMillis: Long = 0,
+            clock: () -> Long = System::currentTimeMillis
+        ): FilePersistence? = try {
             directory.mkdirs()
-            FilePersistence(directory, maxFileSize, maxFileCount).apply {
+            FilePersistence(directory, maxFileSize, maxFileCount, retentionMillis, clock).apply {
                 openActiveFile()
                 pruneOldFiles()
             }

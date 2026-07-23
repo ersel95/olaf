@@ -21,6 +21,13 @@ data class OlafConfiguration(
     val maxFileCount: Int = 5,
 
     /**
+     * Discard rotated files older than this, in milliseconds. Applied alongside [maxFileCount]:
+     * whichever limit bites first wins, so a quiet week can't leave stale logs on disk and a busy
+     * hour can't blow past the file cap. `0` disables the age limit.
+     */
+    val retentionMillis: Long = 24 * 60 * 60 * 1000L, // 1 day
+
+    /**
      * **Human-readable** format used for `.log` export. On-disk storage is always NDJSON, so
      * history round-trips losslessly; this formatter only shapes the shared text.
      */
@@ -28,6 +35,12 @@ data class OlafConfiguration(
 
     /** Mirror entries to Logcat, so they show up in `adb logcat` / the IDE console. */
     val mirrorsToLogcat: Boolean = true,
+
+    /**
+     * Show captured requests in the notification shade, with a tap straight into the viewer, and
+     * register a launcher shortcut. Silently inert without the notification permission.
+     */
+    val showsNotification: Boolean = true,
 
     /** Logcat tag prefix; the category is appended (`Olaf/network`). */
     val logcatTag: String = "Olaf"

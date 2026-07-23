@@ -25,6 +25,7 @@ class LogStoreTest {
         persistence = null,
         exportFormatter = PlainTextFormatter(),
         logcatMirror = null,
+        notifier = null,
         sessionId = "test-session",
         cacheDirectory = temporaryFolder.root
     )
