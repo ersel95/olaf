@@ -56,8 +56,8 @@ repositories {
 
 ```kotlin
 // build.gradle.kts
-debugImplementation("com.github.ersel95.olaf:olaf:android-0.8.0")
-releaseImplementation("com.github.ersel95.olaf:olaf-no-op:android-0.8.0")
+debugImplementation("com.github.ersel95.olaf:olaf:android-0.9.0")
+releaseImplementation("com.github.ersel95.olaf:olaf-no-op:android-0.9.0")
 ```
 
 ```kotlin

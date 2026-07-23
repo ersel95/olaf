@@ -4,6 +4,28 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.9.0] — 2026-07-23
+### Changed
+- **Distribution is now tag-driven.** Artifacts are built from the git tag by JitPack, so there is
+  no publishing infrastructure, no account and no secret to maintain, and consumers add one
+  repository line:
+
+  ```kotlin
+  maven { url = uri("https://jitpack.io") }
+  debugImplementation("com.github.ersel95.olaf:olaf:android-0.9.0")
+  releaseImplementation("com.github.ersel95.olaf:olaf-no-op:android-0.9.0")
+  ```
+
+  The artifact version *is* the tag, so it is always obvious which commit a build came from. The
+  build takes its version from `-Pversion` when CI or JitPack passes the tag, and from a local
+  constant otherwise — cutting a release no longer means editing the build file.
+- **`scripts/release.sh <ios|android> <x.y.z>`** runs every gate before the tag exists: clean tree,
+  free tag, a matching CHANGELOG section, version consistency, then the full test and build
+  verification — including the sample compiled against both artifacts. `--dry-run` shows the
+  release notes without tagging.
+- Release notes are generated from the CHANGELOG, and a missing section fails the release instead
+  of publishing empty notes.
+
 ## [0.8.0] — 2026-07-23
 ### Changed
 - **Native Material 3 pass over the viewer.** The port matched iOS's information architecture but
