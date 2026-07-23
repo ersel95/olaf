@@ -4,6 +4,27 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.4.0] — 2026-07-23
+### Added
+- **HAR 1.2 and Postman Collection v2.1 export** of the visible network entries, alongside the
+  existing `.log` and NDJSON shares. HAR opens directly in Charles/Proxyman/DevTools; the Postman
+  collection deduplicates repeated `method + URL` pairs so it stays re-runnable.
+- **Statistics**: request count, failure rate, bytes sent/received, average/median/p95 duration,
+  status-class and method distribution, busiest hosts and slowest requests — all computed over the
+  entries currently on screen.
+- **Mock list**: view and remove registered mocks from inside the viewer.
+- **Active requests bar**: in-flight calls with their elapsed time, so a hung request is obvious;
+  anything over five seconds is highlighted.
+- **Decoding-error capture** (`Olaf.logDecodingError`): lifts the failing field path out of Gson
+  and Moshi messages (`$.user.accounts[0].iban`) and stores it with the raw body. Decode entries
+  fold into the network row they belong to (same host+path, within 30s) and surface as a
+  "Decoding errors" section in the detail view — while still matching the `decoding` chip, the
+  ERROR level and search, so folding never hides a failure.
+- **Detail additions**: cURL rendering with copy-to-clipboard, and an inline image preview for
+  captured image responses.
+- 16 further unit tests (91 total) over the exporters, statistics, cURL escaping, decode-path
+  extraction and decode attachment.
+
 ## [0.3.0] — 2026-07-23
 ### Added
 - **In-app viewer** (Jetpack Compose): shake the device — or call `OlafUI.present()` — and the

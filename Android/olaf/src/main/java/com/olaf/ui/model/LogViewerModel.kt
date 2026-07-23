@@ -6,8 +6,13 @@ import com.olaf.LogCategory
 import com.olaf.LogEntry
 import com.olaf.LogLevel
 import com.olaf.Olaf
+import com.olaf.internal.LogExportFile
+import com.olaf.ui.util.HarExporter
+import com.olaf.ui.util.PostmanExporter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +31,7 @@ import java.time.Instant
  * level/category/content-type/text filtering.
  */
 @OptIn(FlowPreview::class)
-class LogViewerModel : ViewModel() {
+internal class LogViewerModel : ViewModel() {
 
     /** Display scope. */
     enum class Scope {
@@ -97,16 +102,30 @@ class LogViewerModel : ViewModel() {
         .debounce(SEARCH_DEBOUNCE_MS)
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
-    /** Filtered entries, newest first. */
-    val filteredEntries: StateFlow<List<LogEntry>> = combine(
+    /**
+     * Filtered entries plus the decode index, derived in one pass so the two can never disagree —
+     * a row hidden by one but not badged by the other would make a decode failure unfindable.
+     */
+    private val derived: StateFlow<Pair<List<LogEntry>, DecodeAttachmentIndex>> = combine(
         _entries,
         effectiveQuery,
         _enabledLevels,
         _selectedCategories,
         _selectedContentKinds
     ) { entries, query, levels, categories, contentKinds ->
-        filter(entries, query, levels, categories, contentKinds)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        val index = DecodeAttachmentIndex.build(entries)
+        filter(entries, query, levels, categories, contentKinds, index) to index
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList<LogEntry>() to DecodeAttachmentIndex.Empty)
+
+    /** Filtered entries, newest first. */
+    val filteredEntries: StateFlow<List<LogEntry>> = derived
+        .map { it.first }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Decode errors folded under their network entry. */
+    val decodeIndex: StateFlow<DecodeAttachmentIndex> = derived
+        .map { it.second }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DecodeAttachmentIndex.Empty)
 
     /** Categories present in the loaded entries — drives the chip bar. */
     val availableCategories: StateFlow<List<LogCategory>> = _entries
@@ -291,27 +310,56 @@ class LogViewerModel : ViewModel() {
         return if (chosen.isEmpty()) null else Olaf.exportFile(chosen)
     }
 
+    /** Writes the visible **network** entries as HAR 1.2 — opens in Charles/Proxyman/DevTools. */
+    suspend fun exportHarFile(cacheDirectory: File): File? = withContext(Dispatchers.IO) {
+        val text = HarExporter.harDocument(filteredEntries.value.asReversed())
+        LogExportFile.write(cacheDirectory, text, fileExtension = "har")
+    }
+
+    /** Writes the visible **network** entries as a Postman Collection v2.1. */
+    suspend fun exportPostmanFile(cacheDirectory: File): File? = withContext(Dispatchers.IO) {
+        val text = PostmanExporter.collection(filteredEntries.value.asReversed())
+        LogExportFile.write(cacheDirectory, text, fileExtension = "postman_collection.json")
+    }
+
+    /** Statistics over the entries currently on screen. */
+    fun statistics(): NetworkStats = NetworkStats.compute(filteredEntries.value)
+
     // MARK: - Derivation logic (pure functions → directly testable)
 
     internal companion object {
         private const val SEARCH_DEBOUNCE_MS = 200L
         private const val HISTORY_PAGE_SIZE = 500
 
-        /** Level/category/content-type/search filter — newest first. */
+        /**
+         * Level/category/content-type/search filter — newest first.
+         *
+         * An attached decode entry is never listed on its own; its network row answers for it
+         * instead, matching the `decoding` chip, the `ERROR` level and any query that hits the
+         * attached entry — so folding never makes a decode failure unfindable.
+         */
         fun filter(
             entries: List<LogEntry>,
             query: String, // already trimmed and lowercased by the debounce pipeline
             levels: Set<LogLevel>,
             categories: Set<LogCategory>,
-            contentKinds: Set<NetworkContentKind> = emptySet()
+            contentKinds: Set<NetworkContentKind> = emptySet(),
+            decodeIndex: DecodeAttachmentIndex = DecodeAttachmentIndex.Empty
         ): List<LogEntry> = entries.asReversed().filter { entry ->
-            if (levels.isNotEmpty() && entry.level !in levels) return@filter false
-            if (categories.isNotEmpty() && entry.category !in categories) return@filter false
+            if (entry.id in decodeIndex.attachedIds) return@filter false
+            val attached = decodeIndex.errors(entry)
+
+            if (levels.isNotEmpty() && entry.level !in levels) {
+                if (attached.isEmpty() || LogLevel.ERROR !in levels) return@filter false
+            }
+            if (categories.isNotEmpty() && entry.category !in categories) {
+                if (attached.isEmpty() || LogCategory.Decoding !in categories) return@filter false
+            }
             if (contentKinds.isNotEmpty()) {
                 val kind = NetworkContentKind.of(entry)
                 if (kind == null || kind !in contentKinds) return@filter false
             }
-            query.isEmpty() || matchesQuery(entry, query)
+            query.isEmpty() || matchesQuery(entry, query) || attached.any { matchesQuery(it, query) }
         }
 
         fun matchesQuery(entry: LogEntry, query: String): Boolean {

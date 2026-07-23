@@ -174,6 +174,51 @@ object Olaf {
         log(LogLevel.ERROR, throwable.message ?: throwable.javaClass.simpleName, category, enriched)
     }
 
+    // MARK: - Decoding errors
+
+    /**
+     * Logs a deserialization failure together with **the path of the offending field**
+     * (e.g. `$.user.accounts[0].iban`), so a schema mismatch can be read right next to the raw
+     * body — the "Decoding errors" section of the viewer.
+     *
+     * ```kotlin
+     * try {
+     *     gson.fromJson(body, User::class.java)
+     * } catch (error: Throwable) {
+     *     Olaf.logDecodingError(error, url = call.request.url.toString(), body = body, typeName = "User")
+     *     throw error
+     * }
+     * ```
+     *
+     * @param url the URL the body came from; this is what ties the entry to its request.
+     */
+    fun logDecodingError(
+        error: Throwable,
+        url: String? = null,
+        body: String? = null,
+        typeName: String? = null,
+        category: LogCategory = LogCategory.Decoding
+    ) {
+        val described = DecodingErrorDescriber.describe(error)
+
+        val metadata = buildMap {
+            put("decoding.detail", described.detail)
+            described.path?.let { put("decoding.path", it) }
+            typeName?.let { put("decoding.type", it) }
+            url?.let { put("url", it) }
+            body?.takeIf { it.isNotEmpty() }
+                ?.let { put("responseBody", it.take(DecodingErrorDescriber.MAX_BODY_CHARS)) }
+        }
+
+        val message = buildString {
+            append("Decoding error")
+            typeName?.let { append(" (").append(it).append(")") }
+            described.path?.let { append(": ").append(it) }
+        }
+
+        log(LogLevel.ERROR, message, category, metadata)
+    }
+
     // MARK: - Navigation tracking
 
     /**

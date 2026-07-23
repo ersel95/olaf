@@ -78,9 +78,13 @@ internal fun OlafViewerScreen(
     val isFiltering by model.isFiltering.collectAsStateWithLifecycle()
     val sessions by model.sessionGroups.collectAsStateWithLifecycle()
 
+    val decodeIndex by model.decodeIndex.collectAsStateWithLifecycle()
+
     var selectedEntry by remember { mutableStateOf<LogEntry?>(null) }
     var isFilterSheetOpen by remember { mutableStateOf(false) }
     var isMenuOpen by remember { mutableStateOf(false) }
+    var isStatsSheetOpen by remember { mutableStateOf(false) }
+    var isMockSheetOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { model.start() }
 
@@ -90,7 +94,11 @@ internal fun OlafViewerScreen(
 
     val entry = selectedEntry
     if (entry != null) {
-        LogDetailScreen(entry = entry, onBack = { selectedEntry = null })
+        LogDetailScreen(
+            entry = entry,
+            decodeErrors = decodeIndex.errors(entry),
+            onBack = { selectedEntry = null }
+        )
         return
     }
 
@@ -143,6 +151,43 @@ internal fun OlafViewerScreen(
                                     }
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text("Share HAR (network)") },
+                                onClick = {
+                                    isMenuOpen = false
+                                    coroutineScope.launch {
+                                        model.exportHarFile(context.cacheDir)?.let {
+                                            shareFile(context, it, mimeType = "application/json")
+                                        }
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Share Postman Collection") },
+                                onClick = {
+                                    isMenuOpen = false
+                                    coroutineScope.launch {
+                                        model.exportPostmanFile(context.cacheDir)?.let {
+                                            shareFile(context, it, mimeType = "application/json")
+                                        }
+                                    }
+                                }
+                            )
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Statistics") },
+                                onClick = {
+                                    isMenuOpen = false
+                                    isStatsSheetOpen = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Mocks") },
+                                onClick = {
+                                    isMenuOpen = false
+                                    isMockSheetOpen = true
+                                }
+                            )
                             HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Clear") },
@@ -177,6 +222,10 @@ internal fun OlafViewerScreen(
                 onToggle = model::toggleCategory
             )
 
+            if (scope == LogViewerModel.Scope.SESSION) {
+                PendingRequestsBar()
+            }
+
             HorizontalDivider()
 
             when {
@@ -202,6 +251,14 @@ internal fun OlafViewerScreen(
                 )
             }
         }
+    }
+
+    if (isStatsSheetOpen) {
+        NetworkStatsSheet(stats = model.statistics(), onDismiss = { isStatsSheetOpen = false })
+    }
+
+    if (isMockSheetOpen) {
+        MockListSheet(onDismiss = { isMockSheetOpen = false })
     }
 
     if (isFilterSheetOpen) {
