@@ -4,6 +4,35 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.3.0] — 2026-07-23
+### Added
+- **In-app viewer** (Jetpack Compose): shake the device — or call `OlafUI.present()` — and the
+  viewer opens in its own activity, so the host's back stack and navigation graph stay untouched
+  (the counterpart of iOS presenting it in a separate window).
+- **List**: network rows with a status pill, method badge, path, host, time, duration and size;
+  plain log rows with a level dot, category chip and level name. Search across message, category
+  and metadata (debounced), category chips, a filter sheet for level/category/content type, pin &
+  pinned section, pause/resume of the live stream.
+- **Session / History scopes**: History groups entries by previous session and pages through disk
+  history as you scroll, with a manual "Load older entries" fallback.
+- **Detail screen**: status/method/URL header, call-site and thread, summary (duration, sizes),
+  the full timing breakdown, request/response headers and pre-formatted bodies, all selectable,
+  plus copy-to-clipboard.
+- **Sharing** of the visible (filtered) entries as `.log` or raw NDJSON, through a `FileProvider`
+  declared by the library itself — the host configures nothing.
+- **`ExternalToolBridge`** and **`OlafUI.onLogoTap`**, so Olaf can hand off to another
+  shake-activated diagnostics tool.
+- 14 further unit tests (75 total) covering the viewer's filtering, session grouping, default chip
+  selection and network metadata parsing.
+
+### Changed
+- Call-site capture now skips OkHttp/Okio frames, so a captured request is attributed to the code
+  that issued it (`SampleActivity.kt:69`) rather than to `RealInterceptorChain.proceed`.
+
+### Verified
+- Ran on a Pixel 9a emulator: real requests captured (200/500), the network chip preselected,
+  detail showing DNS/TCP/TLS/TTFB, `h2` and connection reuse.
+
 ## [0.2.0] — 2026-07-23
 ### Added
 - **Network capture** (`OlafNetwork.interceptor()`): an OkHttp application interceptor that logs

@@ -30,9 +30,16 @@ internal data class CallSite(
             return Unknown
         }
 
+        /**
+         * Frames belonging to Olaf itself — and to the HTTP stack it logs from. Skipping OkHttp's
+         * internals means a captured request is attributed to the code that actually issued the
+         * call, instead of `RealInterceptorChain.proceed`.
+         */
         private fun isOlafFrame(className: String): Boolean =
             className == "com.olaf.Olaf" ||
                 className.startsWith("com.olaf.internal.") ||
-                className.startsWith("com.olaf.network.")
+                className.startsWith("com.olaf.network.") ||
+                className.startsWith("okhttp3.") ||
+                className.startsWith("okio.")
     }
 }

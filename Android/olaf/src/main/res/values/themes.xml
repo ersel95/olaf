@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Compose draws the entire viewer, so the XML theme only provides a plain window. A platform
+         parent keeps the library free of any Material Components (View) dependency. -->
+    <style name="Theme.Olaf.Viewer" parent="android:Theme.Material.NoActionBar" />
+
+</resources>

@@ -10,7 +10,7 @@ plugins {
 
 // Single source of truth for the published version — mirrored in Android/CHANGELOG.md
 // and used by both publishable modules. iOS keeps its own version line (see /CHANGELOG.md).
-val olafVersion by extra("0.2.0")
+val olafVersion by extra("0.3.0")
 val olafGroup by extra("com.github.ersel95.olaf")
 
 subprojects {

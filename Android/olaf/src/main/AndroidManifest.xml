@@ -1,1 +1,28 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!-- The viewer lives in its own activity, so the host's back stack, navigation graph and
+             lifecycle stay untouched — the counterpart of iOS presenting it in a separate window. -->
+        <activity
+            android:name="com.olaf.ui.presentation.OlafViewerActivity"
+            android:exported="false"
+            android:label="Olaf"
+            android:theme="@style/Theme.Olaf.Viewer"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
+        <!-- Serves only the export directory, and only for an explicit share action. The authority
+             is derived from the host package, so several apps can ship Olaf side by side. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.olaf.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/olaf_file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>
