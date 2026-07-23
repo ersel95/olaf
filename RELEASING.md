@@ -5,8 +5,8 @@ one never forces a release of the other.
 
 | Platform | Tag | Consumed as |
 |---|---|---|
-| iOS | `0.51.0` | Swift Package Manager resolves the tag directly from git |
-| Android | `android-0.9.0` | JitPack builds the artifacts from the same tag |
+| iOS | `0.51.0` (example) | Swift Package Manager resolves the tag directly from git |
+| Android | `android-0.11.0` (example) | JitPack builds the artifacts from the same tag |
 
 `android-*` tags are not semver, so SPM ignores them entirely — the iOS version line stays clean
 no matter how often Android ships.
@@ -23,7 +23,7 @@ Releasing is **tag-driven**. Everything after the tag is automated by
 
    ```bash
    git tag 0.51.0        && git push --tags   # iOS
-   git tag android-0.9.0 && git push --tags   # Android
+   git tag android-0.11.0 && git push --tags   # Android
    ```
 
 The workflow then:
@@ -56,8 +56,8 @@ dependencyResolutionManagement {
 
 ```kotlin
 // build.gradle.kts of the module that owns your OkHttpClient
-debugImplementation("com.github.ersel95.olaf:olaf:android-0.9.0")
-releaseImplementation("com.github.ersel95.olaf:olaf-no-op:android-0.9.0")
+debugImplementation("com.github.ersel95.olaf:olaf:android-0.10.0")
+releaseImplementation("com.github.ersel95.olaf:olaf-no-op:android-0.10.0")
 ```
 
 The version is the tag itself, so it is always obvious which commit an artifact came from.

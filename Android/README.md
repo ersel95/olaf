@@ -6,14 +6,17 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/ersel95/olaf/releases"><img src="https://img.shields.io/github/v/tag/ersel95/olaf?filter=android-*&label=release&color=green" alt="Android release"></a>
   <img src="https://img.shields.io/badge/Kotlin-2.1-blueviolet.svg" alt="Kotlin 2.1">
   <img src="https://img.shields.io/badge/minSdk-26-blue.svg" alt="minSdk 26">
   <img src="https://img.shields.io/badge/Compose-BOM%202025.09-green.svg" alt="Compose">
   <a href="../LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey.svg" alt="MIT License"></a>
 </p>
 
-> The Android port of the [Olaf iOS package](../README.md). Same product decisions, same on-disk
-> schema, same metadata keys — expressed in Kotlin and Jetpack Compose.
+> The Android side of [Olaf](../README.md). Same product decisions, same on-disk schema, same
+> metadata keys — expressed in Kotlin and Jetpack Compose. Both platforms live in one repository
+> on independent version lines; **this file is the entry point for Android**, and everything you
+> need is under `Android/`. AI agents integrating Olaf should follow [AGENTS.md](AGENTS.md).
 
 > **Olaf is not a proxy and not a crash reporter.** It has **no backend and no telemetry**. Logs are
 > stored on-device as NDJSON and shared only when *you* tap share. It also does **not** redact

@@ -45,7 +45,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${GITHUB_REF_NAME}" \
-            --title "${GITHUB_REF_NAME}" \
+            --title "iOS ${GITHUB_REF_NAME}" \
+            --latest \
             --notes-file release-notes.md
 
   android:
@@ -89,8 +90,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Not marked latest: the repository's front page belongs to the Swift package, and an
+          # Android tag showing up as "Latest" there misleads iOS consumers. The Android release
+          # line is found through Android/README.md and its own badge.
           gh release create "${GITHUB_REF_NAME}" \
-            --title "${GITHUB_REF_NAME}" \
+            --title "Android ${GITHUB_REF_NAME#android-}" \
+            --latest=false \
             --notes-file Android/release-notes.md \
             Android/olaf/build/outputs/aar/olaf-release.aar \
             Android/olaf-no-op/build/outputs/aar/olaf-no-op-release.aar

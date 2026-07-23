@@ -5,13 +5,14 @@
 <h1 align="center">Olaf</h1>
 
 <p align="center">
-  <b>On-device network logger &amp; log viewer for iOS.</b><br>
+  <b>On-device network logger &amp; log viewer for iOS and Android.</b><br>
   Shake your device — see every request, response, and log. Nothing ever leaves the device.
 </p>
 
 <p align="center">
   <a href="https://github.com/ersel95/olaf/actions/workflows/ci.yml"><img src="https://github.com/ersel95/olaf/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/ersel95/olaf/tags"><img src="https://img.shields.io/github/v/tag/ersel95/olaf?label=release&color=blue" alt="Release"></a>
+  <a href="https://github.com/ersel95/olaf/releases"><img src="https://img.shields.io/github/v/tag/ersel95/olaf?filter=!android-*&label=iOS&color=blue" alt="iOS release"></a>
+  <a href="https://github.com/ersel95/olaf/releases"><img src="https://img.shields.io/github/v/tag/ersel95/olaf?filter=android-*&label=Android&color=green" alt="Android release"></a>
   <img src="https://img.shields.io/badge/Swift-5.9%2B-orange.svg" alt="Swift 5.9+">
   <img src="https://img.shields.io/badge/platform-iOS%2017%2B-blue.svg" alt="iOS 17+">
   <img src="https://img.shields.io/badge/SPM-compatible-brightgreen.svg" alt="Swift Package Manager">
@@ -23,10 +24,23 @@
 > share. It also does **not** redact anything — data is shown raw, which is exactly why it is
 > a **non-production debug tool** (`#if !PROD`).
 
-> **Android?** The port lives in **[`Android/`](Android/README.md)** — same product decisions, same
-> on-disk schema and metadata keys, expressed in Kotlin and Jetpack Compose. This repository holds
-> both platforms; the Swift package stays at the root, so Swift Package Manager resolution is
-> unaffected.
+## Two platforms, one repository
+
+| | Lives in | Install | Docs |
+|---|---|---|---|
+| **iOS** (Swift, SwiftUI) | repository root | Swift Package Manager — see [below](#installation) | this file · [INTEGRATION](INTEGRATION.md) · [AGENTS](AGENTS.md) |
+| **Android** (Kotlin, Compose) | [`Android/`](Android/) | JitPack — see [Android/README](Android/README.md#quick-start) | [Android/README](Android/README.md) · [INTEGRATION](Android/INTEGRATION.md) · [AGENTS](Android/AGENTS.md) |
+
+Both are actively maintained and ship on **independent version lines** (`0.51.0` for iOS,
+`android-0.10.0` for Android), so a release on one never forces one on the other — see
+[RELEASING.md](RELEASING.md). They share the product decisions, the on-disk NDJSON schema and the
+network metadata keys, so the same tooling reads either platform's export.
+
+The Swift package stays at the repository root, so Swift Package Manager resolution is unaffected
+by the Android sources; `android-*` tags are not semver, so SPM ignores them.
+
+**The rest of this file documents the iOS package.** For Android, start at
+**[Android/README.md](Android/README.md)**.
 
 <!-- TODO: add a demo GIF here — shake → viewer → request detail (docs/demo.gif) -->
 
