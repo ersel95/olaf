@@ -50,8 +50,8 @@
 // `./gradlew publishToMavenLocal` and add mavenLocal() to your repositories.
 
 // build.gradle.kts
-debugImplementation("com.github.ersel95.olaf:olaf:0.7.0")
-releaseImplementation("com.github.ersel95.olaf:olaf-no-op:0.7.0")
+debugImplementation("com.github.ersel95.olaf:olaf:0.8.0")
+releaseImplementation("com.github.ersel95.olaf:olaf-no-op:0.8.0")
 ```
 
 ```kotlin

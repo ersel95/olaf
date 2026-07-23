@@ -4,6 +4,23 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.8.0] — 2026-07-23
+### Changed
+- **Native Material 3 pass over the viewer.** The port matched iOS's information architecture but
+  not yet Android's visual language; this closes that gap:
+  - **Dynamic colour** on Android 12+, so the viewer takes the device's theme instead of imposing
+    a fixed palette. Semantic colours (status pills, level dots) stay fixed — a 500 has to read as
+    a failure whatever the wallpaper is.
+  - **Edge-to-edge**, the platform default from Android 15 on; the scaffolds inset their own
+    content, which also removes the dead band under the status bar.
+  - **Correct icons**: a filter funnel and a pin, drawn from Material's own geometry, replacing the
+    list/star stand-ins that read wrong. Still `material-icons-core` only.
+  - **Search field** with a leading search icon, a clear button that appears only when there is
+    something to clear, and a pill shape.
+  - **Empty state** that names what is missing and offers the way out, instead of a blank screen.
+  - **Haptic feedback** on pin, which otherwise has no confirmation.
+  - An entry with no metadata now says so rather than rendering an empty detail screen.
+
 ## [0.7.0] — 2026-07-23
 ### Added
 - **Timber bridge template** (`Integration/OlafTimberTree.kt`): plant it next to `DebugTree` and

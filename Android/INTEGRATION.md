@@ -15,7 +15,7 @@ Olaf ships **two artifacts**, wired the same way Chucker is:
 ```kotlin
 // gradle/libs.versions.toml
 [versions]
-olaf = "0.7.0"
+olaf = "0.8.0"
 
 [libraries]
 olaf = { module = "com.github.ersel95.olaf:olaf", version.ref = "olaf" }

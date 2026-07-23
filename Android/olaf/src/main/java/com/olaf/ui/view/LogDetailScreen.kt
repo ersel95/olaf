@@ -273,10 +273,19 @@ private fun ImagePreview(bytes: ByteArray) {
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.metadataSection(entry: LogEntry) {
-    if (entry.metadata.isEmpty()) return
     item {
         Section(title = "Metadata") {
-            entry.metadata.entries.sortedBy { it.key }.forEach { KeyValue(it.key, it.value) }
+            if (entry.metadata.isEmpty()) {
+                // Saying so beats an empty screen that reads as a rendering bug.
+                Text(
+                    text = "This entry carries no metadata. Pass a map to the log call to attach " +
+                        "structured context.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                entry.metadata.entries.sortedBy { it.key }.forEach { KeyValue(it.key, it.value) }
+            }
         }
     }
 }

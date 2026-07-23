@@ -41,9 +41,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -258,8 +262,19 @@ internal fun OlafViewerScreen(
             OutlinedTextField(
                 value = searchText,
                 onValueChange = model::setSearchText,
+                // Kept short so it never wraps to a second line and grows the field.
                 placeholder = { Text("Search logs") },
                 singleLine = true,
+                shape = MaterialTheme.shapes.extraLarge,
+                leadingIcon = { Icon(OlafIcons.Search, contentDescription = null) },
+                trailingIcon = {
+                    // Only offered once there is something to clear, so the field stays quiet.
+                    if (searchText.isNotEmpty()) {
+                        IconButton(onClick = { model.setSearchText("") }) {
+                            Icon(OlafIcons.Clear, contentDescription = "Clear search")
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp)
@@ -288,8 +303,21 @@ internal fun OlafViewerScreen(
                     onSelect = { selectedEntry = it }
                 )
 
-                entries.isEmpty() && pinned.isEmpty() ->
-                    CenteredMessage("No logs matched the filter.", showSpinner = false)
+                entries.isEmpty() && pinned.isEmpty() -> EmptyState(
+                    title = if (searchText.isNotEmpty() || isFiltering) "Nothing matches" else "No logs yet",
+                    detail = when {
+                        searchText.isNotEmpty() || isFiltering ->
+                            "Try clearing the search or the filters."
+
+                        else ->
+                            "Logs and captured requests will appear here as the app runs."
+                    },
+                    actionLabel = if (searchText.isNotEmpty() || isFiltering) "Reset filters" else null,
+                    onAction = {
+                        model.setSearchText("")
+                        model.resetFilters()
+                    }
+                )
 
                 else -> SessionList(
                     entries = entries,
@@ -435,7 +463,12 @@ private fun EntryRow(
         )
         if (!isSelecting) {
             val isPinned = entry.id in pinnedIds
-            IconButton(onClick = { onTogglePin(entry) }) {
+            val haptics = LocalHapticFeedback.current
+            IconButton(onClick = {
+                // Pinning has no other confirmation, so it gets the tactile one Android users expect.
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onTogglePin(entry)
+            }) {
                 Icon(
                     imageVector = OlafIcons.Pin,
                     contentDescription = if (isPinned) "Unpin" else "Pin",
@@ -567,6 +600,47 @@ private fun CenteredMessage(text: String, showSpinner: Boolean) {
         ) {
             if (showSpinner) CircularProgressIndicator()
             Text(text = text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * Empty state that says what is missing and offers the way out, rather than leaving a blank
+ * screen — the difference between "the tool is broken" and "there is nothing here yet".
+ */
+@Composable
+private fun EmptyState(
+    title: String,
+    detail: String,
+    actionLabel: String?,
+    onAction: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = OlafIcons.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.size(48.dp)
+            )
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            if (actionLabel != null) {
+                TextButton(onClick = onAction) { Text(actionLabel) }
+            }
         }
     }
 }

@@ -3,13 +3,11 @@ package com.olaf.ui.presentation
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.ui.Modifier
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import com.olaf.ui.view.OlafTheme
 import com.olaf.ui.view.OlafViewerScreen
 
 /**
@@ -19,15 +17,14 @@ import com.olaf.ui.view.OlafViewerScreen
 internal class OlafViewerActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Edge-to-edge is the platform default from Android 15 on; opting in here means the
+        // viewer draws behind the system bars and the scaffolds inset their own content.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         OlafPresenter.onViewerCreated(this)
 
         setContent {
-            // The viewer carries its own Material theme rather than inheriting the host's, so it
-            // looks and reads the same in every app it is embedded in.
-            MaterialTheme(
-                colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()
-            ) {
+            OlafTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     OlafViewerScreen(onClose = { finish() })
                 }
