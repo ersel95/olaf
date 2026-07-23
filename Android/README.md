@@ -25,11 +25,14 @@
 - [x] **App + network logs in a single timeline** — categories, levels, call-site info, live stream
 - [x] **Shake → viewer** — Compose viewer with search, filters, session/history scopes, paginated
       history, pin, and its own activity (your navigation is untouched)
-- [x] **Request detail** — status banner, headers, pretty-printed bodies, image previews, cURL
+- [x] **Request detail** — status banner, collapsible sections, headers, syntax-highlighted bodies,
+      image previews, cURL
+- [x] **Body viewer** — full-screen search that keeps JSON blocks whole, line-wrap toggle, copy
 - [x] **Timing breakdown** — DNS / TCP / TLS / TTFB per request, protocol (h2/h3), connection reuse
 - [x] **Active requests bar** — in-flight calls with elapsed time; spot a hung request instantly
 - [x] **Response mocking** — return your own status/body/delay/transport-error without hitting the
-      network
+      network, or **convert any captured response into a mock** on-device, no code
+- [x] **Logcat import** — pull other SDKs' output into the same timeline and the same export
 - [x] **Decoding-error capture** — logs the failing field path (`$.user.accounts[0].iban`) next to
       the raw body, folded into the request it belongs to
 - [x] **Statistics** — error rate, average/median/p95 durations, status & method distribution,
@@ -46,8 +49,8 @@
 // `./gradlew publishToMavenLocal` and add mavenLocal() to your repositories.
 
 // build.gradle.kts
-debugImplementation("com.github.ersel95.olaf:olaf:0.5.0")
-releaseImplementation("com.github.ersel95.olaf:olaf-no-op:0.5.0")
+debugImplementation("com.github.ersel95.olaf:olaf:0.6.0")
+releaseImplementation("com.github.ersel95.olaf:olaf-no-op:0.6.0")
 ```
 
 ```kotlin
@@ -163,7 +166,7 @@ cd Android
 ./gradlew :sample:installDebug                              # try it on a device/emulator
 ```
 
-91 tests, zero warnings (`allWarningsAsErrors`). See the [CHANGELOG](CHANGELOG.md).
+101 tests, zero warnings (`allWarningsAsErrors`). See the [CHANGELOG](CHANGELOG.md).
 
 ## License
 
