@@ -34,8 +34,8 @@ private struct NetworkRow: View {
                     MethodBadge(method: info.method ?? "GET")
                     Text(info.path)
                         .font(.subheadline.monospaced())
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
                     if decodeErrorCount > 0 {
                         DecodeBadge(count: decodeErrorCount)
                     }
