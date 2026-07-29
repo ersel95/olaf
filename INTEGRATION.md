@@ -234,8 +234,58 @@ OlafNetwork.removeAllMocks()   // back to the real backend
   network).
 - **On-device, without writing code**: in the viewer, a network entry's detail → **"Convert to
   mock"** — the captured response opens in an editor (edit status/body/delay/transport error),
-  and it activates once saved. Active mocks can be viewed/deleted from **⋯ → Mocks**.
+  and it activates once saved. Everything is managed from **⋯ → Mocks**.
 - Like everything else, this is **non-prod only** (`#if !PROD`).
+
+### Variants, reset and the global override
+
+A mocked endpoint keeps **every response you've saved for it** and serves one of them, so you
+switch cases instead of deleting and rebuilding a mock:
+
+```swift
+let empty = OlafMockVariant(name: "Empty", payload: OlafMockPayload(json: #"{"accounts": []}"#))
+let broken = OlafMockVariant(name: "500", payload: OlafMockPayload(statusCode: 500, json: "{}"))
+
+let endpointID = OlafNetwork.addEndpoint(OlafMockEndpoint(
+    urlContains: "/v1/accounts",
+    variants: [empty, broken],
+    activeVariantID: empty.id
+))
+
+OlafNetwork.selectVariant(broken.id, for: endpointID)   // switch the served response
+OlafNetwork.resetEndpoint(id: endpointID)               // back to the real backend, variants kept
+OlafNetwork.resetAllToOriginal()                        // same for every endpoint + global override off
+```
+
+Resolution runs in three layers for every captured request:
+
+1. the matching endpoint's **active variant** — served, and capture filters are overridden;
+   an endpoint on **Original** stops here (real network, and the global override is skipped for
+   it — an explicit "leave this one alone" is not undone by a blanket rule),
+2. the **global override** — a template served to every captured request without an endpoint entry
+   of its own; unlike endpoint mocks it respects `includedURLs`/`excludedURLs`,
+3. nothing — the real network.
+
+Templates are URL-agnostic responses (`401 Unauthorized`, `Empty list`, `Offline`, `Timeout`, … plus
+whatever you save from the editor). They can be applied to an endpoint as a variant or switched on
+globally:
+
+```swift
+OlafNetwork.addTemplate(OlafMockTemplate(name: "Maintenance", payload: OlafMockPayload(statusCode: 503, json: "{}")))
+OlafNetwork.globalMockTemplateID = OlafNetwork.mockTemplates.first { $0.name == "Offline" }?.id
+```
+
+Scenarios name a whole setup — which variant every endpoint is on, plus the global override — and
+apply it in one go (endpoints the scenario doesn't name go back to Original):
+
+```swift
+let scenario = OlafNetwork.saveScenario(name: "New user")
+OlafNetwork.applyScenario(id: scenario.id)
+```
+
+In the viewer all of this lives under **⋯ → Mocks**: pick a variant per endpoint, swipe an endpoint
+right to reset it to Original, choose the global override, and save or apply scenarios. Everything
+is **in memory** — mocks reset on app restart, deliberately, so raw bodies never outlive the process.
 
 ---
 

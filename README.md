@@ -53,7 +53,7 @@ Both platforms carry the same feature set unless marked otherwise.
 - [x] **Request detail** — status banner, collapsible sections, headers, syntax-highlighted bodies, image previews, cURL
 - [x] **Timing breakdown** — DNS / TCP / TLS / TTFB per request, protocol (h2/h3), connection reuse ("is the API slow, or the network?")
 - [x] **Active requests bar** — in-flight calls shown live with elapsed time; spot a hung request instantly
-- [x] **Response mocking** — your own status/body/delay/transport-error without hitting the network; convert any captured response into a mock **on-device, no code**
+- [x] **Response mocking** — your own status/body/delay/transport-error without hitting the network; convert any captured response into a mock **on-device, no code**. Save several **variants** per endpoint and switch between them, **reset** any endpoint back to the real backend, flip a **global override** on for everything else, or apply a saved **scenario**
 - [x] **Decoding-error capture** — logs the exact failing field path (`user.accounts[0].iban`) next to the raw body, folded into the request it belongs to
 - [x] **Statistics** — error rate, avg/median/p95 durations, status & method distribution, slowest requests
 - [x] **Export anywhere** — `.log`, raw NDJSON, **HAR 1.2** (Charles/Proxyman/DevTools), **Postman Collection v2.1**
@@ -187,7 +187,18 @@ OlafNetwork.addMock(OlafMockResponse.failure("/v1/rates", OlafMockResponse.Trans
 ```
 
 Or entirely on-device on both platforms: open any captured request → **Convert to Mock** → edit
-status/body/delay → save. Manage active mocks from the viewer's overflow menu.
+status/body/delay → save. Everything else lives in the viewer's overflow menu → **Mocks**:
+
+- **Variants** — save several responses per endpoint ("Success", "Empty", "500") and switch which
+  one is served instead of rebuilding a mock each time.
+- **Reset to Original** — send one endpoint (or all of them) back to the real backend without
+  deleting anything; in the editor, "Reset to captured response" undoes body/status edits.
+- **Global override** — a template served to every captured request that has no endpoint of its own
+  ("Offline", "500 Server Error", …); it respects the capture filters, and endpoints on Original are
+  left alone.
+- **Scenarios** — name a whole setup and apply it in one tap.
+
+Mocks live in memory and reset on app restart.
 
 <details>
 <summary><b>Known limitations</b></summary>

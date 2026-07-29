@@ -15,6 +15,12 @@ import Foundation
 /// OlafNetwork.addMock(.failure(urlContains: "/v1/transfer", error: .timedOut, delaySeconds: 3))
 /// ```
 ///
+/// This is the **one-shot** form of the API: a single response for a single match rule. Registering
+/// one creates an `OlafMockEndpoint` holding a single active variant, so mocks added this way show
+/// up in the viewer alongside the ones built there and can be given further variants, switched, or
+/// reset to Original. For several saved responses per endpoint, use
+/// `OlafNetwork.addEndpoint(_:)` / `addVariant(_:to:)` directly.
+///
 /// Matching: the URL (lowercase) contains the `urlContains` part and `method` matches
 /// (nil = all methods). If multiple mocks match, the **first one added** wins.
 /// Capture filters (`includedURLs`/`excludedURLs`) don't affect mocks.
@@ -27,13 +33,31 @@ public struct OlafMockResponse: Sendable, Identifiable {
     public var urlContains: String
     /// The HTTP method to match (`nil` = all). Compared uppercase.
     public var method: String?
-    public var statusCode: Int
-    public var headers: [String: String]
-    public var body: Data
+    /// The response itself — status, headers, body, delay, transport error.
+    public var payload: OlafMockPayload
+
+    public var statusCode: Int {
+        get { payload.statusCode }
+        set { payload.statusCode = newValue }
+    }
+    public var headers: [String: String] {
+        get { payload.headers }
+        set { payload.headers = newValue }
+    }
+    public var body: Data {
+        get { payload.body }
+        set { payload.body = newValue }
+    }
     /// The response is delayed by this many seconds (slow network simulation; shows up in the pending requests bar).
-    public var delaySeconds: TimeInterval
+    public var delaySeconds: TimeInterval {
+        get { payload.delaySeconds }
+        set { payload.delaySeconds = max(0, newValue) }
+    }
     /// If set, returns a **transport error** instead of an HTTP response (e.g. `.notConnectedToInternet`).
-    public var transportError: URLError.Code?
+    public var transportError: URLError.Code? {
+        get { payload.transportError }
+        set { payload.transportError = newValue }
+    }
 
     public init(
         urlContains: String,
@@ -44,14 +68,18 @@ public struct OlafMockResponse: Sendable, Identifiable {
         delaySeconds: TimeInterval = 0,
         transportError: URLError.Code? = nil
     ) {
-        self.id = UUID()
-        self.urlContains = urlContains.lowercased()
-        self.method = method?.uppercased()
-        self.statusCode = statusCode
-        self.headers = headers
-        self.body = body
-        self.delaySeconds = max(0, delaySeconds)
-        self.transportError = transportError
+        self.init(
+            id: UUID(),
+            urlContains: urlContains,
+            method: method,
+            payload: OlafMockPayload(
+                statusCode: statusCode,
+                headers: headers,
+                body: body,
+                delaySeconds: delaySeconds,
+                transportError: transportError
+            )
+        )
     }
 
     /// Shortcut for a mock with a JSON body (`Content-Type: application/json`).
@@ -72,6 +100,13 @@ public struct OlafMockResponse: Sendable, Identifiable {
         )
     }
 
+    init(id: UUID, urlContains: String, method: String?, payload: OlafMockPayload) {
+        self.id = id
+        self.urlContains = urlContains.lowercased()
+        self.method = method?.uppercased()
+        self.payload = payload
+    }
+
     /// Shortcut for a transport-error mock (no response; throws a URLError).
     public static func failure(
         urlContains: String,
@@ -89,10 +124,18 @@ public struct OlafMockResponse: Sendable, Identifiable {
 
     /// Does this mock match the given request?
     func matches(_ request: URLRequest) -> Bool {
-        guard let url = request.url?.absoluteString.lowercased(), url.contains(urlContains) else {
-            return false
-        }
-        guard let method else { return true }
-        return method == (request.httpMethod ?? "GET").uppercased()
+        OlafMockEndpoint.matches(request, urlContains: urlContains, method: method)
+    }
+
+    /// The endpoint entry this one-shot mock is stored as: a single variant, active.
+    func asEndpoint(variantName: String = "Default") -> OlafMockEndpoint {
+        let variant = OlafMockVariant(name: variantName, payload: payload)
+        return OlafMockEndpoint(
+            id: id,
+            urlContains: urlContains,
+            method: method,
+            variants: [variant],
+            activeVariantID: variant.id
+        )
     }
 }

@@ -39,8 +39,11 @@ final class OlafURLProtocol: URLProtocol {
         if URLProtocol.property(forKey: handledKey, in: request) != nil { return false }
         guard let scheme = request.url?.scheme?.lowercased(),
               scheme == "http" || scheme == "https" else { return false }
-        // Mocked requests are captured even if they fall outside the capture filters (mock takes priority).
-        if OlafNetwork.mock(for: request) != nil { return true }
+        // An endpoint mock is an explicit, addressed decision, so it's captured even when the
+        // request falls outside the capture filters. The global override is not — it would
+        // otherwise mock the very traffic the host filtered out — so it goes through the filter
+        // below like any other request, as does an endpoint sitting on Original.
+        if case .endpoint = OlafNetwork.mockResolution(for: request) { return true }
         // baseURL allow/deny filter: requests outside the filter aren't captured (pass through as-is).
         return OlafNetwork.current.shouldCapture(request.url)
     }
@@ -79,9 +82,9 @@ final class OlafURLProtocol: URLProtocol {
             url: request.url?.absoluteString ?? "-"
         )
 
-        // If a mock matches, never hit the network: the (possibly delayed) response is produced here.
-        if let mock = OlafNetwork.mock(for: request) {
-            startMockDelivery(mock)
+        // If a mock applies, never hit the network: the (possibly delayed) response is produced here.
+        if let payload = OlafNetwork.mock(for: request) {
+            startMockDelivery(payload)
             return
         }
 
@@ -108,7 +111,7 @@ final class OlafURLProtocol: URLProtocol {
 
     private var mockWorkItem: DispatchWorkItem?
 
-    private func startMockDelivery(_ mock: OlafMockResponse) {
+    private func startMockDelivery(_ mock: OlafMockPayload) {
         let item = DispatchWorkItem { [weak self] in
             self?.deliverMock(mock)
         }
@@ -117,7 +120,7 @@ final class OlafURLProtocol: URLProtocol {
             .asyncAfter(deadline: .now() + mock.delaySeconds, execute: item)
     }
 
-    private func deliverMock(_ mock: OlafMockResponse) {
+    private func deliverMock(_ mock: OlafMockPayload) {
         mockWorkItem = nil
         if let pendingID {
             PendingRequestRegistry.shared.unregister(pendingID)

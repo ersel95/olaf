@@ -90,34 +90,159 @@ public enum OlafNetwork {
     }
 
     // MARK: - Response mocking
+    //
+    // Three layers, resolved in this order for every captured request:
+    //
+    //   1. the matching endpoint's active variant  → served, and capture filters are overridden
+    //      (an endpoint on **Original** stops resolution here: real network, no global override)
+    //   2. the global override template            → served, but only within the capture filters
+    //   3. nothing                                 → real network
+    //
+    // Everything lives in memory and resets on app restart. Non-prod debug only, like the rest of
+    // Olaf — should stay under `#if !PROD`.
 
-    /// Registers a mock. Matching requests receive this response **without hitting the network**
-    /// (capture must be active — `startAutomaticCapture`/`install`). If multiple mocks match, the
-    /// first one added wins. Non-prod debug only (like the rest of Olaf, should stay under `#if !PROD`).
+    private static var registry: MockRegistry { .shared }
+
+    /// Registers a one-shot mock. Matching requests receive this response **without hitting the
+    /// network** (capture must be active — `startAutomaticCapture`/`install`). If multiple mocks
+    /// match, the first one added wins.
+    ///
+    /// The mock is stored as an endpoint with a single active variant, so it shows up in the
+    /// viewer's mock list and can be given further variants or reset to Original from there.
     public static func addMock(_ mock: OlafMockResponse) {
-        box.mocks.append(mock)
+        registry.addLegacyMock(mock)
     }
 
-    /// Removes a single mock (used by the viewer's mock list).
+    /// Removes a single mock — by endpoint id (as handed out by `OlafMockResponse.id`) or by
+    /// variant id. Used by the viewer's mock list.
     public static func removeMock(id: UUID) {
-        box.mocks.removeAll { $0.id == id }
+        registry.removeMock(id: id)
     }
 
-    /// Removes all mocks (requests go to the real backend again).
+    /// Removes every mocked endpoint and switches the global override off (requests go to the real
+    /// backend again). The template library and saved scenario names are kept.
     public static func removeAllMocks() {
-        box.mocks = []
+        registry.removeAllEndpoints()
     }
 
-    /// Registered mocks (in insertion order).
+    /// The responses currently being served, in the one-shot shape. Endpoints sitting on
+    /// **Original** are not included — nothing is served for them.
     public static var activeMocks: [OlafMockResponse] {
-        box.mocks
+        registry.activeMocks
     }
 
-    /// The first mock matching the given request (internal — used by `OlafURLProtocol`).
-    static func mock(for request: URLRequest) -> OlafMockResponse? {
-        let mocks = box.mocks
-        guard !mocks.isEmpty else { return nil }
-        return mocks.first { $0.matches(request) }
+    // MARK: Endpoints and variants
+
+    /// Every mocked endpoint, in insertion order — the viewer's mock list.
+    public static var mockEndpoints: [OlafMockEndpoint] {
+        registry.endpoints
+    }
+
+    /// Registers an endpoint with its saved variants; returns its id.
+    @discardableResult
+    public static func addEndpoint(_ endpoint: OlafMockEndpoint) -> UUID {
+        registry.addEndpoint(endpoint)
+    }
+
+    /// Removes an endpoint together with all of its variants.
+    public static func removeEndpoint(id: UUID) {
+        registry.removeEndpoint(id: id)
+    }
+
+    /// Saves another variant on an endpoint; `activate` serves it immediately.
+    public static func addVariant(_ variant: OlafMockVariant, to endpointID: UUID, activate: Bool = true) {
+        registry.addVariant(variant, to: endpointID, activate: activate)
+    }
+
+    /// Removes one saved variant. If it was the active one, the endpoint falls back to Original.
+    public static func removeVariant(id variantID: UUID, from endpointID: UUID) {
+        registry.removeVariant(id: variantID, from: endpointID)
+    }
+
+    /// Edits a saved variant in place (name and/or response). `capturedPayload` is left alone, so
+    /// "reset to captured response" keeps working after any number of edits.
+    public static func updateVariant(
+        id variantID: UUID,
+        in endpointID: UUID,
+        _ mutate: (inout OlafMockVariant) -> Void
+    ) {
+        registry.updateVariant(id: variantID, in: endpointID, mutate)
+    }
+
+    /// Switches which saved variant an endpoint serves; `nil` means **Original**.
+    public static func selectVariant(_ variantID: UUID?, for endpointID: UUID) {
+        registry.selectVariant(variantID, for: endpointID)
+    }
+
+    /// Puts one endpoint back on **Original**: it hits the real backend again and the global
+    /// override doesn't apply to it. Its variants are kept and can be switched back on.
+    public static func resetEndpoint(id: UUID) {
+        registry.selectVariant(nil, for: id)
+    }
+
+    /// Puts every endpoint back on Original and switches the global override off. Nothing is
+    /// deleted — this is the "back to the real backend, keep my setup" button.
+    public static func resetAllToOriginal() {
+        registry.resetAllToOriginal()
+    }
+
+    // MARK: Templates and the global override
+
+    /// The template library: built-ins plus anything saved from the mock editor.
+    public static var mockTemplates: [OlafMockTemplate] {
+        registry.templates
+    }
+
+    /// Saves a reusable, URL-agnostic response; returns its id.
+    @discardableResult
+    public static func addTemplate(_ template: OlafMockTemplate) -> UUID {
+        registry.addTemplate(template)
+    }
+
+    /// Removes a user-saved template (built-ins can't be removed).
+    public static func removeTemplate(id: UUID) {
+        registry.removeTemplate(id: id)
+    }
+
+    /// The template served to **every captured request without an endpoint entry of its own**;
+    /// `nil` = off. Unlike endpoint mocks it respects `includedURLs`/`excludedURLs`.
+    public static var globalMockTemplateID: UUID? {
+        get { registry.globalTemplateID }
+        set { registry.globalTemplateID = newValue }
+    }
+
+    // MARK: Scenarios
+
+    /// Saved scenarios — named snapshots of every endpoint's selection plus the global override.
+    public static var mockScenarios: [OlafMockScenario] {
+        registry.scenarios
+    }
+
+    /// Saves the current selection of every endpoint under a name.
+    @discardableResult
+    public static func saveScenario(name: String) -> OlafMockScenario {
+        registry.saveScenario(name: name)
+    }
+
+    /// Applies a saved scenario. Endpoints the scenario doesn't name go back to Original.
+    public static func applyScenario(id: UUID) {
+        registry.applyScenario(id: id)
+    }
+
+    public static func removeScenario(id: UUID) {
+        registry.removeScenario(id: id)
+    }
+
+    // MARK: Resolution (internal — used by `OlafURLProtocol`)
+
+    /// How the request resolves against the three mocking layers.
+    static func mockResolution(for request: URLRequest) -> MockResolution {
+        registry.resolve(request)
+    }
+
+    /// The response to serve for this request, if any.
+    static func mock(for request: URLRequest) -> OlafMockPayload? {
+        registry.resolve(request).payload
     }
 
     // Internal access (read by URLProtocol's config).
@@ -127,7 +252,6 @@ public enum OlafNetwork {
         private let lock = NSLock()
         private var _value = OlafNetworkConfiguration.default
         private var _chained: [AnyClass] = []
-        private var _mocks: [OlafMockResponse] = []
 
         var value: OlafNetworkConfiguration {
             get { lock.lock(); defer { lock.unlock() }; return _value }
@@ -136,10 +260,6 @@ public enum OlafNetwork {
         var chained: [AnyClass] {
             get { lock.lock(); defer { lock.unlock() }; return _chained }
             set { lock.lock(); _chained = newValue; lock.unlock() }
-        }
-        var mocks: [OlafMockResponse] {
-            get { lock.lock(); defer { lock.unlock() }; return _mocks }
-            set { lock.lock(); _mocks = newValue; lock.unlock() }
         }
     }
 }

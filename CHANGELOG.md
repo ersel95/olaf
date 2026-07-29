@@ -3,6 +3,40 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.51.0] — 2026-07-29
+### Added
+Mocking was a one-shot list: a mock could only be added or deleted, so trying "empty list, then
+500, then back to real" meant rebuilding it three times. It is now a set of definitions you switch
+between.
+
+- **Variants**: an endpoint keeps every response saved for it under a name ("Success", "Empty",
+  "500") and serves one of them — `OlafMockEndpoint` + `OlafMockVariant`, switched with
+  `selectVariant(_:for:)`.
+- **Reset to Original**: `resetEndpoint(id:)` / `resetAllToOriginal()` send an endpoint (or all of
+  them) back to the real backend without deleting anything. In the editor, "Reset to captured
+  response" restores the response a variant was created from after the body/status was edited.
+- **Global override**: a template served to every captured request that has no endpoint entry of
+  its own (`globalMockTemplateID`) — the "everything 500" / "offline" switch. Unlike endpoint mocks
+  it respects `includedURLs`/`excludedURLs`, and an endpoint on Original is skipped by it, since a
+  deliberate "leave this one alone" should not be undone by a blanket rule.
+- **Templates**: URL-agnostic responses, seven built in (`401`, `404`, `500`, `Empty list`,
+  `Offline`, `Timeout`, `Slow (3s)`) plus anything saved from the editor. Apply them to an endpoint
+  as a variant or switch them on globally.
+- **Scenarios**: name the whole setup — which variant every endpoint is on plus the global override
+  — and apply it in one go; endpoints a scenario doesn't name go back to Original.
+- Viewer: **⋯ → Mocks** is now the hub (global override, endpoints with their served variant,
+  scenarios); an endpoint opens its variant list, and the editor gained a variant name, template
+  apply/save and reset.
+- 15 further unit tests (122 total) over layer precedence, endpoint reset, variant editing,
+  scenarios and the unchanged one-shot API.
+
+### Notes
+- `addMock`/`removeMock`/`removeAllMocks`/`activeMocks`/`OlafMockResponse` are unchanged: a one-shot
+  mock is stored as an endpoint holding a single active variant, so existing host code keeps working
+  and those mocks show up in the viewer alongside the ones built there.
+- Still in memory only, deliberately — mocks reset on app restart rather than leaving raw bodies on
+  disk.
+
 ## [0.50.0] — 2026-07-22
 ### Changed
 - **Network filter on by default**: the viewer now opens with the `network` category chip
