@@ -1,10 +1,6 @@
 package com.olaf.network
 
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.Protocol
 import okhttp3.Request
-import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -21,6 +17,12 @@ import java.util.UUID
  * OlafNetwork.addMock(OlafMockResponse(urlContains = "/v1/accounts", json = """{"accounts": []}"""))
  * OlafNetwork.addMock(OlafMockResponse.failure("/v1/rates", TransportError.Timeout, delayMillis = 3_000))
  * ```
+ *
+ * This is the **one-shot** form of the API: a single response for a single match rule. Registering
+ * one creates an [OlafMockEndpoint] holding a single active variant, so mocks added this way show
+ * up in the viewer next to the ones built there and can be given further variants, switched, or
+ * reset to Original. For several saved responses per endpoint use `OlafNetwork.addEndpoint` /
+ * `addVariant` directly.
  *
  * Matching: the lowercased URL contains [urlContains] and [method] matches (`null` = any method).
  * When several mocks match, the **first one added** wins. Capture filters don't affect mocks.
@@ -84,28 +86,40 @@ data class OlafMockResponse(
         delayMillis = delayMillis
     )
 
+    internal constructor(
+        urlContains: String,
+        method: String?,
+        payload: OlafMockPayload,
+        id: String
+    ) : this(
+        urlContains = urlContains,
+        method = method,
+        statusCode = payload.statusCode,
+        headers = payload.headers,
+        body = payload.body,
+        delayMillis = payload.delayMillis,
+        transportError = payload.transportError,
+        id = id
+    )
+
+    /** The response itself — status, headers, body, delay, transport error. */
+    val payload: OlafMockPayload
+        get() = OlafMockPayload(statusCode, headers, body, delayMillis, transportError)
+
     /** Does this mock match the given request? */
-    internal fun matches(request: Request): Boolean {
-        if (!request.url.toString().lowercase().contains(urlContains.lowercase())) return false
-        val method = method ?: return true
-        return method.uppercase() == request.method.uppercase()
-    }
+    internal fun matches(request: Request): Boolean =
+        OlafMockEndpoint.matches(request, urlContains, method)
 
-    internal fun toResponse(request: Request): Response {
-        val contentType = headers.entries
-            .firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
-            ?.value
-            ?.toMediaTypeOrNull()
-
-        val builder = Response.Builder()
-            .request(request)
-            .protocol(Protocol.HTTP_1_1)
-            .code(statusCode)
-            .message(statusMessage(statusCode))
-            .body(body.toResponseBody(contentType))
-
-        headers.forEach { (name, value) -> builder.header(name, value) }
-        return builder.build()
+    /** The endpoint entry this one-shot mock is stored as: a single variant, active. */
+    internal fun asEndpoint(variantName: String = "Default"): OlafMockEndpoint {
+        val variant = OlafMockVariant(name = variantName, payload = payload)
+        return OlafMockEndpoint(
+            urlContains = urlContains,
+            method = method,
+            variants = listOf(variant),
+            activeVariantId = variant.id,
+            id = id
+        )
     }
 
     // `body` is a ByteArray, so the generated data-class equality would compare references.
@@ -126,18 +140,5 @@ data class OlafMockResponse(
             delayMillis = delayMillis,
             transportError = error
         )
-
-        private fun statusMessage(code: Int): String = when (code) {
-            200 -> "OK"
-            201 -> "Created"
-            204 -> "No Content"
-            400 -> "Bad Request"
-            401 -> "Unauthorized"
-            403 -> "Forbidden"
-            404 -> "Not Found"
-            500 -> "Internal Server Error"
-            503 -> "Service Unavailable"
-            else -> "Mock"
-        }
     }
 }

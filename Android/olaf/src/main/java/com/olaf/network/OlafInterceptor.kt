@@ -33,10 +33,14 @@ internal class OlafInterceptor : Interceptor {
         val config = OlafNetwork.configuration
         val url = request.url.toString()
 
-        // Mocks take priority over the capture filters, exactly as on iOS.
-        val mock = OlafNetwork.mock(request)
-        if (mock == null && !config.shouldCapture(url)) {
-            return chain.proceed(request)
+        // An endpoint mock is an explicit, addressed decision, so it takes priority over the
+        // capture filters — exactly as on iOS. The global override is not: it would otherwise mock
+        // the very traffic the host filtered out, so it only applies within the filters.
+        val resolution = OlafNetwork.mockResolution(request)
+        val mock = when {
+            resolution is MockResolution.Endpoint -> resolution.payload
+            config.shouldCapture(url) -> resolution.payloadOrNull
+            else -> return chain.proceed(request)
         }
 
         val method = request.method
@@ -133,7 +137,7 @@ internal class OlafInterceptor : Interceptor {
 
     private fun deliverMock(
         chain: Interceptor.Chain,
-        mock: OlafMockResponse,
+        mock: OlafMockPayload,
         pendingId: String,
         startNanos: Long,
         requestBodyText: String?,

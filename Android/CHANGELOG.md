@@ -4,6 +4,34 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.11.0] — 2026-07-29
+### Added
+The mocking model from the iOS package's 0.51.0, expressed in Kotlin and Compose — same three
+layers, same precedence, same names.
+
+- **Variants**: an endpoint keeps every response saved for it under a name and serves one of them
+  (`OlafMockEndpoint` + `OlafMockVariant`, switched with `selectVariant`).
+- **Reset to Original**: `resetEndpoint` / `resetAllToOriginal` send an endpoint (or all of them)
+  back to the real backend without deleting anything; the editor's "Reset to captured" restores the
+  response a variant was created from.
+- **Global override** (`globalMockTemplateId`): served to every captured request without an endpoint
+  entry of its own. Unlike endpoint mocks it respects the capture filters, and an endpoint on
+  Original is skipped by it.
+- **Templates**: URL-agnostic responses, seven built in, plus anything saved from the editor.
+- **Scenarios**: a named snapshot of every endpoint's selection plus the global override, applied in
+  one go.
+- The viewer's **⋮ → Mocks** sheet now navigates between the endpoint list, an endpoint's variants,
+  the template library and the editor — one sheet with its own back stack, since nested bottom
+  sheets fight the sheet's gesture handling.
+- 16 further unit tests (124 total) over layer precedence, endpoint reset, variant editing,
+  scenarios and the unchanged one-shot API.
+
+### Notes
+- `addMock`/`removeMock`/`removeAllMocks`/`activeMocks`/`OlafMockResponse` are unchanged: a one-shot
+  mock is stored as an endpoint holding a single active variant.
+- `olaf-no-op` mirrors every new type and member, so `:sample:assembleRelease` keeps proving the two
+  artifacts have not drifted.
+
 ## [0.10.0] — 2026-07-23
 ### Added
 Closing the gaps found by comparing against Chucker:

@@ -34,7 +34,9 @@
 - [x] **Timing breakdown** — DNS / TCP / TLS / TTFB per request, protocol (h2/h3), connection reuse
 - [x] **Active requests bar** — in-flight calls with elapsed time; spot a hung request instantly
 - [x] **Response mocking** — return your own status/body/delay/transport-error without hitting the
-      network, or **convert any captured response into a mock** on-device, no code
+      network, or **convert any captured response into a mock** on-device, no code. Save several
+      **variants** per endpoint and switch between them, **reset** any endpoint back to the real
+      backend, flip a **global override** on for everything else, or apply a saved **scenario**
 - [x] **Logcat import** — pull other SDKs' output into the same timeline and the same export
 - [x] **Decoding-error capture** — logs the failing field path (`$.user.accounts[0].iban`) next to
       the raw body, folded into the request it belongs to
@@ -119,8 +121,11 @@ OlafNetwork.addMock(OlafMockResponse(urlContains = "/v1/accounts", json = """{"a
 OlafNetwork.addMock(OlafMockResponse.failure("/v1/rates", OlafMockResponse.TransportError.Timeout))
 ```
 
-A matching request never reaches the network; the mock also wins over the capture filters. Manage
-active mocks from the viewer's **⋮ → Mocks**.
+A matching request never reaches the network; the mock also wins over the capture filters. The rest
+lives in the viewer's **⋮ → Mocks**: save several **variants** per endpoint and switch which one is
+served, **reset** an endpoint (or all of them) back to the real backend without deleting anything,
+switch on a **global override** for every other captured request, and save the whole setup as a
+**scenario**. Mocks live in memory and reset on app restart.
 
 <details>
 <summary><b>Differences from the iOS package</b></summary>

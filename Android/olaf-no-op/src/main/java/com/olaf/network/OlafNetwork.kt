@@ -58,6 +58,95 @@ data class NetworkTimingMetrics(
     val reusedConnection: Boolean? = null
 )
 
+/** No-op stand-in for the response half of a mock. */
+data class OlafMockPayload(
+    val statusCode: Int = 200,
+    val headers: Map<String, String> = mapOf("Content-Type" to "application/json"),
+    val body: ByteArray = ByteArray(0),
+    val delayMillis: Long = 0,
+    val transportError: OlafTransportError? = null
+) {
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is OlafMockPayload) return false
+        return statusCode == other.statusCode &&
+            headers == other.headers &&
+            body.contentEquals(other.body) &&
+            delayMillis == other.delayMillis &&
+            transportError == other.transportError
+    }
+
+    override fun hashCode(): Int {
+        var result = statusCode
+        result = 31 * result + headers.hashCode()
+        result = 31 * result + body.contentHashCode()
+        result = 31 * result + delayMillis.hashCode()
+        result = 31 * result + (transportError?.hashCode() ?: 0)
+        return result
+    }
+
+    companion object {
+        fun json(json: String, statusCode: Int = 200, delayMillis: Long = 0): OlafMockPayload =
+            OlafMockPayload(
+                statusCode = statusCode,
+                body = json.toByteArray(),
+                delayMillis = delayMillis
+            )
+
+        fun failure(
+            error: OlafTransportError = OlafTransportError.NotConnectedToInternet,
+            delayMillis: Long = 0
+        ): OlafMockPayload = OlafMockPayload(delayMillis = delayMillis, transportError = error)
+    }
+}
+
+/** No-op stand-in. */
+typealias OlafTransportError = OlafMockResponse.TransportError
+
+/** No-op stand-in. The library ships the same names so host code compiles unchanged in release. */
+data class OlafMockTemplate(
+    val name: String,
+    val payload: OlafMockPayload,
+    val isBuiltIn: Boolean = false,
+    val id: String = UUID.randomUUID().toString()
+) {
+    companion object {
+        val BuiltIn: List<OlafMockTemplate> = emptyList()
+    }
+}
+
+/** No-op stand-in. */
+data class OlafMockVariant(
+    val name: String,
+    val payload: OlafMockPayload,
+    val capturedPayload: OlafMockPayload = payload,
+    val id: String = UUID.randomUUID().toString()
+) {
+    val isModified: Boolean get() = false
+
+    fun resetToCaptured(): OlafMockVariant = this
+}
+
+/** No-op stand-in. */
+data class OlafMockEndpoint(
+    val urlContains: String,
+    val method: String? = null,
+    val variants: List<OlafMockVariant> = emptyList(),
+    val activeVariantId: String? = null,
+    val id: String = UUID.randomUUID().toString()
+) {
+    val activeVariant: OlafMockVariant? get() = null
+}
+
+/** No-op stand-in. */
+data class OlafMockScenario(
+    val name: String,
+    val selections: Map<String, String>,
+    val globalTemplateId: String? = null,
+    val id: String = UUID.randomUUID().toString()
+)
+
 /** No-op stand-in. Registering a mock in release does nothing — requests always hit the network. */
 data class OlafMockResponse(
     val urlContains: String,
@@ -95,6 +184,9 @@ data class OlafMockResponse(
         body = json.toByteArray(),
         delayMillis = delayMillis
     )
+
+    val payload: OlafMockPayload
+        get() = OlafMockPayload(statusCode, headers, body, delayMillis, transportError)
 
     override fun equals(other: Any?): Boolean = this === other || (other is OlafMockResponse && id == other.id)
 
@@ -135,7 +227,41 @@ object OlafNetwork {
 
     val activeMocks: List<OlafMockResponse> get() = emptyList()
 
-    internal fun mock(request: Request): OlafMockResponse? = null
+    val mockEndpoints: List<OlafMockEndpoint> get() = emptyList()
+
+    fun addEndpoint(endpoint: OlafMockEndpoint): String = endpoint.id
+
+    fun removeEndpoint(id: String) = Unit
+
+    fun addVariant(variant: OlafMockVariant, endpointId: String, activate: Boolean = true) = Unit
+
+    fun removeVariant(variantId: String, endpointId: String) = Unit
+
+    fun updateVariant(variantId: String, endpointId: String, mutate: (OlafMockVariant) -> OlafMockVariant) = Unit
+
+    fun selectVariant(variantId: String?, endpointId: String) = Unit
+
+    fun resetEndpoint(id: String) = Unit
+
+    fun resetAllToOriginal() = Unit
+
+    val mockTemplates: List<OlafMockTemplate> get() = emptyList()
+
+    fun addTemplate(template: OlafMockTemplate): String = template.id
+
+    fun removeTemplate(id: String) = Unit
+
+    var globalMockTemplateId: String? = null
+
+    val mockScenarios: List<OlafMockScenario> get() = emptyList()
+
+    fun saveScenario(name: String): OlafMockScenario = OlafMockScenario(name, emptyMap())
+
+    fun applyScenario(id: String) = Unit
+
+    fun removeScenario(id: String) = Unit
+
+    internal fun mock(request: Request): OlafMockPayload? = null
 }
 
 /**
