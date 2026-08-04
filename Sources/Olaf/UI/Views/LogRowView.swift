@@ -27,13 +27,21 @@ private struct NetworkRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            StatusPill(statusCode: info.statusCode, isFailure: info.isFailure)
+            // Status + method share the left column so the whole width is left for the path.
+            VStack(spacing: 3) {
+                StatusPill(statusCode: info.statusCode, isFailure: info.isFailure)
+                MethodBadge(method: info.method ?? "GET")
+            }
+            .frame(minWidth: 46)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
-                    MethodBadge(method: info.method ?? "GET")
-                    Text(info.path)
+                    // Query-free path, truncated from the head: the endpoint's tail — the part
+                    // that says where the request went — always stays visible.
+                    Text(info.pathWithoutQuery)
                         .font(.subheadline.monospaced())
+                        .lineLimit(2)
+                        .truncationMode(.head)
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
                     if decodeErrorCount > 0 {

@@ -52,6 +52,7 @@ final class NetworkLogInfoTests: XCTestCase {
         // URL parsing.
         XCTAssertEqual(unwrapped.host, "api.example.com")
         XCTAssertEqual(unwrapped.path, "/v1/pay?id=7")
+        XCTAssertEqual(unwrapped.pathWithoutQuery, "/v1/pay")   // the list row hides the query
         XCTAssertFalse(unwrapped.isFailure)
     }
 

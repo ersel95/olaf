@@ -3,6 +3,14 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.52.0] — 2026-08-04
+### Changed
+- Network rows now read as "where did this request go": the method badge moved under the status
+  pill, freeing the whole row width for the path, and the path is shown **without its query** —
+  truncated from the head when it still doesn't fit, so the tail of the endpoint always stays
+  visible instead of being cut out of the middle. The full URL (query included) is unchanged in
+  the detail view, in sharing and in the exporters.
+
 ## [0.51.0] — 2026-07-29
 ### Added
 Mocking was a one-shot list: a mock could only be added or deleted, so trying "empty list, then

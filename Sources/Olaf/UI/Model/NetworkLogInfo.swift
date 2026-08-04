@@ -78,6 +78,13 @@ struct NetworkLogInfo {
         return p
     }
 
+    /// The URL's path without the query — for the list row: it shows where the request went
+    /// without the parameter noise (the full URL stays in the detail view).
+    var pathWithoutQuery: String {
+        guard let url, let comps = URLComponents(string: url) else { return url ?? "-" }
+        return comps.path.isEmpty ? "/" : comps.path
+    }
+
     /// The URL's host.
     var host: String {
         guard let url, let comps = URLComponents(string: url) else { return "" }
