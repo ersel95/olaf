@@ -4,6 +4,14 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.12.0] — 2026-08-04
+### Changed
+- The network row from the iOS package's 0.52.0: the method badge moved under the status pill so
+  the whole row width is left for the path, and the path is shown **without its query**, ellipsised
+  at the start when it still doesn't fit — the tail of the endpoint stays visible instead of being
+  cut out of the middle. The full URL (query included) is unchanged on the detail screen, in
+  sharing and in the exporters.
+
 ## [0.11.0] — 2026-07-29
 ### Added
 The mocking model from the iOS package's 0.51.0, expressed in Kotlin and Compose — same three

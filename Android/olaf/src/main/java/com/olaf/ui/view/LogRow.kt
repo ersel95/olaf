@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,20 +53,30 @@ private fun NetworkRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        StatusPill(statusCode = info.statusCode, isFailure = info.isFailure)
+        // Status + method share the left column so the whole row width is left for the path.
+        Column(
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.widthIn(min = 46.dp)
+        ) {
+            StatusPill(statusCode = info.statusCode, isFailure = info.isFailure)
+            MethodBadge(method = info.method ?: "GET")
+        }
 
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                MethodBadge(method = info.method ?: "GET")
+                // Query-free path, ellipsised at the start: the tail of the endpoint — the part
+                // that says where the request went — always stays visible. (Start/middle
+                // ellipsis in Compose only applies to a single line, hence maxLines = 1.)
                 Text(
-                    text = info.path,
+                    text = info.pathWithoutQuery,
                     style = MaterialTheme.typography.bodyMedium,
                     fontFamily = FontFamily.Monospace,
                     maxLines = 1,
-                    overflow = TextOverflow.MiddleEllipsis,
+                    overflow = TextOverflow.StartEllipsis,
                     modifier = Modifier.weight(1f, fill = false)
                 )
                 if (decodeErrorCount > 0) DecodeBadge(decodeErrorCount)

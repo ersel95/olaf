@@ -48,6 +48,13 @@ internal data class NetworkLogInfo(
             return if (index < 0) "/" else withoutScheme.substring(index)
         }
 
+    /**
+     * Path without the query — what a list row shows: where the request went, free of the
+     * parameter noise. The full URL stays on the detail screen.
+     */
+    val pathWithoutQuery: String
+        get() = path.substringBefore('?')
+
     val host: String
         get() {
             val raw = url ?: return ""
@@ -59,7 +66,7 @@ internal data class NetworkLogInfo(
      * catch every call to the endpoint, narrow enough not to spill onto other endpoints.
      */
     val suggestedMockPattern: String
-        get() = host + path.substringBefore('?')
+        get() = host + pathWithoutQuery
 
     val isFailure: Boolean
         get() = error != null || (statusCode != null && statusCode >= 400)
