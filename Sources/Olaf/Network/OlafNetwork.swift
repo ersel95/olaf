@@ -1,7 +1,8 @@
 import Foundation
 
-/// Olaf network capture facade. Captures the app's network requests and logs them to Olaf
-/// **raw** (unredacted) under the `.network` category.
+/// Olaf network capture facade. Captures the app's network requests and logs them to Olaf under
+/// the `.network` category — **raw** unless the host supplies an ``OlafRedactor`` via
+/// ``OlafNetworkConfiguration/redactor``.
 ///
 /// ```swift
 /// // To capture all requests (Alamofire/URLSession custom config):

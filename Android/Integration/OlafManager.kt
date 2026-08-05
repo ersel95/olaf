@@ -5,6 +5,7 @@ import android.content.Context
 import com.olaf.LogCategory
 import com.olaf.Olaf
 import com.olaf.OlafConfiguration
+import com.olaf.network.OlafKeyRedactor
 import com.olaf.network.OlafNetwork
 import com.olaf.network.OlafNetworkConfiguration
 import com.olaf.ui.OlafUI
@@ -39,7 +40,19 @@ object OlafManager {
     private val isEnabled: Boolean
         get() = BuildConfig.DEBUG // ADAPT: e.g. `BuildConfig.DEBUG || BuildConfig.FLAVOR_default != "PROD"`
 
+    // ADAPT: environments where captured values must be masked (everything else stays raw).
+    private val isSensitiveEnvironment: Boolean
+        get() = false // ADAPT: e.g. `BuildConfig.FLAVOR_default != "TEST"`
+
     // ADAPT: third-party traffic you don't want in the timeline.
+    //
+    // `redactor` masks per environment: leave it null where the raw traffic is what you want
+    // (test/UAT), supply one where values must not be readable. It runs at capture time over every
+    // body, header and URL, so nothing is wired up per endpoint and the raw value never reaches the
+    // session file on disk. Fill `keys` with YOUR field names.
+    //
+    // It is a denylist: an unrecognised field is stored raw. Not a reason to enable Olaf in
+    // production — that is what [isEnabled] and the no-op artifact are for.
     private val networkConfiguration = OlafNetworkConfiguration(
         excludedUrls = listOf(
             "firebaseio",
@@ -48,7 +61,12 @@ object OlafManager {
             "app-measurement",
             "firebaseinstallations",
             "firebaseremoteconfig"
-        )
+        ),
+        redactor = if (isSensitiveEnvironment) {
+            OlafKeyRedactor(listOf("password", "otp", "pin")) // ADAPT: your field names
+        } else {
+            null
+        }
     )
 
     /**

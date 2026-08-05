@@ -37,6 +37,20 @@ public struct OlafNetworkConfiguration: Sendable {
     /// under `#if !PROD`; live traffic is unaffected. NEVER enable in prod.
     public var allowsArbitraryServerTrustForCapture: Bool
 
+    /// Masks sensitive values at capture time. **`nil` by default** → everything is stored raw,
+    /// which is the behaviour non-prod debugging wants. Set it per environment to mask instead:
+    ///
+    /// ```swift
+    /// config.redactor = isLiveEnvironment ? OlafKeyRedactor(keys: [...]) : nil
+    /// ```
+    ///
+    /// The redactor sees every captured body, header and URL — there is nothing to wire up per
+    /// endpoint. See ``OlafRedactor``.
+    ///
+    /// - Warning: A redactor is a denylist and is *not* a substitute for not capturing at all.
+    ///   A field it does not recognise is stored raw, and stored records are written to disk.
+    public var redactor: (any OlafRedactor)?
+
     public init(
         capturesBodies: Bool = true,
         capturesHeaders: Bool = true,
@@ -45,7 +59,8 @@ public struct OlafNetworkConfiguration: Sendable {
         category: LogCategory = .network,
         includedURLs: [String] = [],
         excludedURLs: [String] = [],
-        allowsArbitraryServerTrustForCapture: Bool = false
+        allowsArbitraryServerTrustForCapture: Bool = false,
+        redactor: (any OlafRedactor)? = nil
     ) {
         self.capturesBodies = capturesBodies
         self.capturesHeaders = capturesHeaders
@@ -55,6 +70,7 @@ public struct OlafNetworkConfiguration: Sendable {
         self.includedURLs = includedURLs.map { $0.lowercased() }
         self.excludedURLs = excludedURLs.map { $0.lowercased() }
         self.allowsArbitraryServerTrustForCapture = allowsArbitraryServerTrustForCapture
+        self.redactor = redactor
     }
 
     /// Should this URL be captured? (allow/deny filter — used in `OlafURLProtocol.canInit`)

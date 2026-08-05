@@ -24,7 +24,8 @@ data class OlafNetworkConfiguration(
     val category: LogCategory = LogCategory.Network,
     val includedUrls: List<String> = emptyList(),
     val excludedUrls: List<String> = emptyList(),
-    val bodyDecoders: List<BodyDecoder> = emptyList()
+    val bodyDecoders: List<BodyDecoder> = emptyList(),
+    val redactor: OlafRedactor? = null
 ) {
     fun shouldCapture(url: String?): Boolean = false
 
@@ -36,6 +37,33 @@ data class OlafNetworkConfiguration(
 /** No-op stand-in — never invoked, because nothing is captured. */
 fun interface BodyDecoder {
     fun decode(bytes: ByteArray, contentType: String?, contentEncoding: String?): String?
+}
+
+/** No-op stand-in — never invoked, because nothing is captured to redact. */
+interface OlafRedactor {
+    fun redactBody(body: String, url: String?): String
+    fun redactHeader(value: String, name: String, url: String?): String = value
+    fun redactUrl(url: String): String = url
+}
+
+/**
+ * No-op stand-in. Keeping the constructor signature identical means a host can build its redactor
+ * unconditionally; in release it simply never runs.
+ */
+@Suppress("UNUSED_PARAMETER")
+class OlafKeyRedactor(
+    keys: List<String>,
+    headerNames: List<String> = listOf("authorization", "cookie", "set-cookie", "x-api-key"),
+    placeholder: String = "***",
+    matchesSubstrings: Boolean = true,
+    unparsableBodyPolicy: UnparsableBodyPolicy = UnparsableBodyPolicy.MaskEntirely
+) : OlafRedactor {
+
+    enum class UnparsableBodyPolicy { MaskEntirely, BestEffort, KeepRaw }
+
+    fun matches(key: String): Boolean = false
+
+    override fun redactBody(body: String, url: String?): String = body
 }
 
 /** No-op stand-in. */

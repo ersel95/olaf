@@ -74,6 +74,14 @@ OlafNetwork.startAutomaticCapture()   // URLSessionConfiguration swizzle + globa
 ```
 Requests/responses land in Olaf raw (unmasked) in the `.network` category. Body + header capture is **on by default**;
 to reduce it, use `startAutomaticCapture(OlafNetworkConfiguration(capturesBodies: false))`.
+To mask instead of dropping — e.g. a live-like environment where you still want traffic visible — set
+`redactor` on the configuration; it runs at capture time over every body, header and URL:
+```swift
+OlafNetwork.startAutomaticCapture(OlafNetworkConfiguration(
+    redactor: isLiveEnvironment ? OlafKeyRedactor(keys: ["password", "otp", "balance"]) : nil
+))
+```
+It's a denylist, though: an unrecognised field is stored raw, so it does not make capture safe for production.
 For manual/deterministic injection into your own session (step 4), use `configureNetworkCapture(_:)` / `install(into:chainingTo:)`.
 
 ## Extending: adding an external diagnostics tool

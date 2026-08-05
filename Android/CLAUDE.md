@@ -29,9 +29,15 @@ Inside `olaf/src/main/java/com/olaf/`:
 All three must be green on every change. `allWarningsAsErrors` is on: warnings fail the build.
 
 ## Immutable rules
-- **NO redaction/masking/filtering.** Message, metadata, bodies and headers are stored and shown
-  exactly as they arrived, `Authorization` included. Masking is not offered even as an option;
-  preventing leaks is the host's job, which is what `olaf-no-op` exists for.
+- **Raw by default; masking only via a host-supplied redactor.** With no redactor configured,
+  message, metadata, bodies and headers are stored and shown exactly as they arrived,
+  `Authorization` included — that default must not change. Since android-0.14.0 a host can set
+  `OlafNetworkConfiguration.redactor` (the iOS package's 0.54.0), applied at capture time in the
+  single choke point `NetworkLogComposer.metadata(event, redactor)`; there is no per-endpoint
+  filtering. **The rules live on the host side**: the library ships only the generic `OlafRedactor`
+  interface and the field-name-driven `OlafKeyRedactor`, never domain-specific field names. A
+  redactor is a denylist, not a safety net — keeping capture out of production is still what
+  `olaf-no-op` exists for.
 - **The no-op artifact mirrors the public API exactly.** Every public declaration added to `:olaf`
   must be added to `:olaf-no-op` with the same signature. The sample compiles against `:olaf` in
   debug and `:olaf-no-op` in release, so `:sample:assembleRelease` is the drift alarm — and it is

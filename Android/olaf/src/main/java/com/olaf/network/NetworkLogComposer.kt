@@ -60,9 +60,9 @@ internal object NetworkLogComposer {
         else -> LogLevel.INFO
     }
 
-    fun message(event: NetworkLogEvent): String = buildList {
+    fun message(event: NetworkLogEvent, redactor: OlafRedactor? = null): String = buildList {
         add(event.method)
-        add(event.url)
+        add(redactor?.redactUrl(event.url) ?: event.url)
         event.statusCode?.let { add("→ $it") }
         if (event.cancelled) add("→ cancelled")
         if (event.error != null) add("→ ✗")
@@ -70,9 +70,14 @@ internal object NetworkLogComposer {
         add("(${event.durationMs}ms)")
     }.joinToString(" ")
 
-    fun metadata(event: NetworkLogEvent): Map<String, String> = buildMap {
+    /**
+     * @param redactor masks bodies, headers and the URL before they become a stored record. This
+     * is the **single** point where captured data turns into a log entry, so a host never filters
+     * per endpoint. `null` stores everything raw, which is the default.
+     */
+    fun metadata(event: NetworkLogEvent, redactor: OlafRedactor? = null): Map<String, String> = buildMap {
         put("method", event.method)
-        put("url", event.url)
+        put("url", redactor?.redactUrl(event.url) ?: event.url)
         put("durationMs", event.durationMs.toString())
         put("reqBytes", event.requestBytes.toString())
         put("respBytes", event.responseBytes.toString())
@@ -80,13 +85,18 @@ internal object NetworkLogComposer {
         event.error?.let { put("error", it) }
         if (event.cancelled) put("cancelled", "true")
         if (event.mocked) put("mocked", "true")
-        // Bodies are stored raw under their own keys.
-        event.requestBody?.let { put("requestBody", it) }
-        event.responseBody?.let { put("responseBody", it) }
+        // Bodies live under their own keys — raw unless a redactor is configured, in which case
+        // they are masked here, before anything is stored or persisted.
+        event.requestBody?.let { put("requestBody", redactor?.redactBody(it, event.url) ?: it) }
+        event.responseBody?.let { put("responseBody", redactor?.redactBody(it, event.url) ?: it) }
         event.responseImageBase64?.let { put("responseImageBase64", it) }
-        // Headers are stored raw, one metadata key per header.
-        event.requestHeaders?.forEach { (key, value) -> put("reqH.$key", value) }
-        event.responseHeaders?.forEach { (key, value) -> put("respH.$key", value) }
+        // One metadata key per header, each passed through the redactor by name.
+        event.requestHeaders?.forEach { (key, value) ->
+            put("reqH.$key", redactor?.redactHeader(value, key, event.url) ?: value)
+        }
+        event.responseHeaders?.forEach { (key, value) ->
+            put("respH.$key", redactor?.redactHeader(value, key, event.url) ?: value)
+        }
         // Timing lives under the `t.` prefix — the viewer's "Timing" section reads these.
         event.timing?.let { timing ->
             timing.dnsMs?.let { put("t.dnsMs", it.toString()) }

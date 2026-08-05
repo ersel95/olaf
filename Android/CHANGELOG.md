@@ -4,6 +4,22 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.14.0] — 2026-08-05
+### Added
+- Optional masking from the iOS package's 0.54.0: `OlafNetworkConfiguration.redactor` takes an
+  `OlafRedactor`, applied at capture time in `NetworkLogComposer` — the single point where a
+  captured call becomes a stored record — so every body, header and URL passes through it with
+  nothing wired up per endpoint, and the raw value never reaches the session file on disk.
+- `OlafKeyRedactor`, matching by **field name** (case-insensitive, substring by default) across
+  JSON bodies including nested objects and arrays, form bodies and query strings; the usual
+  credential headers are masked out of the box. An unparsable body is masked entirely by default
+  (`unparsableBodyPolicy`). Mirrored in `olaf-no-op` with the same signatures, so a host can build
+  its redactor unconditionally and have it simply never run in release.
+
+The default is unchanged: with no redactor, everything is stored raw. Field names come from the
+host. A redactor is a denylist and does not make capture production-safe — that is still what the
+no-op artifact is for.
+
 ## [0.13.0] — 2026-08-05
 ### Added
 - The copy button from the iOS package's 0.53.0: an expanded header row now carries a copy icon

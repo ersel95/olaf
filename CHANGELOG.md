@@ -3,6 +3,24 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.54.0] — 2026-08-05
+### Added
+- Optional masking, for hosts that want capture in a live-like environment without the values.
+  `OlafNetworkConfiguration.redactor` takes an `OlafRedactor` and is applied at capture time in
+  `NetworkLogComposer` — the single point where a captured call becomes a stored record — so every
+  body, header and URL passes through it and nothing is wired up per endpoint. The raw value never
+  reaches the NDJSON session file.
+- `OlafKeyRedactor`, a ready-made redactor matching by **field name** (case-insensitive,
+  substring by default) across JSON bodies including nested objects and arrays, form bodies and
+  query strings; `Authorization`/`Cookie`/`Set-Cookie`/`X-API-Key` are masked out of the box. A body
+  it cannot parse — a truncated one, typically — is masked entirely rather than passed through,
+  configurable via `unparsableBodyPolicy`.
+
+The default is unchanged and stays that way: with no redactor configured, everything is stored raw.
+The field names come from the host, so the package itself carries no domain vocabulary. Note that a
+redactor is a **denylist** — an unrecognised field is stored raw — and therefore does not make
+capture safe for production; the `#if !PROD` gate is still the only real guarantee.
+
 ## [0.53.0] — 2026-08-05
 ### Added
 - A copy button in the headers list: expanding a header row now shows a copy icon next to the

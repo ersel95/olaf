@@ -53,8 +53,8 @@ enum NetworkLogComposer {
         }
     }
 
-    static func message(for event: NetworkLogEvent) -> String {
-        var parts = ["\(event.method)", event.url]
+    static func message(for event: NetworkLogEvent, redactor: (any OlafRedactor)? = nil) -> String {
+        var parts = ["\(event.method)", redactor?.redact(url: event.url) ?? event.url]
         if let status = event.statusCode { parts.append("→ \(status)") }
         if event.cancelled { parts.append("→ cancelled") }
         if event.error != nil { parts.append("→ ✗") }
@@ -63,10 +63,14 @@ enum NetworkLogComposer {
         return parts.joined(separator: " ")
     }
 
-    static func metadata(for event: NetworkLogEvent) -> [String: String] {
+    /// - Parameter redactor: masks bodies, headers and the URL before they become a stored record.
+    ///   This is the **single** point where captured data turns into a log entry, so a host never
+    ///   has to filter per endpoint. `nil` → everything is stored raw (the default).
+    static func metadata(for event: NetworkLogEvent, redactor: (any OlafRedactor)? = nil) -> [String: String] {
+        let requestURL = URL(string: event.url)
         var metadata: [String: String] = [
             "method": event.method,
-            "url": event.url,
+            "url": redactor?.redact(url: event.url) ?? event.url,
             "durationMs": String(event.durationMs),
             "reqBytes": String(event.requestBytes),
             "respBytes": String(event.responseBytes)
@@ -75,13 +79,22 @@ enum NetworkLogComposer {
         if let error = event.error { metadata["error"] = error }
         if event.cancelled { metadata["cancelled"] = "true" }
         if event.mocked { metadata["mocked"] = "true" }
-        // Bodies are stored raw under separate `requestBody`/`responseBody` keys.
-        if let body = event.requestBody { metadata["requestBody"] = body }
-        if let body = event.responseBody { metadata["responseBody"] = body }
+        // Bodies live under separate `requestBody`/`responseBody` keys — raw unless a redactor
+        // is configured, in which case they are masked here, before anything is stored or persisted.
+        if let body = event.requestBody {
+            metadata["requestBody"] = redactor?.redact(body: body, url: requestURL) ?? body
+        }
+        if let body = event.responseBody {
+            metadata["responseBody"] = redactor?.redact(body: body, url: requestURL) ?? body
+        }
         if let image = event.responseImageBase64 { metadata["responseImageBase64"] = image }
-        // Headers are stored raw under separate keys.
-        for (key, value) in event.requestHeaders ?? [:] { metadata["reqH.\(key)"] = value }
-        for (key, value) in event.responseHeaders ?? [:] { metadata["respH.\(key)"] = value }
+        // Headers get one key each, passed through the redactor by name.
+        for (key, value) in event.requestHeaders ?? [:] {
+            metadata["reqH.\(key)"] = redactor?.redact(headerValue: value, name: key, url: requestURL) ?? value
+        }
+        for (key, value) in event.responseHeaders ?? [:] {
+            metadata["respH.\(key)"] = redactor?.redact(headerValue: value, name: key, url: requestURL) ?? value
+        }
         // Timing breakdown is stored with a `t.` prefix (read by the viewer's "Timing" section).
         if let timing = event.timing {
             if let v = timing.dnsMs { metadata["t.dnsMs"] = String(v) }

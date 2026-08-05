@@ -60,9 +60,24 @@ public final class OlafManager {
     /// flag only relaxes the **capture proxy's** server-trust check (your app's own traffic validation is
     /// unchanged, SSL is not broken). The code already compiles under `#if !PROD` → it doesn't end up in the
     /// prod binary. Not needed for public certificates signed by a system CA; leave it `false`.
+    /// ADAPT: `redactor` — masking, per environment. Leave it `nil` where you want the raw traffic
+    /// (test/UAT); supply one where values must not be readable. It runs at capture time over every
+    /// body, header and URL, so there is nothing to add per endpoint, and the raw value never
+    /// reaches the on-disk session file. Fill `keys` with YOUR field names.
+    ///
+    /// A redactor is a **denylist**: a field it doesn't recognise is stored raw. It is not a reason
+    /// to enable capture in production — keep the `#if !PROD` boundary above regardless.
     private static let networkConfiguration = OlafNetworkConfiguration(
-        allowsArbitraryServerTrustForCapture: false
+        allowsArbitraryServerTrustForCapture: false,
+        redactor: isSensitiveEnvironment
+            ? OlafKeyRedactor(keys: ["password", "otp", "pin"])   // ADAPT: your field names
+            : nil
     )
+
+    /// ADAPT: environments where captured values must be masked (everything else stays raw).
+    private static var isSensitiveEnvironment: Bool {
+        false   // e.g. `AppEnvironment.current != .test`
+    }
 
     /// (Optional) If the host sets up its own `URLSessionConfiguration`: injects Olaf at the front of this
     /// config instead of automatic swizzling. If you use this, startAutomaticCapture in initialize is not needed.

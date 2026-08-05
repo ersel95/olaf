@@ -318,9 +318,9 @@ final class OlafURLProtocol: URLProtocol {
 
         Olaf.log(
             NetworkLogComposer.level(statusCode: event.statusCode, error: event.error, cancelled: event.cancelled),
-            NetworkLogComposer.message(for: event),
+            NetworkLogComposer.message(for: event, redactor: config.redactor),
             category: config.category,
-            metadata: NetworkLogComposer.metadata(for: event)
+            metadata: NetworkLogComposer.metadata(for: event, redactor: config.redactor)
         )
     }
 

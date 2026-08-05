@@ -204,9 +204,9 @@ internal class OlafInterceptor : Interceptor {
     private fun log(event: NetworkLogEvent) {
         Olaf.log(
             level = NetworkLogComposer.level(event.statusCode, event.error, event.cancelled),
-            message = NetworkLogComposer.message(event),
+            message = NetworkLogComposer.message(event, OlafNetwork.configuration.redactor),
             category = OlafNetwork.configuration.category,
-            metadata = NetworkLogComposer.metadata(event)
+            metadata = NetworkLogComposer.metadata(event, OlafNetwork.configuration.redactor)
         )
     }
 

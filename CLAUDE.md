@@ -24,7 +24,7 @@ SPM offers a single product: `Olaf`. The host adds this one product, and a singl
   can add its own external diagnostics tool to the viewer as a button (the package is not tied to any external tool).
 - **`Sources/Olaf/Network`** — URLProtocol network capture; in the `.network` category, raw (unmasked).
   - `startAutomaticCapture(config)` — automatically injects into all sessions via a URLSessionConfiguration swizzle (without touching the host's networking code). Captured requests go through a SINGLE shared proxy session (`OlafProxySession`): connection pooling/TLS are reused, and the shared `HTTPCookieStorage` is preserved. Trust defaults to system validation (`allowsArbitraryServerTrustForCapture` is opt-in only).
-  - `OlafNetworkConfiguration`: `capturesBodies/capturesHeaders` (on by default), `includedURLs`/`excludedURLs` (a baseURL allow/deny filter — applied in `canInit`, exclude takes priority), `maxBodyLength`, `category`.
+  - `OlafNetworkConfiguration`: `capturesBodies/capturesHeaders` (on by default), `includedURLs`/`excludedURLs` (a baseURL allow/deny filter — applied in `canInit`, exclude takes priority), `maxBodyLength`, `category`, `redactor` (`nil` by default → raw).
   - JSON bodies are pretty-printed and stored **at capture time**; syntax-highlighted in the viewer via `JSONHighlighter`.
 
 ## Build / test
@@ -36,7 +36,16 @@ Both macOS tests and the iOS build must be green on every change.
 
 ## Immutable rules
 - **A single SPM product/target remains.** The package is not to be split back into multiple products; upload/bug-reporter is not to be added back.
-- **NO redaction/masking/filtering.** All data is stored and displayed **raw**, exactly as it came from the call site (message, metadata, network body/header). Masking is not offered even as an option — the `Redactor`/`BankingRedactor`/`redactionEnabled` API has been deliberately removed; it is not to be added back. Preventing sensitive data leaks is the host's responsibility (gate capture in PROD with `#if !PROD`).
+- **Raw by default; masking only via a host-supplied redactor.** With no redactor configured, all
+  data is stored and displayed **raw**, exactly as it came from the call site (message, metadata,
+  network body/header) — that default must not change. Since 0.54.0 a host that needs masking in a
+  live-like environment can set `OlafNetworkConfiguration.redactor`; the package applies it at
+  capture time in the single choke point `NetworkLogComposer.metadata(for:redactor:)`, so no
+  per-endpoint filtering exists anywhere. **The rules stay on the host side**: the package ships
+  only the generic `OlafRedactor` protocol and the field-name-driven `OlafKeyRedactor` — no
+  domain-specific field names (see the "keep it generic" rule below). A redactor is a *denylist*
+  and does not make capture safe for production; gating capture out (`#if !PROD`) is still the
+  host's responsibility and still the only real guarantee.
 - **The package is NOT tied to any external tool.** External diagnostics tool handoff is added only on the host side via the generic `ExternalToolBridge`
   + `OlafUI.register(_:)`; if needed, another capture tool's URLProtocol can be chained onto the shared session via
   `OlafNetwork.install(chainingTo:)`.

@@ -21,8 +21,9 @@
 
 > **Olaf is not a network proxy and not a crash reporter.** It has **no backend, no telemetry,
 > and zero dependencies**. Logs are stored on-device as NDJSON and shared only when *you* tap
-> share. It also does **not** redact anything — data is shown raw, which is exactly why it is
-> a **non-production debug tool** (`#if !PROD`).
+> share. By default it does **not** redact anything — data is shown raw, which is exactly why it is
+> a **non-production debug tool** (`#if !PROD`). A host that needs masking in a live-like
+> environment can plug in its own [redactor](#masking-sensitive-values-optional).
 
 ## Two platforms, one repository
 
@@ -172,6 +173,40 @@ OkHttp has no global injection point, so the interceptor is added explicitly —
 Chucker needs. In exchange nothing re-issues your requests, so your TLS, pinning and timeouts apply
 untouched.
 
+### Masking sensitive values (optional)
+
+By default nothing is masked. When you want capture in a live-like environment but not the values
+themselves, hand the configuration a **redactor**. It runs at capture time over every body, header
+and URL, at the one point where a captured call becomes a stored record — so there is nothing to
+wire up per endpoint, and the raw value never reaches the on-disk session file.
+
+```swift
+var config = OlafNetworkConfiguration()
+config.redactor = isLiveEnvironment
+    ? OlafKeyRedactor(keys: ["password", "otp", "balance", "iban"])   // your field names
+    : nil                                                            // nil → raw, as before
+OlafNetwork.startAutomaticCapture(config)
+```
+
+```kotlin
+OlafNetwork.configuration = OlafNetworkConfiguration(
+    redactor = if (isLiveEnvironment) OlafKeyRedactor(listOf("password", "otp", "balance")) else null
+)
+```
+
+`OlafKeyRedactor` matches **field names** — case-insensitively and as substrings, so `balance` also
+covers `availableBalance` — across JSON bodies (nested objects and arrays included), form bodies and
+query strings; `Authorization`, `Cookie`, `Set-Cookie` and `X-API-Key` are masked by default. A body
+it cannot parse (a truncated one, say) is masked *entirely* rather than passed through — configurable
+via `unparsableBodyPolicy`. For anything else, implement `OlafRedactor` yourself. Olaf deliberately
+ships no domain-specific field names: what counts as sensitive is yours to declare.
+
+> [!WARNING]
+> A redactor is a **denylist**, not a safety net. The day an endpoint returns a field your list
+> doesn't name, its value is stored raw — and stored records are written to disk. It does not make
+> capture safe for production; keeping capture out of production builds is still the only real
+> guarantee.
+
 ### Response mocking
 
 ```swift
@@ -246,7 +281,7 @@ Android  OlafNetwork (Interceptor + EventListener)       ·  OlafUI → its own 
 ## Privacy & Security
 
 - **Fully local.** No backend, no analytics, no network calls of its own. Data leaves the device only through the share sheet, by explicit user action.
-- **No redaction, by design.** Everything is stored raw (including `Authorization`/`Cookie`); that's what makes it useful for debugging — and why you must gate it out of production builds.
+- **Raw by default, by design.** With no redactor configured everything is stored raw (including `Authorization`/`Cookie`); that's what makes it useful for debugging — and why you must gate it out of production builds. See [Masking sensitive values](#masking-sensitive-values-optional) when you need capture in a live-like environment.
 - *iOS:* ships a [`PrivacyInfo.xcprivacy`](Sources/Olaf/PrivacyInfo.xcprivacy) manifest (no tracking, no data collection).\n- *Android:* the `FileProvider` is declared by the library itself and exposes only the export directory; release builds link the no-op artifact, so none of this reaches production.
 
 ## Development

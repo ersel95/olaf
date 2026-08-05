@@ -42,7 +42,20 @@ data class OlafNetworkConfiguration(
      * Decoders for bodies Olaf can't read as text — Protobuf and friends. Tried in order; the
      * first non-null result wins. See [BodyDecoder], which also covers compressed bodies.
      */
-    val bodyDecoders: List<BodyDecoder> = emptyList()
+    val bodyDecoders: List<BodyDecoder> = emptyList(),
+
+    /**
+     * Masks sensitive values at capture time. **`null` by default** → everything is stored raw,
+     * which is what non-prod debugging wants. Set it per environment to mask instead:
+     *
+     * ```kotlin
+     * redactor = if (isLiveEnvironment) OlafKeyRedactor(listOf("password", "otp")) else null
+     * ```
+     *
+     * The redactor sees every captured body, header and URL, so there is nothing to wire up per
+     * endpoint. See [OlafRedactor] — and note that a denylist is no substitute for not capturing.
+     */
+    val redactor: OlafRedactor? = null
 ) {
 
     private val normalizedIncluded = includedUrls.map { it.lowercase() }
