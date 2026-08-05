@@ -3,6 +3,12 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.53.0] — 2026-08-05
+### Added
+- A copy button in the headers list: expanding a header row now shows a copy icon next to the
+  value, and tapping it puts that value on the clipboard with the usual "Copied" toast. Selecting
+  a wrapped bearer token or `set-cookie` by hand was the fiddly part; text selection still works.
+
 ## [0.52.0] — 2026-08-04
 ### Changed
 - Network rows now read as "where did this request go": the method badge moved under the status

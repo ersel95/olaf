@@ -7,29 +7,46 @@ struct HeadersListView: View {
     let title: String
     let headers: [(key: String, value: String)]
 
+    @State private var didCopy = false
+
     var body: some View {
         List {
             ForEach(headers, id: \.key) { header in
-                HeaderRow(key: header.key, value: header.value)
+                HeaderRow(key: header.key, value: header.value, didCopy: $didCopy)
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .copyToast($didCopy)
     }
 }
 
 private struct HeaderRow: View {
     let key: String
     let value: String
+    @Binding var didCopy: Bool
 
     @State private var isExpanded = false
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
-            Text(value)
-                .font(.callout.monospaced())
-                .textSelection(.enabled)
+            HStack(alignment: .top, spacing: 12) {
+                Text(value)
+                    .font(.callout.monospaced())
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                // Selection works, but dragging a token across several lines is fiddly —
+                // one tap copies the whole value.
+                Button {
+                    olafCopy(value, showing: $didCopy)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.callout)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Copy \(key)")
+            }
         } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(key)

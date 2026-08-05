@@ -4,6 +4,12 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 SemVer (0.x — API not yet stable). Android releases are tagged `android-x.y.z` so they stay
 independent of the iOS package's own version line (see the [root CHANGELOG](../CHANGELOG.md)).
 
+## [0.13.0] — 2026-08-05
+### Added
+- The copy button from the iOS package's 0.53.0: an expanded header row now carries a copy icon
+  next to its value, and tapping it copies that value with the usual snackbar confirmation.
+  Selection is untouched — it was just fiddly on a wrapped token.
+
 ## [0.12.0] — 2026-08-04
 ### Changed
 - The network row from the iOS package's 0.52.0: the method badge moved under the status pill so

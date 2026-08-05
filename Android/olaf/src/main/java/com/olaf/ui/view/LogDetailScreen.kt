@@ -5,11 +5,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.graphics.asImageBitmap
@@ -151,7 +154,11 @@ internal fun LogDetailScreen(
             }
 
             if (network != null) {
-                networkSections(network) { title, text -> fullScreenText = title to text }
+                networkSections(
+                    info = network,
+                    onOpenText = { title, text -> fullScreenText = title to text },
+                    onCopy = { label, text -> copy(label, text) }
+                )
                 item {
                     Section(title = "cURL", initiallyExpanded = false) {
                         val command = remember(network) { CurlBuilder.curl(network) }
@@ -168,7 +175,8 @@ internal fun LogDetailScreen(
 
 private fun androidx.compose.foundation.lazy.LazyListScope.networkSections(
     info: NetworkLogInfo,
-    onOpenText: (title: String, text: String) -> Unit
+    onOpenText: (title: String, text: String) -> Unit,
+    onCopy: (label: String, text: String) -> Unit
 ) {
     info.error?.let { error ->
         item { Section(title = "Error") { SelectableValue(error) } }
@@ -199,7 +207,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.networkSections(
     if (info.requestHeaders.isNotEmpty()) {
         item {
             Section(title = "Request headers (${info.requestHeaders.size})") {
-                info.requestHeaders.forEach { HeaderRow(it.first, it.second) }
+                info.requestHeaders.forEach { HeaderRow(it.first, it.second, onCopy) }
             }
         }
     }
@@ -215,7 +223,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.networkSections(
     if (info.responseHeaders.isNotEmpty()) {
         item {
             Section(title = "Response headers (${info.responseHeaders.size})") {
-                info.responseHeaders.forEach { HeaderRow(it.first, it.second) }
+                info.responseHeaders.forEach { HeaderRow(it.first, it.second, onCopy) }
             }
         }
     }
@@ -327,7 +335,7 @@ private fun Section(
  * hundreds of characters, and expanding them all at once buries the rest of the response.
  */
 @Composable
-private fun HeaderRow(name: String, value: String) {
+private fun HeaderRow(name: String, value: String, onCopy: (String, String) -> Unit) {
     var expanded by remember(name, value) { mutableStateOf(false) }
     val isLong = value.length > HEADER_PREVIEW_LIMIT
 
@@ -343,7 +351,21 @@ private fun HeaderRow(name: String, value: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (expanded || !isLong) {
-            SelectableValue(value)
+            // Selection works, but dragging across a wrapped token is fiddly — one tap
+            // copies the whole value.
+            Row(verticalAlignment = Alignment.Top) {
+                Box(modifier = Modifier.weight(1f)) { SelectableValue(value) }
+                IconButton(
+                    onClick = { onCopy(name, value) },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = OlafIcons.Copy,
+                        contentDescription = "Copy $name",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         } else {
             Text(
                 text = value,
