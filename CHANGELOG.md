@@ -7,10 +7,11 @@ The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); ve
 ### Changed
 - The minimum iOS version drops from **17 to 15**. Only the viewer used newer APIs; the engine and
   network capture already ran on iOS 15. The viewer now goes through small internal back-ports —
-  `NavigationStack`, `ContentUnavailableView` and `LabeledContent` are used natively where the OS
-  has them and replaced by equivalents on older versions — so nothing changes on iOS 17+.
-- Log rows open their detail via destination-based `NavigationLink`s instead of
-  `navigationDestination(for:)`, which iOS 15 lacks. No public API changed.
+  `NavigationStack`, `LabeledContent`, value-based navigation and `ContentUnavailableView` are
+  used natively where the OS has them and replaced by equivalents on older versions — so nothing
+  changes on iOS 17+, and on iOS 16 only the empty-state screen differs. No public API changed.
+- Known iOS 15 limitation: log rows there open their detail through a destination-based link, so
+  an open detail can close by itself if its entry leaves the list (ring-buffer eviction, Clear).
 
 ## [0.54.0] — 2026-08-05
 ### Added

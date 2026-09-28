@@ -95,6 +95,7 @@ public struct OlafViewerView: View {
             }
             .listStyle(.plain)
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
+            .compatNavigationDestination(for: LogEntry.self) { entry in detail(entry) }
             .safeAreaInset(edge: .bottom) {
                 if isSelecting { selectionBar }
             }
@@ -114,13 +115,16 @@ public struct OlafViewerView: View {
         }
     }
 
-    /// Destination-based link (iOS 15 has no `navigationDestination(for:)`).
     private func entryLink(_ entry: LogEntry) -> some View {
-        NavigationLink {
-            LogDetailView(entry: entry, decodeErrors: model.decodeIndex.errors(for: entry))
+        CompatNavigationLink(value: entry) {
+            detail(entry)
         } label: {
             logRow(entry)
         }
+    }
+
+    private func detail(_ entry: LogEntry) -> some View {
+        LogDetailView(entry: entry, decodeErrors: model.decodeIndex.errors(for: entry))
     }
 
     /// Row with the folded decode-error badge (count comes from the shared index).
@@ -190,6 +194,7 @@ public struct OlafViewerView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .compatNavigationDestination(for: LogEntry.self) { entry in detail(entry) }
         }
     }
 

@@ -51,11 +51,14 @@ struct EmptyStateView: View {
     }
 }
 
-/// `LabeledContent` look-alike (label leading, secondary-styled value trailing) that also
-/// runs on iOS 15. Mirrors the three `LabeledContent` initializers the viewer uses.
+/// `LabeledContent` on iOS 16+; on iOS 15 a look-alike (label leading, value trailing).
+/// Mirrors the three `LabeledContent` initializers the viewer uses. Only the plain
+/// `value:` form dims its value on iOS 15, so custom content (e.g. a `TextField`) keeps its
+/// own color there — callers that want a dimmed custom value style it themselves.
 struct LabeledRow<Label: View, Content: View>: View {
     private let label: Label
     private let content: Content
+    private var dimsContent = false
 
     init(@ViewBuilder content: () -> Content, @ViewBuilder label: () -> Label) {
         self.content = content()
@@ -63,11 +66,18 @@ struct LabeledRow<Label: View, Content: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            label
-            Spacer(minLength: 12)
-            content
-                .foregroundStyle(.secondary)
+        if #available(iOS 16, *) {
+            LabeledContent { content } label: { label }
+        } else {
+            HStack(alignment: .firstTextBaseline) {
+                label
+                Spacer(minLength: 12)
+                if dimsContent {
+                    content.foregroundStyle(.secondary)
+                } else {
+                    content
+                }
+            }
         }
     }
 }
@@ -81,6 +91,39 @@ extension LabeledRow where Label == Text {
 extension LabeledRow where Label == Text, Content == Text {
     init(_ title: String, value: String) {
         self.init(content: { Text(value) }) { Text(title) }
+        dimsContent = true
+    }
+}
+
+extension View {
+    /// `navigationDestination(for:)` on iOS 16+; a no-op on iOS 15, where links carry
+    /// their destination directly (see `CompatNavigationLink`).
+    @ViewBuilder
+    func compatNavigationDestination<D: Hashable, Destination: View>(
+        for type: D.Type,
+        @ViewBuilder destination: @escaping (D) -> Destination
+    ) -> some View {
+        if #available(iOS 16, *) {
+            navigationDestination(for: type, destination: destination)
+        } else {
+            self
+        }
+    }
+}
+
+/// Value-based `NavigationLink` on iOS 16+ (resolved by `compatNavigationDestination`), so a
+/// pushed detail survives its row leaving the list; destination-based on iOS 15.
+struct CompatNavigationLink<Value: Hashable, Destination: View, Label: View>: View {
+    let value: Value
+    @ViewBuilder let destination: () -> Destination
+    @ViewBuilder let label: () -> Label
+
+    var body: some View {
+        if #available(iOS 16, *) {
+            NavigationLink(value: value, label: label)
+        } else {
+            NavigationLink(destination: destination, label: label)
+        }
     }
 }
 #endif

@@ -71,7 +71,7 @@ struct NetworkStatsView: View {
                 Section("Slowest requests") {
                     ForEach(Array(stats.slowest.enumerated()), id: \.offset) { _, item in
                         LabeledRow {
-                            Text("\(item.durationMs) ms").monospacedDigit()
+                            Text("\(item.durationMs) ms").monospacedDigit().foregroundStyle(.secondary)
                         } label: {
                             Text(item.path)
                                 .font(.callout.monospaced())

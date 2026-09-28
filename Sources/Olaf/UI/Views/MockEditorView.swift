@@ -159,6 +159,7 @@ struct MockEditorView: View {
                 LabeledRow("URL fragment") {
                     Text(urlContains)
                         .font(.callout.monospaced())
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
