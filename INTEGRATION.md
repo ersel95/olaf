@@ -173,7 +173,7 @@ Call it manually when a screen appears:
 4. Open a network entry → the status banner, headers, pretty-printed JSON body, and sharing
    (Simple/Full log + cURL) should all work.
 
-> **Version compatibility:** iOS 17+. **No external dependencies.** UIKit code is gated behind
+> **Version compatibility:** iOS 15+. **No external dependencies.** UIKit code is gated behind
 > `#if canImport(UIKit)` (non-UI logic also compiles/tests on macOS).
 
 ---

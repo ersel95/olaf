@@ -19,7 +19,7 @@ public struct OlafViewerView: View {
     }
 
     public var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             VStack(spacing: 0) {
                 scopePicker
                 FilterBarView(model: model)
@@ -79,7 +79,7 @@ public struct OlafViewerView: View {
     private var sessionList: some View {
         let entries = model.filteredEntries
         if entries.isEmpty && model.pinnedEntries.isEmpty {
-            ContentUnavailableView("No entries", systemImage: "doc.text.magnifyingglass", description: Text("No logs matched the filter."))
+            EmptyStateView("No entries", systemImage: "doc.text.magnifyingglass", description: Text("No logs matched the filter."))
                 .frame(maxHeight: .infinity)
         } else {
             List(selection: $selectedIDs) {
@@ -88,16 +88,13 @@ public struct OlafViewerView: View {
                 }
                 Section {
                     ForEach(entries) { entry in
-                        NavigationLink(value: entry) { logRow(entry) }
+                        entryLink(entry)
                             .contextMenu { pinButton(entry) }
                     }
                 }
             }
             .listStyle(.plain)
             .environment(\.editMode, .constant(isSelecting ? .active : .inactive))
-            .navigationDestination(for: LogEntry.self) { entry in
-                LogDetailView(entry: entry, decodeErrors: model.decodeIndex.errors(for: entry))
-            }
             .safeAreaInset(edge: .bottom) {
                 if isSelecting { selectionBar }
             }
@@ -108,12 +105,21 @@ public struct OlafViewerView: View {
     private var pinnedSection: some View {
         Section {
             ForEach(model.pinnedEntries) { entry in
-                NavigationLink(value: entry) { logRow(entry) }
+                entryLink(entry)
                     .contextMenu { pinButton(entry) }
             }
         } header: {
             Label("Pinned", systemImage: "pin.fill")
                 .font(.caption)
+        }
+    }
+
+    /// Destination-based link (iOS 15 has no `navigationDestination(for:)`).
+    private func entryLink(_ entry: LogEntry) -> some View {
+        NavigationLink {
+            LogDetailView(entry: entry, decodeErrors: model.decodeIndex.errors(for: entry))
+        } label: {
+            logRow(entry)
         }
     }
 
@@ -166,14 +172,14 @@ public struct OlafViewerView: View {
     private var historyList: some View {
         let sessions = model.sessionGroups
         if sessions.isEmpty && !model.hasMoreHistory {
-            ContentUnavailableView("No history sessions", systemImage: "clock.arrow.circlepath", description: Text("No logs found from previous sessions."))
+            EmptyStateView("No history sessions", systemImage: "clock.arrow.circlepath", description: Text("No logs found from previous sessions."))
                 .frame(maxHeight: .infinity)
         } else {
             List {
                 ForEach(sessions) { session in
                     Section {
                         ForEach(session.entries) { entry in
-                            NavigationLink(value: entry) { logRow(entry) }
+                            entryLink(entry)
                         }
                     } header: {
                         sessionHeader(session)
@@ -184,9 +190,6 @@ public struct OlafViewerView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationDestination(for: LogEntry.self) { entry in
-                LogDetailView(entry: entry, decodeErrors: model.decodeIndex.errors(for: entry))
-            }
         }
     }
 

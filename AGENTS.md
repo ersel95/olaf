@@ -3,7 +3,7 @@
 When an AI agent receives an "integrate Olaf" command, it follows **this file**. The steps are mechanical and sequential.
 
 ## Prerequisites
-- Target: an iOS 17+ app.
+- Target: an iOS 15+ app.
 - Olaf package: `https://github.com/ersel95/olaf`
 - Single product: `Olaf` (engine + network capture + viewer all included).
 - External diagnostics tools can be added on the host side via the generic `ExternalToolBridge` (the package is not tied to any external tool).

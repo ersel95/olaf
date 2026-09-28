@@ -30,7 +30,7 @@ struct MockVariantsView: View {
                 .listStyle(.insetGrouped)
                 .navigationTitle(endpoint.method.map { "\($0) mock" } ?? "Mock")
             } else {
-                ContentUnavailableView("Endpoint removed", systemImage: "questionmark.circle")
+                EmptyStateView("Endpoint removed", systemImage: "questionmark.circle")
             }
         }
         .navigationBarTitleDisplayMode(.inline)

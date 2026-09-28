@@ -11,10 +11,10 @@ struct NetworkStatsView: View {
     private var stats: NetworkStats { NetworkStats.compute(from: entries) }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Group {
                 if stats.totalRequests == 0 {
-                    ContentUnavailableView(
+                    EmptyStateView(
                         "No network entries",
                         systemImage: "chart.bar",
                         description: Text("No network requests were found in the visible list to compute statistics from.")
@@ -37,16 +37,16 @@ struct NetworkStatsView: View {
         let stats = self.stats
         return List {
             Section("Summary") {
-                LabeledContent("Total requests", value: "\(stats.totalRequests)")
-                LabeledContent("Errors", value: "\(stats.failureCount) (%\(stats.failurePercent))")
+                LabeledRow("Total requests", value: "\(stats.totalRequests)")
+                LabeledRow("Errors", value: "\(stats.failureCount) (%\(stats.failurePercent))")
                 if stats.cancelledCount > 0 {
-                    LabeledContent("Cancelled", value: "\(stats.cancelledCount)")
+                    LabeledRow("Cancelled", value: "\(stats.cancelledCount)")
                 }
-                if let ms = stats.averageDurationMs { LabeledContent("Average duration", value: "\(ms) ms") }
-                if let ms = stats.medianDurationMs { LabeledContent("Median duration", value: "\(ms) ms") }
-                if let ms = stats.p95DurationMs { LabeledContent("p95 duration", value: "\(ms) ms") }
-                LabeledContent("Request size", value: Formatting.byteCount(stats.totalRequestBytes))
-                LabeledContent("Response size", value: Formatting.byteCount(stats.totalResponseBytes))
+                if let ms = stats.averageDurationMs { LabeledRow("Average duration", value: "\(ms) ms") }
+                if let ms = stats.medianDurationMs { LabeledRow("Median duration", value: "\(ms) ms") }
+                if let ms = stats.p95DurationMs { LabeledRow("p95 duration", value: "\(ms) ms") }
+                LabeledRow("Request size", value: Formatting.byteCount(stats.totalRequestBytes))
+                LabeledRow("Response size", value: Formatting.byteCount(stats.totalResponseBytes))
             }
 
             if !stats.statusClassCounts.isEmpty {
@@ -70,7 +70,7 @@ struct NetworkStatsView: View {
             if !stats.slowest.isEmpty {
                 Section("Slowest requests") {
                     ForEach(Array(stats.slowest.enumerated()), id: \.offset) { _, item in
-                        LabeledContent {
+                        LabeledRow {
                             Text("\(item.durationMs) ms").monospacedDigit()
                         } label: {
                             Text(item.path)

@@ -109,7 +109,7 @@ struct MockEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 nameSection
                 matchSection
@@ -156,13 +156,13 @@ struct MockEditorView: View {
     private var matchSection: some View {
         if isEditingExisting {
             Section {
-                LabeledContent("URL fragment") {
+                LabeledRow("URL fragment") {
                     Text(urlContains)
                         .font(.callout.monospaced())
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                LabeledContent("Method", value: sourceMethod ?? "All")
+                LabeledRow("Method", value: sourceMethod ?? "All")
             } header: {
                 Text("Match")
             } footer: {
@@ -195,7 +195,7 @@ struct MockEditorView: View {
 
             switch mode {
             case .response:
-                LabeledContent("Status code") {
+                LabeledRow("Status code") {
                     TextField("200", text: $statusText)
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.trailing)
@@ -226,7 +226,7 @@ struct MockEditorView: View {
 
     private var simulationSection: some View {
         Section {
-            LabeledContent("Delay (sec)") {
+            LabeledRow("Delay (sec)") {
                 TextField("0", text: $delayText)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.trailing)

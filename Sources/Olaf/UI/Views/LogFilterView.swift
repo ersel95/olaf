@@ -7,7 +7,7 @@ struct LogFilterView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             Form {
                 Section("Scope") {
                     Picker("Entries", selection: Binding(

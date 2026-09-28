@@ -311,7 +311,7 @@ struct LogDetailView: View {
 
     @ViewBuilder
     private func kv(_ key: String, _ value: String, mono: Bool = false) -> some View {
-        LabeledContent {
+        LabeledRow {
             Text(value)
                 .font(mono ? .callout.monospaced() : .callout)
                 .foregroundStyle(.secondary)

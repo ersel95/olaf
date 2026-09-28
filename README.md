@@ -14,7 +14,7 @@
   <a href="https://github.com/ersel95/olaf/releases"><img src="https://img.shields.io/github/v/tag/ersel95/olaf?filter=!android-*&label=iOS&color=blue" alt="iOS release"></a>
   <a href="https://github.com/ersel95/olaf/releases"><img src="https://img.shields.io/github/v/tag/ersel95/olaf?filter=android-*&label=Android&color=green" alt="Android release"></a>
   <img src="https://img.shields.io/badge/Swift-5.9%2B-orange.svg" alt="Swift 5.9+">
-  <img src="https://img.shields.io/badge/platform-iOS%2017%2B-blue.svg" alt="iOS 17+">
+  <img src="https://img.shields.io/badge/platform-iOS%2015%2B-blue.svg" alt="iOS 15+">
   <img src="https://img.shields.io/badge/SPM-compatible-brightgreen.svg" alt="Swift Package Manager">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey.svg" alt="MIT License"></a>
 </p>
@@ -136,7 +136,7 @@ stored logs reach a production APK.
 
 | Platform | Language | Toolchain | Dependencies |
 |---|---|---|---|
-| iOS 17+ (viewer) · macOS 14+ (engine, tests) | Swift 5.9+ | Xcode 15+ | **None** |
+| iOS 15+ (viewer) · macOS 14+ (engine, tests) | Swift 5.9+ | Xcode 15+ | **None** |
 | Android, minSdk 26 · compileSdk 36 | Kotlin 2.1+ | Java 17 | OkHttp, Compose (UI/Material3), Coroutines |
 
 No Hilt, no Room, no reflection, no annotation processing on either side.

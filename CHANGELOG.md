@@ -3,6 +3,15 @@
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/); versioning follows SemVer
 (0.x — API not yet stable). For older versions, see the git tag history.
 
+## [0.55.0] — 2026-09-28
+### Changed
+- The minimum iOS version drops from **17 to 15**. Only the viewer used newer APIs; the engine and
+  network capture already ran on iOS 15. The viewer now goes through small internal back-ports —
+  `NavigationStack`, `ContentUnavailableView` and `LabeledContent` are used natively where the OS
+  has them and replaced by equivalents on older versions — so nothing changes on iOS 17+.
+- Log rows open their detail via destination-based `NavigationLink`s instead of
+  `navigationDestination(for:)`, which iOS 15 lacks. No public API changed.
+
 ## [0.54.0] — 2026-08-05
 ### Added
 - Optional masking, for hosts that want capture in a live-like environment without the values.

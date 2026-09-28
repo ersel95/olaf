@@ -19,7 +19,7 @@ struct MockListView: View {
     @State private var scenarioName = ""
 
     var body: some View {
-        NavigationStack {
+        CompatNavigationStack {
             List {
                 globalSection
                 endpointsSection

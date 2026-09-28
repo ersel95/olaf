@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "Olaf",
     platforms: [
-        .iOS(.v17),
+        .iOS(.v15),
         .macOS(.v14) // The engine is UIKit-free, so it also compiles/tests on macOS
     ],
     products: [
